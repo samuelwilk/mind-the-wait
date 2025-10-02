@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+docker compose exec -T php composer cs-fix
+git add -A
