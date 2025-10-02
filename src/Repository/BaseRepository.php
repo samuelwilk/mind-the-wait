@@ -10,8 +10,12 @@ use Doctrine\ORM\EntityNotFoundException;
 use Doctrine\ORM\Tools\Pagination\Paginator;
 use Doctrine\Persistence\ManagerRegistry;
 
+use function count;
+use function sprintf;
+
 /**
  * @template T of object
+ *
  * @extends ServiceEntityRepository<T>
  */
 abstract class BaseRepository extends ServiceEntityRepository
@@ -68,15 +72,19 @@ abstract class BaseRepository extends ServiceEntityRepository
     {
         $entity = $this->find($id);
         if (!$entity) {
-            throw new EntityNotFoundException(sprintf('%s(%s) not found', $this->getClassName(), (string)$id));
+            throw new EntityNotFoundException(sprintf('%s(%s) not found', $this->getClassName(), (string) $id));
         }
+
         return $entity;
     }
 
     /**
      * Wrap a unit of work in a transaction.
+     *
      * @template R
+     *
      * @param callable():R $fn
+     *
      * @return R
      */
     public function transactional(callable $fn): mixed
@@ -87,6 +95,7 @@ abstract class BaseRepository extends ServiceEntityRepository
 
     /**
      * @param \Doctrine\ORM\QueryBuilder $qb
+     *
      * @return array{items: list<object>, total: int}
      */
     public function paginate($qb, int $page = 1, int $perPage = 25): array
@@ -95,8 +104,8 @@ abstract class BaseRepository extends ServiceEntityRepository
         $qb->setFirstResult($first)->setMaxResults($perPage);
 
         $paginator = new Paginator($qb, true);
-        $items = iterator_to_array($paginator);
-        $total = count($paginator);
+        $items     = iterator_to_array($paginator);
+        $total     = count($paginator);
 
         return ['items' => $items, 'total' => $total];
     }

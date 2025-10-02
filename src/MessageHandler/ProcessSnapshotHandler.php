@@ -6,10 +6,14 @@ use App\Message\ProcessSnapshot;
 use Predis\ClientInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
+use const JSON_UNESCAPED_UNICODE;
+
 #[AsMessageHandler]
 final readonly class ProcessSnapshotHandler
 {
-    public function __construct(private ClientInterface $redis) {}
+    public function __construct(private ClientInterface $redis)
+    {
+    }
 
     public function __invoke(ProcessSnapshot $m): void
     {

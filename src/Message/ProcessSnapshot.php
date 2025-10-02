@@ -8,7 +8,8 @@ final class ProcessSnapshot
 {
     public function __construct(
         public GtfsKindEnum $kind,
-        public array        $payload,
-        public int          $headerTs
-    ) {}
+        public array $payload,
+        public int $headerTs,
+    ) {
+    }
 }

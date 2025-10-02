@@ -83,6 +83,8 @@
         "symfony/polyfill-php82": "*"
     },
     "scripts": {
+        "cs-check": "php-cs-fixer fix --dry-run --diff --allow-risky=yes",
+        "cs-fix": "php-cs-fixer fix --allow-risky=yes",
         "auto-scripts": {
             "cache:clear": "symfony-cmd",
             "assets:install %PUBLIC_DIR%": "symfony-cmd",
@@ -105,6 +107,7 @@
         }
     },
     "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.64",
         "phpunit/phpunit": "^12.3",
         "symfony/browser-kit": "7.3.*",
         "symfony/css-selector": "7.3.*",

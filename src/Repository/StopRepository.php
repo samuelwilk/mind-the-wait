@@ -24,16 +24,17 @@ class StopRepository extends BaseRepository
 
     /**
      * @return array<string,int> map gtfsId => internal id
+     *
      * @throws Exception
      */
     public function idMapByGtfsId(): array
     {
         $conn = $this->getEntityManager()->getConnection();
         $rows = $conn->fetchAllAssociative('SELECT id, gtfs_id FROM stops');
-        $map = [];
+        $map  = [];
 
         foreach ($rows as $r) {
-            $map[$r['gtfs_id']] = (int)$r['id'];
+            $map[$r['gtfs_id']] = (int) $r['id'];
         }
 
         return $map;

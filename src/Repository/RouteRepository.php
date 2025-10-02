@@ -30,6 +30,7 @@ class RouteRepository extends BaseRepository
         foreach ($all as $r) {
             $out[$r->getGtfsId()] = $r;
         }
+
         return $out;
     }
 

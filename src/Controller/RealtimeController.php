@@ -8,9 +8,16 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Annotation\Route;
 
+use function function_exists;
+
+use const JSON_INVALID_UTF8_SUBSTITUTE;
+use const JSON_UNESCAPED_UNICODE;
+
 final class RealtimeController extends AbstractController
 {
-    public function __construct(private readonly RealtimeRepository $rt) {}
+    public function __construct(private readonly RealtimeRepository $rt)
+    {
+    }
 
     #[Route('/api/realtime', name: 'api_realtime', methods: ['GET'])]
     public function realtime(): JsonResponse
@@ -18,8 +25,8 @@ final class RealtimeController extends AbstractController
         return $this->json(
             $this->rt->snapshot(),
             200,
-            ['Content-Type' => 'application/json'],
-            ['json_encode_options' => \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE]
+            ['Content-Type'        => 'application/json'],
+            ['json_encode_options' => JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE]
         );
     }
 
@@ -41,7 +48,7 @@ final class RealtimeController extends AbstractController
                 $snap = $this->rt->snapshot();
                 if ($snap['ts'] > $last) {
                     echo "event: snapshot\n";
-                    echo 'data: ' . json_encode($snap, JSON_UNESCAPED_UNICODE) . "\n\n";
+                    echo 'data: '.json_encode($snap, JSON_UNESCAPED_UNICODE)."\n\n";
                     @ob_flush();
                     @flush();
                     $last = $snap['ts'];

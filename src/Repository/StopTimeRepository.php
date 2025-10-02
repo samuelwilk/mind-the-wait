@@ -25,12 +25,16 @@ class StopTimeRepository extends BaseRepository
 
     /**
      * Bulk insert stop_times (trip_id, stop_id, stop_sequence, arrival_time, departure_time).
+     *
      * @param list<array{trip:int,stop:int,seq:int,arr:?int,dep:?int}> $rows
+     *
      * @throws Exception
      */
     public function bulkInsert(array $rows): void
     {
-        if (!$rows) return;
+        if (!$rows) {
+            return;
+        }
 
         $sql = 'INSERT INTO stop_times (trip_id, stop_id, stop_sequence, arrival_time, departure_time)
                 VALUES (:trip, :stop, :seq, :arr, :dep)

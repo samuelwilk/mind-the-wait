@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Command;
 
 use App\Enum\GtfsKindEnum;
@@ -13,7 +14,10 @@ use Symfony\Component\Messenger\Stamp\DelayStamp;
 #[AsCommand(name: 'app:gtfs:tick', description: 'Enqueue GTFS-RT polls')]
 final class TickGtfsCommand extends Command
 {
-    public function __construct(private MessageBusInterface $bus) { parent::__construct(); }
+    public function __construct(private MessageBusInterface $bus)
+    {
+        parent::__construct();
+    }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
@@ -26,6 +30,7 @@ final class TickGtfsCommand extends Command
         foreach ($delays as $kind => $ms) {
             $this->bus->dispatch(new PollGtfs(GtfsKindEnum::from($kind)), [new DelayStamp($ms)]);
         }
+
         return Command::SUCCESS;
     }
 }

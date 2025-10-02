@@ -15,8 +15,9 @@ final readonly class PollGtfsHandler
     public function __construct(
         private HttpClientInterface $http,
         private MessageBusInterface $bus,
-        private LoggerInterface     $log,
-    ) {}
+        private LoggerInterface $log,
+    ) {
+    }
 
     public function __invoke(PollGtfs $m): void
     {
@@ -25,6 +26,7 @@ final readonly class PollGtfsHandler
         $url = $_ENV[$env] ?? null;
         if (!$url) {
             $this->log->debug('No URL for kind', ['kind' => $m->kind->value]);
+
             return;
         }
 
@@ -35,14 +37,15 @@ final readonly class PollGtfsHandler
 
         if (200 !== $res->getStatusCode()) {
             $this->log->warning('poll status != 200', [
-                'kind' => $m->kind->value,
-                'status' => $res->getStatusCode()
+                'kind'   => $m->kind->value,
+                'status' => $res->getStatusCode(),
             ]);
+
             return;
         }
 
-        $json = $res->toArray(false);
-        $headerTs = (int)($json['ts'] ?? time());
+        $json     = $res->toArray(false);
+        $headerTs = (int) ($json['ts'] ?? time());
         $payload  = $json['data'] ?? ($json['vehicles'] ?? $json ?? []);
 
         $this->bus->dispatch(new ProcessSnapshot($m->kind, $payload, $headerTs));

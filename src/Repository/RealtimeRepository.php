@@ -4,12 +4,19 @@ namespace App\Repository;
 
 use Predis\ClientInterface;
 
+use function is_array;
+
+use const JSON_THROW_ON_ERROR;
+
 final readonly class RealtimeRepository
 {
-    public function __construct(private ClientInterface $redis) {}
+    public function __construct(private ClientInterface $redis)
+    {
+    }
 
     /**
      * Return a stable payload for the API.
+     *
      * @return array{ts:int, vehicles:array, trips:array, alerts:array}
      */
     public function snapshot(): array
@@ -22,13 +29,13 @@ final readonly class RealtimeRepository
         $trips    = $this->safeJsonDecode($tri['json'] ?? '[]');
         $alerts   = $this->safeJsonDecode($alt['json'] ?? '[]');
 
-        $ts = max((int)($veh['ts'] ?? 0), (int)($tri['ts'] ?? 0), (int)($alt['ts'] ?? 0));
+        $ts = max((int) ($veh['ts'] ?? 0), (int) ($tri['ts'] ?? 0), (int) ($alt['ts'] ?? 0));
 
         return [
             'ts'       => $ts,
             'vehicles' => is_array($vehicles) ? $vehicles : [],
-            'trips'    => is_array($trips)    ? $trips    : [],
-            'alerts'   => is_array($alerts)   ? $alerts   : [],
+            'trips'    => is_array($trips) ? $trips : [],
+            'alerts'   => is_array($alerts) ? $alerts : [],
         ];
     }
 
@@ -41,8 +48,9 @@ final readonly class RealtimeRepository
             return ['redis' => 'down', 'error' => $e->getMessage()];
         }
 
-        $vehTs = (int)($this->redis->hget('mtw:vehicles', 'ts') ?: 0);
-        return ['redis' => (string)$pong, 'rtTs' => $vehTs];
+        $vehTs = (int) ($this->redis->hget('mtw:vehicles', 'ts') ?: 0);
+
+        return ['redis' => (string) $pong, 'rtTs' => $vehTs];
     }
 
     private function safeJsonDecode(string $json): mixed
