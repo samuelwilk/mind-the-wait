@@ -67,6 +67,7 @@ services:
     restart: unless-stopped
 
   worker:
+    profiles: ["queue"] # docker compose --profile queue up -d worker
     build:
       context: .
       dockerfile: docker/Dockerfile

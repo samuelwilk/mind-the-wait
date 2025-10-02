@@ -22,8 +22,14 @@ framework:
             messenger.bus.default: ~
 
         routing:
-            Symfony\Component\Mailer\Messenger\SendEmailMessage: async
-            Symfony\Component\Notifier\Message\ChatMessage: async
-            Symfony\Component\Notifier\Message\SmsMessage: async
-            # App\Message\PollGtfs: async
-            App\Message\ProcessSnapshot: async
+            routing:
+                # Route framework messages to the in-process (synchronous) transport.
+                # This avoids needing a background worker while keeping features functional.
+                Symfony\Component\Mailer\Messenger\SendEmailMessage: 'sync://'   # send emails inline (no queue)
+                Symfony\Component\Notifier\Message\ChatMessage: 'sync://'        # send chat notifications inline
+                Symfony\Component\Notifier\Message\SmsMessage: 'sync://'         # send SMS inline
+
+                # Our app messages: handle immediately to keep dev stack simple.
+                # If/when these become heavy, switch to "async" and run a worker.
+                App\Message\ProcessSnapshot: 'sync://'                           # lightweight; safe to run inline
+                # App\Message\PollGtfs: 'sync://'                                # only if still dispatched anywhere
