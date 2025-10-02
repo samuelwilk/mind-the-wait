@@ -23,7 +23,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile
     environment:
-      APP_ENV: dev
+      APP_ENV: ${APP_ENV}
       COMPOSER_HOME: /tmp
     volumes:
       - ./:/var/www/app:cached
@@ -41,6 +41,62 @@ services:
       - ./docker/certs:/etc/nginx/certs:ro
     depends_on:
       - php
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  pyparser:
+    build:
+      context: .
+      dockerfile: docker/pyparser.Dockerfile
+    environment:
+      REDIS_URL: redis://redis:6379
+      VEH_URL: "https://saskprdtmgtfs.sasktrpcloud.com/TMGTFSRealTimeWebService/Vehicle/VehiclePositions.pb"
+      TRIP_URL: "https://saskprdtmgtfs.sasktrpcloud.com/TMGTFSRealTimeWebService/TripUpdate/TripUpdates.pb"
+      ALERT_URL: "https://saskprdtmgtfs.sasktrpcloud.com/TMGTFSRealTimeWebService/Alert/Alerts.pb"
+      POLL_SEC: "12"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    depends_on:
+      - php
+      - redis
+    working_dir: /var/www/app
+    # was: "php bin/console messenger:consume redis -vv"
+    command: bash -lc "php bin/console messenger:consume async -vv --time-limit=3600 --memory-limit=256M --sleep=1"
+    volumes:
+      - ./:/var/www/app:cached
+    environment:
+      APP_ENV: ${APP_ENV}
+      # This is optional because Symfony loads .env.local inside the container,
+      # but it doesn't hurt to be explicit for the worker:
+      MESSENGER_TRANSPORT_DSN: ${MESSENGER_TRANSPORT_DSN}
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    depends_on:
+      - php
+      - redis
+    working_dir: /var/www/app
+    command: bash -lc 'while true; do php bin/console app:score:tick || true; sleep 30; done'
+    volumes:
+      - ./:/var/www/app:cached
+    environment:
+      APP_ENV: ${APP_ENV}
 
 volumes:
   ###> doctrine/doctrine-bundle ###
