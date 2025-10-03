@@ -127,4 +127,11 @@ abstract class BaseRepository extends ServiceEntityRepository
     {
         return $this->getClassMetadata()->getName();
     }
+
+    public function getTableName(): string
+    {
+        $meta = $this->getClassMetadata();
+
+        return $meta->getTableName();
+    }
 }

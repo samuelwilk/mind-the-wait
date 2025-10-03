@@ -24,7 +24,7 @@ class StopTimeRepository extends BaseRepository
     }
 
     /**
-     * Bulk insert stop_times (trip_id, stop_id, stop_sequence, arrival_time, departure_time).
+     * Bulk insert stop_time (trip_id, stop_id, stop_sequence, arrival_time, departure_time).
      *
      * @param list<array{trip:int,stop:int,seq:int,arr:?int,dep:?int}> $rows
      *
@@ -36,17 +36,38 @@ class StopTimeRepository extends BaseRepository
             return;
         }
 
-        $sql = 'INSERT INTO stop_times (trip_id, stop_id, stop_sequence, arrival_time, departure_time)
-                VALUES (:trip, :stop, :seq, :arr, :dep)
-                ON CONFLICT (trip_id, stop_sequence) DO UPDATE
-                SET stop_id = EXCLUDED.stop_id,
-                    arrival_time = EXCLUDED.arrival_time,
-                    departure_time = EXCLUDED.departure_time';
+        $em   = $this->getEntityManager();
+        $conn = $em->getConnection();
+        $plat = $conn->getDatabasePlatform();
 
-        $stmt = $this->connection()->prepare($sql);
+        $table   = $plat->quoteIdentifier($this->getTableName());
+        $colTrip = $plat->quoteIdentifier('trip_id');
+        $colStop = $plat->quoteIdentifier('stop_id');
+        $colSeq  = $plat->quoteIdentifier('stop_sequence');
+        $colArr  = $plat->quoteIdentifier('arrival_time');
+        $colDep  = $plat->quoteIdentifier('departure_time');
+
+        $sql = <<<SQL
+            INSERT INTO {$table} ({$colTrip}, {$colStop}, {$colSeq}, {$colArr}, {$colDep})
+            VALUES (:trip, :stop, :seq, :arr, :dep)
+            ON CONFLICT ({$colTrip}, {$colSeq}) DO UPDATE
+            SET {$colStop} = EXCLUDED.{$colStop},
+                {$colArr}  = EXCLUDED.{$colArr},
+                {$colDep}  = EXCLUDED.{$colDep}
+        SQL;
+
+        $stmt = $conn->prepare($sql);
 
         foreach ($rows as $r) {
-            $stmt->executeStatement($r);
+            // Cast to safe scalar types; DBAL will handle nulls.
+            $params = [
+                'trip' => (int) $r['trip'],
+                'stop' => (int) $r['stop'],
+                'seq'  => (int) $r['seq'],
+                'arr'  => isset($r['arr']) ? (int) $r['arr'] : null,
+                'dep'  => isset($r['dep']) ? (int) $r['dep'] : null,
+            ];
+            $stmt->executeStatement($params);
         }
     }
 }

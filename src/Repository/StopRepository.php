@@ -29,10 +29,12 @@ class StopRepository extends BaseRepository
      */
     public function idMapByGtfsId(): array
     {
-        $conn = $this->getEntityManager()->getConnection();
-        $rows = $conn->fetchAllAssociative('SELECT id, gtfs_id FROM stops');
-        $map  = [];
+        $rows = $this->createQueryBuilder('s')
+            ->select('s.id AS id, s.gtfsId AS gtfs_id')
+            ->getQuery()
+            ->getArrayResult();
 
+        $map = [];
         foreach ($rows as $r) {
             $map[$r['gtfs_id']] = (int) $r['id'];
         }

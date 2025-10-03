@@ -2,6 +2,10 @@
 
 namespace App\Command;
 
+use App\Entity\Route;
+use App\Entity\Stop;
+use App\Entity\StopTime;
+use App\Entity\Trip;
 use App\Enum\DirectionEnum;
 use App\Enum\RouteTypeEnum;
 use App\Repository\RouteRepository;
@@ -24,7 +28,7 @@ use ZipArchive;
 use function count;
 use function sprintf;
 
-#[AsCommand(name: 'app:gtfs:load', description: 'Load static GTFS into DB (routes, trips, stops, stop_times)')]
+#[AsCommand(name: 'app:gtfs:load', description: 'Load static GTFS into DB (route, trip, stop, stop_time)')]
 final class GtfsLoadCommand extends Command
 {
     public function __construct(
@@ -172,12 +176,18 @@ final class GtfsLoadCommand extends Command
     {
         $io->writeln('Truncating tables…');
 
-        $conn = $this->stopTimes->connection();
+        $em   = $this->stopTimes->getEntityManager();
+        $conn = $em->getConnection();
 
-        $conn->executeStatement('TRUNCATE stop_times RESTART IDENTITY CASCADE');
-        $conn->executeStatement('TRUNCATE trips RESTART IDENTITY CASCADE');
-        $conn->executeStatement('TRUNCATE stops RESTART IDENTITY CASCADE');
-        $conn->executeStatement('TRUNCATE routes RESTART IDENTITY CASCADE');
+        $tStopTime = $em->getClassMetadata(StopTime::class)->getTableName();
+        $tTrip     = $em->getClassMetadata(Trip::class)->getTableName();
+        $tStop     = $em->getClassMetadata(Stop::class)->getTableName();
+        $tRoute    = $em->getClassMetadata(Route::class)->getTableName();
+
+        // child → parent to satisfy FKs
+        foreach ([$tStopTime, $tTrip, $tStop, $tRoute] as $t) {
+            $conn->executeStatement(sprintf('TRUNCATE %s RESTART IDENTITY CASCADE', $t));
+        }
     }
 
     /**
