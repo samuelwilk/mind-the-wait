@@ -2,7 +2,7 @@
 
 namespace App\Controller;
 
-use App\Repository\RealtimeRepository;
+use App\Service\Realtime\RealtimeSnapshotService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -15,7 +15,7 @@ use const JSON_UNESCAPED_UNICODE;
 
 final class RealtimeController extends AbstractController
 {
-    public function __construct(private readonly RealtimeRepository $rt)
+    public function __construct(private readonly RealtimeSnapshotService $snapshotService)
     {
     }
 
@@ -23,7 +23,7 @@ final class RealtimeController extends AbstractController
     public function realtime(): JsonResponse
     {
         return $this->json(
-            $this->rt->snapshot(),
+            $this->snapshotService->snapshot(),
             200,
             ['Content-Type'        => 'application/json'],
             ['json_encode_options' => JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE]
@@ -45,7 +45,7 @@ final class RealtimeController extends AbstractController
                     break;
                 }
 
-                $snap = $this->rt->snapshot();
+                $snap = $this->snapshotService->snapshot();
                 if ($snap['ts'] > $last) {
                     echo "event: snapshot\n";
                     echo 'data: '.json_encode($snap, JSON_UNESCAPED_UNICODE)."\n\n";

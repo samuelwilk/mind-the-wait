@@ -39,14 +39,6 @@ cc: ## Clears the symfony cache
 composer-install: ## Installs vendor files via composer
 	@docker compose exec php composer install
 
-##@ Grump
-
-grump-run: ## Run PHP Grump - without having to commit
-	@docker compose exec php ./vendor/bin/grumphp run
-
-grump-init: ## Runs the git:init command to force update the git hooks with any configuration changes
-	@docker compose exec php ./vendor/bin/grumphp git:init
-
 ##@ Database
 
 database: ## Sets up the dev database
@@ -82,14 +74,6 @@ database-migrations-execute-test: ## Runs the current set of migrations against 
 database-migrations-generate: ## Generates a new set of migrations
 	@docker compose exec php bin/console doctrine:migrations:diff
 
-##@ PHPStan
-
-phpstan-baseline-generate: ## generates/updates the baseline file
-	@docker compose exec php vendor/bin/phpstan analyse --generate-baseline
-
-phpstan-run: ## Runs PHPStan
-	@docker compose exec php vendor/bin/phpstan analyse
-
 
 ##@ Linting
 
@@ -102,7 +86,12 @@ cs-fix: ## Automatically apply fixes from php-cs-fixer
 ##@ Tests
 
 test-phpunit: ## Runs PHPUnit
-	@docker compose exec php php vendor/bin/simple-phpunit --configuration phpunit.xml.dist
+	@docker compose exec php vendor/bin/phpunit --configuration phpunit.dist.xml
+
+##@ Application
+
+score-tick: ## Runs the headway scoring cycle once
+	@docker compose exec php bin/console app:score:tick
 
 ##@ Mailpit
 mailpit-delete-all-mail: ## Delete all mail from Mailpit

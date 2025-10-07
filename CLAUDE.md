@@ -31,7 +31,6 @@ make database-migrations-execute   # Run pending migrations
 ```bash
 make cs-fix               # Auto-fix code style with php-cs-fixer
 make cs-dry-run          # Check code style without fixing
-make phpstan-run         # Run static analysis
 make test-phpunit        # Run PHPUnit tests
 ```
 
@@ -44,7 +43,12 @@ docker compose exec php bin/console app:gtfs:load
 docker compose exec php bin/console app:gtfs:tick
 
 # Compute headway scores from realtime vehicle positions
-docker compose exec php bin/console app:score:tick
+make score-tick
+
+# Submit rider feedback (votes: ahead|on_time|late)
+curl -X POST https://localhost/api/vehicle-feedback \
+  -H 'Content-Type: application/json' \
+  -d '{"vehicleId":"veh-1","vote":"late"}'
 ```
 
 ## Architecture
@@ -70,7 +74,8 @@ docker compose exec php bin/console app:score:tick
 
 4. **API Exposure**
    - `/api/score` → returns latest headway scores from Redis (`ScoreController`)
-   - `/api/realtime` → returns raw vehicle/trip/alert snapshot (`RealtimeController`)
+   - `/api/realtime` → returns raw vehicle/trip/alert snapshot enriched with per-vehicle status + feedback (`RealtimeController`)
+   - `/api/vehicle-feedback` → crowd feedback endpoints for punctuality votes (`VehicleFeedbackController`)
 
 ### Key Components
 
@@ -79,10 +84,12 @@ docker compose exec php bin/console app:score:tick
 - `TickGtfsCommand`: Dispatches async messages to poll GTFS-RT feeds (currently disabled; Python sidecar handles this)
 - `ScoreTickCommand`: Orchestrates headway calculation and scoring
 
-**Services:**
-- `VehicleGrouper`: Groups vehicles by route + direction
-- `HeadwayCalculator`: Computes mean headway and assigns A-F grade
-- `HeadwayScorer`: Coordinates grouping + calculation, outputs `ScoreDto[]`
+- **Services:**
+  - `VehicleGrouper`: Groups vehicles by route + direction
+  - `HeadwayCalculator`: Computes mean headway and assigns A-F grade
+  - `HeadwayScorer`: Coordinates grouping + calculation, outputs `ScoreDto[]`
+  - `VehicleStatusService`: Builds red/yellow/green punctuality with feedback + heuristics
+  - `HeuristicTrafficReasonProvider`: Generates placeholder traffic reasons for delays/early running
 
 **Repositories:**
 - `RealtimeRepository`: Redis-backed storage for vehicles, trips, alerts, scores
@@ -99,6 +106,7 @@ docker compose exec php bin/console app:score:tick
 - `mtw:trips` → hash: `{ts: int, json: TripUpdate[]}`
 - `mtw:alerts` → hash: `{ts: int, json: Alert[]}`
 - `mtw:score` → hash: `{ts: int, json: ScoreDto[]}`
+- `mtw:vehicle_feedback:<vehicleId>` → hash storing vote tallies (ahead/on_time/late/total)
 
 ### Container Architecture
 
@@ -151,8 +159,8 @@ MESSENGER_TRANSPORT_DSN=redis://redis:6379/messages
 
 - PHPUnit tests: `make test-phpunit`
 - Code style: `make cs-fix` (uses `.php-cs-fixer.dist.php`)
-- Static analysis: `make phpstan-run`
 - Git hooks configured in `.githooks/` (pre-commit runs cs-fixer)
+- Realtime status coverage lives in `tests/Service/Realtime/VehicleStatusServiceTest.php`.
 
 ## Common Workflows
 
@@ -167,6 +175,9 @@ docker compose exec php bin/console app:gtfs:load --mode=arcgis
 
 **Monitoring realtime scores:**
 ```bash
+# Kick off a manual scoring pass
+make score-tick
+
 # Check Redis for latest scores
 docker compose exec redis redis-cli HGETALL mtw:score
 

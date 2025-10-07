@@ -3,11 +3,9 @@
 namespace App\Repository;
 
 use App\Dto\VehicleDto;
-use App\Enum\DirectionEnum;
 use Predis\ClientInterface;
 
 use function is_array;
-use function is_int;
 
 use const JSON_THROW_ON_ERROR;
 use const JSON_UNESCAPED_UNICODE;
@@ -61,29 +59,11 @@ final readonly class RealtimeRepository
                 continue;
             }
 
-            // Normalize keys from sidecar:
-            // route key is "route", trip key is "trip", timestamp is "ts"
-            $route = $row['route'] ?? $row['route_id'] ?? null;
-            $trip  = $row['trip']  ?? $row['trip_id'] ?? null;
-            $ts    = $row['ts']    ?? $row['timestamp'] ?? null;
-
-            if ($route === null || $trip === null) {
+            $dto = VehicleDto::fromArrayWithDirMap($row, $dirMap);
+            if ($dto === null) {
                 continue;
             }
 
-            $dirInt = $dirMap[(string) $trip] ?? null;
-            // if ($dirInt === null) {
-            //    // If we really want to keep it even without a known dir, we could default to 0:
-            //    // $dirInt = 0;
-            //    // For accuracy, skip when direction is unknown:
-            //    continue;
-            // }
-
-            $dto = new VehicleDto(
-                routeId: (string) $route,
-                direction: $dirInt !== null ? DirectionEnum::from((int) $dirInt) : null,
-                timestamp: is_int($ts) ? $ts : null
-            );
             $out[] = $dto;
         }
 

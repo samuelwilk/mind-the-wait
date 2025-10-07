@@ -18,7 +18,7 @@ use const PHP_FLOAT_MAX;
  * Interpolates vehicle position along route using scheduled stop sequences.
  * This allows proper headway calculation based on route progress, not GPS timestamp deltas.
  */
-final readonly class PositionInterpolator
+final readonly class PositionInterpolator implements CrossingTimeEstimatorInterface
 {
     private const EARTH_RADIUS_KM = 6371.0;
 

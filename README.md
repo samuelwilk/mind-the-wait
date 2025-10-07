@@ -1,51 +1,94 @@
-# Symfony Docker
+# mind-the-wait
 
-A [Docker](https://www.docker.com/)-based installer and runtime for the [Symfony](https://symfony.com) web framework,
-with [FrankenPHP](https://frankenphp.dev) and [Caddy](https://caddyserver.com/) inside!
+Transit headway monitoring for real-world GTFS agencies. The service ingests GTFS static schedules and GTFS-Realtime vehicle feeds, computes observed headways per route/direction, and grades service reliability in near real time. Redis stores the realtime snapshots, Symfony exposes APIs, and a Python sidecar maintains the GTFS-RT cache.
 
-![CI](https://github.com/dunglas/symfony-docker/workflows/CI/badge.svg)
+## Architecture Overview
+
+- **Symfony 7 / FrankenPHP** – Core API and scoring services (`/api/score`, `/api/realtime`).
+- **Doctrine + PostgreSQL** – Stores GTFS static data (routes, trips, stops, stop_times).
+- **Redis (Predis client)** – Caches realtime vehicles, trip updates, alerts, and scores.
+- **Python GTFS-RT sidecar** – Polls protobuf feeds and writes normalized JSON snapshots.
+- **Headway pipeline** – `VehicleGrouper` → `HeadwayCalculator` → `HeadwayScorer` computes observed headways using TripUpdate predictions with interpolation/timestamp fallbacks.
+
+See `CLAUDE.md` and `IMPLEMENTATION_NOTES.md` for deeper component notes.
+
+## Prerequisites
+
+- Docker Desktop or Docker Engine + Compose v2.10+
+- GNU Make
+- `mkcert` (only if you need local HTTPS certificates)
 
 ## Getting Started
 
-1. If not already done, [install Docker Compose](https://docs.docker.com/compose/install/) (v2.10+)
-2. Run `docker compose build --pull --no-cache` to build fresh images
-3. Run `docker compose up --wait` to set up and start a fresh Symfony project
-4. Open `https://localhost` in your favorite web browser and [accept the auto-generated TLS certificate](https://stackoverflow.com/a/15076602/1352334)
-5. Run `docker compose down --remove-orphans` to stop the Docker containers.
+```bash
+make docker-build   # build containers and start detached
+make docker-up      # subsequent starts (no rebuild)
+make docker-down    # stop containers
+make docker-php     # interactive shell inside php container
+```
 
-## Features
+### Environment
 
-- Production, development and CI ready
-- Just 1 service by default
-- Blazing-fast performance thanks to [the worker mode of FrankenPHP](https://github.com/dunglas/frankenphp/blob/main/docs/worker.md) (automatically enabled in prod mode)
-- [Installation of extra Docker Compose services](docs/extra-services.md) with Symfony Flex
-- Automatic HTTPS (in dev and prod)
-- HTTP/3 and [Early Hints](https://symfony.com/blog/new-in-symfony-6-3-early-hints) support
-- Real-time messaging thanks to a built-in [Mercure hub](https://symfony.com/doc/current/mercure.html)
-- [Vulcain](https://vulcain.rocks) support
-- Native [XDebug](docs/xdebug.md) integration
-- Super-readable configuration
+Copy `.env` → `.env.local` (or adjust existing) and provide:
 
-**Enjoy!**
+```
+MTW_GTFS_STATIC_URL=...       # GTFS static ZIP
+MTW_GTFS_STATIC_FALLBACK=...  # optional local mirror
+REDIS_URL=redis://redis:6379
+DATABASE_URL=postgresql://app:app@database:5432/app
+```
 
-## Docs
+## Loading GTFS Data
 
-1. [Options available](docs/options.md)
-2. [Using Symfony Docker with an existing project](docs/existing-project.md)
-3. [Support for extra services](docs/extra-services.md)
-4. [Deploying in production](docs/production.md)
-5. [Debugging with Xdebug](docs/xdebug.md)
-6. [TLS Certificates](docs/tls.md)
-7. [Using MySQL instead of PostgreSQL](docs/mysql.md)
-8. [Using Alpine Linux instead of Debian](docs/alpine.md)
-9. [Using a Makefile](docs/makefile.md)
-10. [Updating the template](docs/updating.md)
-11. [Troubleshooting](docs/troubleshooting.md)
+```bash
+# inside containers via console command
+docker compose exec php bin/console app:gtfs:load --source=/data/agency.zip
+
+# or ArcGIS endpoints if configured in env (.env.local)
+docker compose exec php bin/console app:gtfs:load --mode=arcgis
+```
+
+The `pyparser` service must be running with valid GTFS-RT URLs (`VEH_URL`, `TRIP_URL`, `ALERT_URL`) in `compose.override.yaml` or environment.
+
+## Running the Headway Scoring Loop
+
+```bash
+make score-tick                # manual scoring pass
+docker compose logs -f scheduler   # watch automated ticks (every 30s)
+docker compose exec redis redis-cli HGETALL mtw:score
+curl -s https://localhost/api/realtime | jq '.vehicles[] | {id, status}'
+```
+
+## Vehicle Status & Rider Feedback
+
+- `/api/realtime` now returns per-vehicle punctuality with a red/yellow/green indicator, severity (minor/major/critical), delay in seconds, and optional traffic heuristics.
+- `/api/vehicle-feedback` (POST) accepts `{"vehicleId":"veh-1","vote":"late"}` to crowd-source perception of delays; `GET /api/vehicle-feedback/{vehicleId}` returns aggregated vote totals.
+- Status calculations prioritise GTFS-RT `delay` values for the next upcoming stop; feedback counters reset roughly every 24 hours.
+
+## Testing & Linting
+
+```bash
+make cs-dry-run   # check style
+make cs-fix       # apply style fixes
+make test-phpunit # runs phpunit inside container
+```
+
+## Database Utilities
+
+```bash
+make database                     # drop/create/migrate dev DB
+make database-migrations-generate # generate new migration
+make database-migrations-execute  # apply latest migrations
+
+make database-test                # prepare test DB (drop/create/migrate/fixtures)
+```
+
+## Troubleshooting
+
+- Ensure Redis, PostgreSQL, and pyparser containers are running (`docker compose ps`).
+- If GTFS static imports fail for large feeds, raise PHP memory (`PHP_MEMORY_LIMIT`) and retry.
+- For trip ID mismatches (static vs realtime), reload the static feed and confirm TripUpdate data aligns (see `IMPLEMENTATION_NOTES.md`).
 
 ## License
 
-Symfony Docker is available under the MIT License.
-
-## Credits
-
-Created by [Kévin Dunglas](https://dunglas.dev), co-maintained by [Maxime Helias](https://twitter.com/maxhelias) and sponsored by [Les-Tilleuls.coop](https://les-tilleuls.coop).
+This project inherits the MIT license from the Symfony Docker template. See `LICENSE` (if present) for details.

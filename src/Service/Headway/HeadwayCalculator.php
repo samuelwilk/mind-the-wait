@@ -8,18 +8,24 @@ use App\Dto\VehicleDto;
 use App\Enum\ScoreGradeEnum;
 
 use function count;
+use function max;
+use function sort;
+use function time;
+use function usort;
 
 final readonly class HeadwayCalculator
 {
+    private const PAST_ARRIVAL_GRACE_SEC = 60;
+
     public function __construct(
-        private PositionInterpolator $interpolator,
+        private CrossingTimeEstimatorInterface $interpolator,
+        private StopTimeProviderInterface $realtimeStopTimes,
     ) {
     }
 
     /**
-     * Calculate observed headway using position-based interpolation.
-     * Estimates when each vehicle will cross a reference point (midpoint of route)
-     * and calculates time deltas at that common point.
+     * Calculate observed headway using realtime TripUpdate predictions when available.
+     * Falls back to position interpolation and raw timestamps if predictions are missing.
      *
      * @param list<VehicleDto> $vehicles
      */
@@ -27,6 +33,12 @@ final readonly class HeadwayCalculator
     {
         if (count($vehicles) < 2) {
             return null;
+        }
+
+        // Prefer predictive headways from GTFS-RT TripUpdate feed
+        $predictedArrivals = $this->collectUpcomingArrivals($vehicles);
+        if (count($predictedArrivals) >= 2) {
+            return $this->calculateMedianHeadway($predictedArrivals);
         }
 
         // Try position-based calculation first
@@ -56,6 +68,94 @@ final readonly class HeadwayCalculator
         }
 
         return $this->calculateMedianHeadway($times);
+    }
+
+    /**
+     * Gather the next predicted arrival times (absolute seconds) for vehicles that share an upcoming stop.
+     *
+     * @param list<VehicleDto> $vehicles
+     *
+     * @return list<int>
+     */
+    private function collectUpcomingArrivals(array $vehicles): array
+    {
+        $byStop = [];
+        $now    = time();
+
+        foreach ($vehicles as $vehicle) {
+            if ($vehicle->tripId === null) {
+                continue;
+            }
+
+            $stopTimes = $this->realtimeStopTimes->getStopTimesForTrip($vehicle->tripId);
+            if ($stopTimes === null) {
+                continue;
+            }
+
+            $referenceTs = max($vehicle->timestamp ?? 0, $now);
+            $nextStop    = $this->findNextUpcomingStop($stopTimes, $referenceTs);
+            if ($nextStop === null) {
+                continue;
+            }
+
+            $byStop[$nextStop['stop_id']] ??= [];
+            $byStop[$nextStop['stop_id']][] = $nextStop['time'];
+        }
+
+        if ($byStop === []) {
+            return [];
+        }
+
+        $candidates = [];
+        foreach ($byStop as $stopId => $times) {
+            if (count($times) < 2) {
+                continue;
+            }
+
+            sort($times);
+            $candidates[] = [
+                'stop'      => $stopId,
+                'times'     => $times,
+                'reference' => $times[0],
+            ];
+        }
+
+        if ($candidates === []) {
+            return [];
+        }
+
+        usort($candidates, static fn (array $a, array $b) => $a['reference'] <=> $b['reference']);
+
+        /** @var list<int> */
+        $selected = $candidates[0]['times'];
+
+        return $selected;
+    }
+
+    /**
+     * @param list<array{stop_id: string, seq: int, arr: int|null, dep: int|null}> $stopTimes
+     *
+     * @return array{stop_id: string, time: int}|null
+     */
+    private function findNextUpcomingStop(array $stopTimes, int $referenceTs): ?array
+    {
+        foreach ($stopTimes as $stop) {
+            $time = $stop['arr'] ?? $stop['dep'] ?? null;
+            if ($time === null) {
+                continue;
+            }
+
+            if ($time < $referenceTs - self::PAST_ARRIVAL_GRACE_SEC) {
+                continue;
+            }
+
+            return [
+                'stop_id' => (string) $stop['stop_id'],
+                'time'    => (int) $time,
+            ];
+        }
+
+        return null;
     }
 
     /**

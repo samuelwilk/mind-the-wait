@@ -12,7 +12,7 @@ use function count;
  * Provides stop_time data from GTFS-RT TripUpdate feed when static data is unavailable.
  * This allows position-based headway calculation even when trip IDs don't match static GTFS.
  */
-final readonly class RealtimeStopTimeProvider
+final readonly class RealtimeStopTimeProvider implements StopTimeProviderInterface
 {
     public function __construct(
         private RealtimeRepository $realtimeRepo,
@@ -24,7 +24,7 @@ final readonly class RealtimeStopTimeProvider
      *
      * @param string $tripId GTFS trip_id
      *
-     * @return list<array{stop_id: string, seq: int, arr: int|null, dep: int|null}>|null
+     * @return list<array{stop_id: string, seq: int, arr: int|null, dep: int|null, delay: int|null}>|null
      */
     public function getStopTimesForTrip(string $tripId): ?array
     {
