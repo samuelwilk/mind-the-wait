@@ -53,7 +53,22 @@ class TripRepository extends BaseRepository
 
         $map = [];
         foreach ($rows as $r) {
-            $map[$r['gtfs_id']] = (int) $r['id'];
+            $map[(string) $r['gtfs_id']] = (int) $r['id'];
+        }
+
+        return $map;
+    }
+
+    public function directionMapByGtfsId(): array
+    {
+        $qb = $this->createQueryBuilder('t')
+            ->select('t.gtfsId, t.direction');
+
+        $results = $qb->getQuery()->getArrayResult();
+
+        $map = [];
+        foreach ($results as $row) {
+            $map[(string) $row['gtfsId']] = (int) $row['direction']->value;
         }
 
         return $map;

@@ -2,15 +2,19 @@
 
 namespace App\Repository;
 
+use App\Dto\VehicleDto;
+use App\Enum\DirectionEnum;
 use Predis\ClientInterface;
 
 use function is_array;
+use function is_int;
 
 use const JSON_THROW_ON_ERROR;
+use const JSON_UNESCAPED_UNICODE;
 
 final readonly class RealtimeRepository
 {
-    public function __construct(private ClientInterface $redis)
+    public function __construct(private ClientInterface $redis, private readonly TripRepository $tripRepository)
     {
     }
 
@@ -37,6 +41,79 @@ final readonly class RealtimeRepository
             'trips'    => is_array($trips) ? $trips : [],
             'alerts'   => is_array($alerts) ? $alerts : [],
         ];
+    }
+
+    /** @return list<VehicleDto> */
+    public function getVehicles(): array
+    {
+        $h   = $this->redis->hgetall('mtw:vehicles');
+        $arr = isset($h['json']) ? json_decode($h['json'], true) : [];
+        if (!is_array($arr)) {
+            return [];
+        }
+
+        // Build trip_id -> direction map once
+        $dirMap = $this->tripRepository->directionMapByGtfsId();
+
+        $out = [];
+        foreach ($arr as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            // Normalize keys from sidecar:
+            // route key is "route", trip key is "trip", timestamp is "ts"
+            $route = $row['route'] ?? $row['route_id'] ?? null;
+            $trip  = $row['trip']  ?? $row['trip_id'] ?? null;
+            $ts    = $row['ts']    ?? $row['timestamp'] ?? null;
+
+            if ($route === null || $trip === null) {
+                continue;
+            }
+
+            $dirInt = $dirMap[(string) $trip] ?? null;
+            // if ($dirInt === null) {
+            //    // If we really want to keep it even without a known dir, we could default to 0:
+            //    // $dirInt = 0;
+            //    // For accuracy, skip when direction is unknown:
+            //    continue;
+            // }
+
+            $dto = new VehicleDto(
+                routeId: (string) $route,
+                direction: $dirInt !== null ? DirectionEnum::from((int) $dirInt) : null,
+                timestamp: is_int($ts) ? $ts : null
+            );
+            $out[] = $dto;
+        }
+
+        return $out;
+    }
+
+    public function getVehiclesTimestamps(): int
+    {
+        $h = $this->redis->hgetall('mtw:vehicles');
+
+        return (int) ($h['ts'] ?? 0);
+    }
+
+    /** @param list<array<string,mixed>> $rows */
+    public function saveScores(int $ts, array $rows): void
+    {
+        $this->redis->hset('mtw:score', 'ts', (string) $ts);
+        $this->redis->hset('mtw:score', 'json', json_encode($rows, JSON_UNESCAPED_UNICODE));
+    }
+
+    /** @return array{ts:int,items:list<array<string,mixed>>} */
+    public function readScores(): array
+    {
+        $h     = $this->redis->hgetall('mtw:score');
+        $items = isset($h['json']) ? json_decode($h['json'], true) : [];
+        if (!is_array($items)) {
+            $items = [];
+        }
+
+        return ['ts' => (int) ($h['ts'] ?? 0), 'items' => $items];
     }
 
     /** Quick health info for /healthz or logs */

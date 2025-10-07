@@ -25,13 +25,14 @@ class RouteRepository extends BaseRepository
     /** @return array<string, Route> keyed by gtfsId */
     public function mapByGtfsId(): array
     {
-        $all = $this->createQueryBuilder('r')->getQuery()->getResult();
-        $out = [];
-        foreach ($all as $r) {
-            $out[$r->getGtfsId()] = $r;
+        $routes = $this->findAll();
+        $map    = [];
+
+        foreach ($routes as $r) {
+            $map[(string) $r->getGtfsId()] = $r;
         }
 
-        return $out;
+        return $map;
     }
 
     public function upsert(string $gtfsId, ?string $shortName, ?string $longName, ?string $colour, ?RouteTypeEnum $type): Route

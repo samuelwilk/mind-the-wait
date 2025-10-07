@@ -36,7 +36,7 @@ class StopRepository extends BaseRepository
 
         $map = [];
         foreach ($rows as $r) {
-            $map[$r['gtfs_id']] = (int) $r['id'];
+            $map[(string) $r['gtfs_id']] = (int) $r['id'];
         }
 
         return $map;

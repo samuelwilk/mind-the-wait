@@ -23,3 +23,7 @@
 /.php-cs-fixer.php
 /.php-cs-fixer.cache
 ###< friendsofphp/php-cs-fixer ###
+
+# Documentation (can add later if needed)
+CLAUDE.md
+IMPLEMENTATION_NOTES.md

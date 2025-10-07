@@ -2,16 +2,21 @@
 
 namespace App\Command;
 
+use App\Config\GtfsConfig;
 use App\Entity\Route;
 use App\Entity\Stop;
 use App\Entity\StopTime;
 use App\Entity\Trip;
 use App\Enum\DirectionEnum;
+use App\Enum\GtfsSourceEnum;
 use App\Enum\RouteTypeEnum;
+use App\Factory\GtfsConfigFactory;
 use App\Repository\RouteRepository;
 use App\Repository\StopRepository;
 use App\Repository\StopTimeRepository;
 use App\Repository\TripRepository;
+use App\Service\GtfsFeatureAdapter;
+use App\Util\GtfsTimeUtils;
 use Doctrine\DBAL\Exception;
 use League\Csv\Reader;
 use League\Csv\UnavailableStream;
@@ -31,28 +36,48 @@ use function sprintf;
 #[AsCommand(name: 'app:gtfs:load', description: 'Load static GTFS into DB (route, trip, stop, stop_time)')]
 final class GtfsLoadCommand extends Command
 {
+    private const ARCGIS_PAGE_SIZE = 1000;
+    private const ARCGIS_MAX_PAGES = 2000;
+
     public function __construct(
         private readonly RouteRepository $routes,
         private readonly StopRepository $stops,
         private readonly TripRepository $trips,
         private readonly StopTimeRepository $stopTimes,
         private readonly HttpClientInterface $http,
+        private readonly GtfsConfigFactory $configFactory,
     ) {
         parent::__construct();
     }
 
     protected function configure(): void
     {
-        $this->addOption('source', null, InputOption::VALUE_REQUIRED, 'Local path or URL of GTFS zip');
+        $this->addOption('source', null, InputOption::VALUE_REQUIRED, 'Local path or URL of GTFS zip')
+            ->addOption('mode', null, InputOption::VALUE_REQUIRED, 'zip|arcgis (auto if env set)', null)
+            ->addOption('routes-url', null, InputOption::VALUE_REQUIRED)
+            ->addOption('stops-url', null, InputOption::VALUE_REQUIRED)
+            ->addOption('trips-url', null, InputOption::VALUE_REQUIRED)
+            ->addOption('stop-times-url', null, InputOption::VALUE_REQUIRED);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new SymfonyStyle($input, $output);
+        $io     = new SymfonyStyle($input, $output);
+        $config = $this->configFactory->fromInput($input);
 
-        // 1) Resolve source (CLI > env)
-        $source   = $input->getOption('source')       ?? ($_ENV['MTW_GTFS_STATIC_URL'] ?? null);
-        $fallback = $_ENV['MTW_GTFS_STATIC_FALLBACK'] ?? null;
+        return match ($config->source) {
+            GtfsSourceEnum::Arcgis => $this->loadFromArcGis($io, $config),
+            GtfsSourceEnum::Zip    => $this->loadFromZip($io, $config, $input),
+        };
+    }
+
+    // ---------------- ZIP MODE (unchanged from your working version) ----------------
+
+    private function loadFromZip(SymfonyStyle $io, GtfsConfig $config, InputInterface $input): int
+    {
+        $source   = $config->zipUrl;
+        $fallback = $config->zipFallback;
+
         if (!$source) {
             $io->error('No source. Set MTW_GTFS_STATIC_URL or pass --source=/path/to/gtfs.zip');
 
@@ -64,7 +89,6 @@ final class GtfsLoadCommand extends Command
         (new Filesystem())->mkdir($dir);
 
         try {
-            // 2) Download/copy with retries
             $download = function (string $url) use ($io, $zipPath): bool {
                 $io->writeln("Downloading $url …");
                 $attempts = 0;
@@ -121,7 +145,6 @@ final class GtfsLoadCommand extends Command
                 }
             }
 
-            // 3) Extract zip (with checks)
             $zip = new ZipArchive();
             $rc  = $zip->open($zipPath);
             if ($rc !== true) {
@@ -145,8 +168,7 @@ final class GtfsLoadCommand extends Command
                 }
             }
 
-            // 4) Reset + load
-            $this->truncateAll($io);                 // or deleteAllWithDql() if you switched to ORM-only
+            $this->truncateAll($io);
             $this->loadRoutes("$dir/routes.txt", $io);
             $this->loadStops("$dir/stops.txt", $io);
             $this->loadTrips("$dir/trips.txt", $io);
@@ -156,7 +178,6 @@ final class GtfsLoadCommand extends Command
 
             return Command::SUCCESS;
         } finally {
-            // 5) Cleanup temp artifacts
             @is_file($zipPath) && @unlink($zipPath);
             if (is_dir($dir)) {
                 $it = new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS);
@@ -166,6 +187,188 @@ final class GtfsLoadCommand extends Command
                 }
                 @rmdir($dir);
             }
+        }
+    }
+
+    // ---------------- ARCGIS MODE ----------------
+
+    private function loadFromArcGis(SymfonyStyle $io, GtfsConfig $config): int
+    {
+        $io->title('Loading GTFS from ArcGIS FeatureServer');
+
+        $this->truncateAll($io);
+
+        // Routes
+        $io->section('routes (ArcGIS)');
+        $routesIterated = 0;
+        foreach ($this->fetchArcGisFeatures($config->routesUrl) as $feat) {
+            $adapter = new GtfsFeatureAdapter($feat);
+            $type    = $adapter->routeType() !== null ? RouteTypeEnum::tryFrom($adapter->routeType()) : null;
+
+            $this->routes->upsert(
+                $adapter->routeId(),
+                $adapter->routeShortName(),
+                $adapter->routeLongName(),
+                $adapter->routeColor(),
+                $type
+            );
+
+            $this->flushEvery(++$routesIterated, 1000, fn () => $this->routes->flush());
+        }
+        $this->routes->flush();
+        $io->writeln("  upserted: $routesIterated");
+
+        // Stops
+        $io->section('stops (ArcGIS)');
+        $stopsIterated = 0;
+        foreach ($this->fetchArcGisFeatures($config->stopsUrl) as $feat) {
+            $adapter     = new GtfsFeatureAdapter($feat);
+            [$lat, $lon] = array_map('floatval', $adapter->latLon());
+
+            $this->stops->upsert(
+                $adapter->stopId(),
+                $adapter->stopName(),
+                $lat,
+                $lon
+            );
+
+            $this->flushEvery(++$stopsIterated, 1000, fn () => $this->stops->flush());
+        }
+        $this->stops->flush();
+        $io->writeln("  upserted: $stopsIterated");
+
+        // Trips
+        $io->section('trips (ArcGIS)');
+        $routesByGtfs  = $this->routes->mapByGtfsId();
+        $tripsIterated = 0;
+        $skippedTrips  = 0;
+        foreach ($this->fetchArcGisFeatures($config->tripsUrl) as $feat) {
+            $adapter = new GtfsFeatureAdapter($feat);
+            $route   = $routesByGtfs[$adapter->tripRouteId()] ?? null;
+            if (!$route) {
+                ++$skippedTrips;
+                $io->writeln("  ⚠️  Skipped trip {$adapter->tripId()} — route {$adapter->tripRouteId()} not found");
+                continue;
+            }
+
+            $this->trips->upsert(
+                $adapter->tripId(),
+                $route,
+                $adapter->serviceId(),
+                DirectionEnum::from($adapter->directionId()),
+                $adapter->tripHeadsign()
+            );
+
+            $this->flushEvery(++$tripsIterated, 2000, fn () => $this->trips->flush());
+        }
+        $this->trips->flush();
+        $io->writeln("  upserted: $tripsIterated");
+        if ($skippedTrips > 0) {
+            $io->writeln("  skipped (missing route): $skippedTrips");
+        }
+
+        // Stop Times
+        $io->section('stop_times (ArcGIS)');
+        $tripIdMap = $this->trips->idMapByGtfsId();
+        $stopIdMap = $this->stops->idMapByGtfsId();
+
+        $batch             = [];
+        $stopTimesIterated = 0;
+        $BATCH_SIZE        = 1000;
+        $skippedStopTimes  = 0;
+
+        foreach ($this->fetchArcGisFeatures($config->stopTimesUrl) as $feat) {
+            $adapter = new GtfsFeatureAdapter($feat);
+            $trip    = $tripIdMap[$adapter->tripId()] ?? null;
+            $stop    = $stopIdMap[$adapter->stopId()] ?? null;
+            if (!$trip || !$stop) {
+                $io->writeln(sprintf(
+                    '  skipped: trip_id=%s (%s), stop_id=%s (%s)',
+                    $adapter->tripId(),
+                    $trip ? 'found' : 'missing',
+                    $adapter->stopId(),
+                    $stop ? 'found' : 'missing',
+                ));
+                ++$skippedStopTimes;
+                continue;
+            }
+
+            $batch[] = [
+                'trip' => $trip,
+                'stop' => $stop,
+                'seq'  => $adapter->stopSequence(),
+                'arr'  => GtfsTimeUtils::timeToSeconds($adapter->arrivalTime()),
+                'dep'  => GtfsTimeUtils::timeToSeconds($adapter->departureTime()),
+            ];
+
+            if (++$stopTimesIterated % $BATCH_SIZE === 0) {
+                $this->stopTimes->bulkInsert($batch);
+                $batch = [];
+                $io->writeln("  inserted: $stopTimesIterated");
+            }
+        }
+        if ($batch) {
+            $this->stopTimes->bulkInsert($batch);
+        }
+        $io->writeln("  total inserted: $stopTimesIterated");
+        if ($skippedStopTimes > 0) {
+            $io->writeln("  skipped (missing trip or stop): $skippedStopTimes");
+        }
+
+        $io->success('GTFS static loaded (ArcGIS)');
+
+        return Command::SUCCESS;
+    }
+
+    /**
+     * Stream/paginate ArcGIS features with resultOffset.
+     *
+     * @return \Generator<array<string,mixed>>
+     */
+    private function fetchArcGisFeatures(string $baseUrl): \Generator
+    {
+        $offset    = 0;
+        $pageSize  = self::ARCGIS_PAGE_SIZE;
+        $maxPages  = self::ARCGIS_MAX_PAGES;
+        $pageCount = 0;
+
+        while (++$pageCount <= $maxPages) {
+            $query = http_build_query([
+                'where'             => '1=1',
+                'outFields'         => '*',
+                'outSR'             => '4326',
+                'f'                 => 'json',
+                'resultRecordCount' => $pageSize,
+                'resultOffset'      => $offset,
+            ]);
+
+            $url = $baseUrl.(str_contains($baseUrl, '?') ? '&' : '?').$query;
+
+            $res = $this->http->request('GET', $url, [
+                'headers' => ['User-Agent' => 'MindTheWait/1.0 (+https://zu.com)'],
+                'timeout' => 60,
+            ]);
+
+            if ($res->getStatusCode() !== 200) {
+                break;
+            }
+
+            $json     = $res->toArray(false);
+            $features = $json['features'] ?? [];
+
+            if (empty($features)) {
+                break;
+            }
+
+            foreach ($features as $f) {
+                yield $f;
+            }
+
+            if (count($features) < $pageSize) {
+                break; // last page
+            }
+
+            $offset += $pageSize;
         }
     }
 
@@ -184,11 +387,12 @@ final class GtfsLoadCommand extends Command
         $tStop     = $em->getClassMetadata(Stop::class)->getTableName();
         $tRoute    = $em->getClassMetadata(Route::class)->getTableName();
 
-        // child → parent to satisfy FKs
         foreach ([$tStopTime, $tTrip, $tStop, $tRoute] as $t) {
             $conn->executeStatement(sprintf('TRUNCATE %s RESTART IDENTITY CASCADE', $t));
         }
     }
+
+    // ---------------- CSV (ZIP) LOADERS (unchanged) ----------------
 
     /**
      * @throws UnavailableStream
@@ -205,7 +409,7 @@ final class GtfsLoadCommand extends Command
         $csv = Reader::createFromPath($path);
         $csv->setHeaderOffset(0);
 
-        $n = 0;
+        $routesInserted = 0;
         foreach ($csv->getRecords() as $r) {
             $type = isset($r['route_type']) && $r['route_type'] !== ''
                 ? (RouteTypeEnum::tryFrom((int) $r['route_type']) ?? null)
@@ -217,12 +421,10 @@ final class GtfsLoadCommand extends Command
                 $r['route_color']      ?? null,
                 $type
             );
-            if (++$n % 1000 === 0) {
-                $this->routes->flush();
-            }
+            $this->flushEvery(++$routesInserted, 1000, fn () => $this->routes->flush());
         }
         $this->routes->flush();
-        $io->writeln("  upserted: $n");
+        $io->writeln("  upserted: $routesInserted");
     }
 
     /**
@@ -240,7 +442,7 @@ final class GtfsLoadCommand extends Command
         $csv = Reader::createFromPath($path);
         $csv->setHeaderOffset(0);
 
-        $n = 0;
+        $stopsInserted = 0;
         foreach ($csv->getRecords() as $r) {
             $this->stops->upsert(
                 $r['stop_id'],
@@ -248,12 +450,10 @@ final class GtfsLoadCommand extends Command
                 (float) $r['stop_lat'],
                 (float) $r['stop_lon']
             );
-            if (++$n % 2000 === 0) {
-                $this->stops->flush();
-            }
+            $this->flushEvery(++$stopsInserted, 2000, fn () => $this->stops->flush());
         }
         $this->stops->flush();
-        $io->writeln("  upserted: $n");
+        $io->writeln("  upserted: $stopsInserted");
     }
 
     /**
@@ -273,12 +473,12 @@ final class GtfsLoadCommand extends Command
 
         $routesByGtfs = $this->routes->mapByGtfsId();
 
-        $n = 0;
+        $tripsInserted = 0;
         foreach ($csv->getRecords() as $r) {
             $route = $routesByGtfs[$r['route_id']] ?? null;
             if (!$route) {
                 continue;
-            } // skip trips for routes we didn't load
+            }
 
             $this->trips->upsert(
                 $r['trip_id'],
@@ -287,12 +487,10 @@ final class GtfsLoadCommand extends Command
                 DirectionEnum::from((int) ($r['direction_id'] ?? 0)),
                 $r['trip_headsign'] ?? null
             );
-            if (++$n % 2000 === 0) {
-                $this->trips->flush();
-            }
+            $this->flushEvery(++$tripsInserted, 1000, fn () => $this->trips->flush());
         }
         $this->trips->flush();
-        $io->writeln("  upserted: $n");
+        $io->writeln("  upserted: $tripsInserted");
     }
 
     /**
@@ -315,8 +513,10 @@ final class GtfsLoadCommand extends Command
         $csv = Reader::createFromPath($path);
         $csv->setHeaderOffset(0);
 
-        $batch = [];
-        $n     = 0;
+        $batch             = [];
+        $stopTimesInserted = 0;
+        $BATCH_SIZE        = 1000;
+
         foreach ($csv->getRecords() as $r) {
             $trip = $tripIdMap[$r['trip_id']] ?? null;
             $stop = $stopIdMap[$r['stop_id']] ?? null;
@@ -328,31 +528,25 @@ final class GtfsLoadCommand extends Command
                 'trip' => $trip,
                 'stop' => $stop,
                 'seq'  => (int) $r['stop_sequence'],
-                'arr'  => $this->toSec($r['arrival_time'] ?? null),
-                'dep'  => $this->toSec($r['departure_time'] ?? null),
+                'arr'  => GtfsTimeUtils::timeToSeconds($r['arrival_time'] ?? null),
+                'dep'  => GtfsTimeUtils::timeToSeconds($r['departure_time'] ?? null),
             ];
-            if (++$n % 5000 === 0) {
+            if (++$stopTimesInserted % $BATCH_SIZE === 0) {
                 $this->stopTimes->bulkInsert($batch);
                 $batch = [];
-                $io->writeln("  inserted: $n");
+                $io->writeln("  inserted: $stopTimesInserted");
             }
         }
         if ($batch) {
             $this->stopTimes->bulkInsert($batch);
         }
-        $io->writeln("  total inserted: $n");
+        $io->writeln("  total inserted: $stopTimesInserted");
     }
 
-    private function toSec(?string $hhmmss): ?int
+    private function flushEvery(int $count, int $threshold, callable $flusher): void
     {
-        if (!$hhmmss) {
-            return null;
+        if ($count % $threshold === 0) {
+            $flusher();
         }
-        $p = array_map('intval', explode(':', $hhmmss));
-        if (count($p) !== 3) {
-            return null;
-        }
-
-        return $p[0] * 3600 + $p[1] * 60 + $p[2];
     }
 }

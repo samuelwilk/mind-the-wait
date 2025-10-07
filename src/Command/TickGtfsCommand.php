@@ -8,6 +8,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Messenger\Exception\ExceptionInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
 
@@ -19,6 +20,9 @@ final class TickGtfsCommand extends Command
         parent::__construct();
     }
 
+    /**
+     * @throws ExceptionInterface
+     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $delays = [

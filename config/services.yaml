@@ -4,6 +4,13 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    mtw_gtfs_static_url: '%env(MTW_GTFS_STATIC_URL)%'
+    mtw_gtfs_static_fallback: '%env(default::MTW_GTFS_STATIC_FALLBACK)%'
+
+    mtw_arcgis_routes_url: '%env(MTW_ARCGIS_ROUTE)%'
+    mtw_arcgis_stops_url: '%env(MTW_ARCGIS_STOP)%'
+    mtw_arcgis_trips_url: '%env(MTW_ARCGIS_TRIP)%'
+    mtw_arcgis_stop_times_url: '%env(MTW_ARCGIS_STOP_TIME)%'
 
 services:
     # default configuration for services in *this* file
@@ -23,3 +30,12 @@ services:
         arguments:
             - '%env(REDIS_URL)%'
             - { parameters: { read_write_timeout: 2.0 } }
+
+    App\Factory\GtfsConfigFactory:
+        arguments:
+            $gtfsStaticUrl: '%mtw_gtfs_static_url%'
+            $gtfsStaticFallback: '%mtw_gtfs_static_fallback%'
+            $arcgisRoutesUrl: '%mtw_arcgis_routes_url%'
+            $arcgisStopsUrl: '%mtw_arcgis_stops_url%'
+            $arcgisTripsUrl: '%mtw_arcgis_trips_url%'
+            $arcgisStopTimesUrl: '%mtw_arcgis_stop_times_url%'

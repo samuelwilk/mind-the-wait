@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker compose exec:*)",
+      "Bash(curl -sk https://localhost/api/realtime)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

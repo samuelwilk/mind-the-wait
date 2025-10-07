@@ -24,6 +24,23 @@ class StopTimeRepository extends BaseRepository
     }
 
     /**
+     * Find all stop_times for a trip by GTFS trip_id, ordered by stop_sequence.
+     *
+     * @return list<StopTime>
+     */
+    public function findByTripGtfsId(string $gtfsTripId): array
+    {
+        return $this->createQueryBuilder('st')
+            ->join('st.trip', 't')
+            ->join('st.stop', 's')
+            ->where('t.gtfsId = :tripId')
+            ->setParameter('tripId', $gtfsTripId)
+            ->orderBy('st.stopSequence', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Bulk insert stop_time (trip_id, stop_id, stop_sequence, arrival_time, departure_time).
      *
      * @param list<array{trip:int,stop:int,seq:int,arr:?int,dep:?int}> $rows
