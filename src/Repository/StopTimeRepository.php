@@ -41,6 +41,31 @@ class StopTimeRepository extends BaseRepository
     }
 
     /**
+     * Get stop times for a trip in array format (for arrival prediction).
+     *
+     * @return list<array{stop_id: string, seq: int, arr: int|null, dep: int|null}>|null
+     */
+    public function getStopTimesForTrip(string $gtfsTripId): ?array
+    {
+        $stopTimes = $this->findByTripGtfsId($gtfsTripId);
+        if (empty($stopTimes)) {
+            return null;
+        }
+
+        $result = [];
+        foreach ($stopTimes as $st) {
+            $result[] = [
+                'stop_id' => $st->getStop()->getGtfsId(),
+                'seq'     => $st->getStopSequence(),
+                'arr'     => $st->getArrivalTime(),
+                'dep'     => $st->getDepartureTime(),
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
      * Bulk insert stop_time (trip_id, stop_id, stop_sequence, arrival_time, departure_time).
      *
      * @param list<array{trip:int,stop:int,seq:int,arr:?int,dep:?int}> $rows

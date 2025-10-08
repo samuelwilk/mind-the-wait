@@ -107,7 +107,16 @@ High-level system design and data flow for mind-the-wait.
 - Determines color, severity, and reason
 - Integrates crowd feedback from Redis
 
+**ArrivalPredictor** (`src/Service/Prediction/ArrivalPredictor.php`)
+- Predicts vehicle arrival times at stops
+- 3-tier fallback: TripUpdate → GPS interpolation → static schedule
+- Calculates confidence levels (HIGH/MEDIUM/LOW)
+- Enriches predictions with status + feedback
+
 ### API Layer
+
+**StopPredictionController** (`src/Controller/StopPredictionController.php`)
+- `GET /api/stops/{stopId}/predictions` - Arrival predictions with countdown timers
 
 **RealtimeController** (`src/Controller/RealtimeController.php`)
 - `GET /api/realtime` - HTTP snapshot
@@ -158,7 +167,23 @@ VehicleStatusService.enrichSnapshot()
 JSON response with status objects
 ```
 
-### 5. Feedback Submission
+### 5. Arrival Predictions
+```
+Client → GET /api/stops/{stopId}/predictions
+  ↓
+ArrivalPredictor.predictArrivalsForStop()
+  ↓
+For each active vehicle:
+  - Try TripUpdate predictions (HIGH confidence)
+  - Fallback to GPS interpolation (MEDIUM)
+  - Fallback to static schedule (LOW)
+  ↓
+Enrich with VehicleStatus + feedback
+  ↓
+Return sorted predictions with countdown timers
+```
+
+### 6. Feedback Submission
 ```
 Client → POST /api/vehicle-feedback
   ↓

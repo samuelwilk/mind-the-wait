@@ -11,6 +11,7 @@ Welcome to the mind-the-wait documentation! This transit headway monitoring syst
 
 ### API Documentation
 - [REST API Reference](api/endpoints.md) - Complete API endpoint documentation
+- [Arrival Predictions](api/arrival-predictions.md) - ⭐ Realtime countdown timers with confidence levels
 - [Data Models](api/models.md) - Request/response schemas and DTOs
 - [Vehicle Status System](api/vehicle-status.md) - Status colors, severity labels, and feedback
 
@@ -26,6 +27,8 @@ Welcome to the mind-the-wait documentation! This transit headway monitoring syst
 - [Deployment](development/deployment.md) - Production deployment guide
 
 ## Key Features
+
+⏱️ **Arrival Predictions** - Countdown timers with HIGH/MEDIUM/LOW confidence levels
 
 🎨 **6-Color Status Spectrum** - From 🟢 warp speed early to 🟣 ghost bus late
 

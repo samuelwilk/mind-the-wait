@@ -232,4 +232,58 @@ final readonly class PositionInterpolator implements CrossingTimeEstimatorInterf
 
         return self::EARTH_RADIUS_KM * $c;
     }
+
+    /**
+     * Find the nearest stop to a vehicle's current GPS position.
+     *
+     * @return Stop|null The nearest stop, or null if vehicle has no position or trip
+     */
+    public function findNearestStop(VehicleDto $vehicle): ?Stop
+    {
+        if ($vehicle->lat === null || $vehicle->lon === null || $vehicle->tripId === null) {
+            return null;
+        }
+
+        $stopTimes = $this->stopTimeRepo->findByTripGtfsId($vehicle->tripId);
+        if (empty($stopTimes)) {
+            return null;
+        }
+
+        $nearestStop = null;
+        $minDistance = PHP_FLOAT_MAX;
+
+        foreach ($stopTimes as $st) {
+            $stop = $st->getStop();
+            if ($stop === null) {
+                continue;
+            }
+
+            $distance = $this->haversineDistance(
+                $vehicle->lat,
+                $vehicle->lon,
+                $stop->getLat(),
+                $stop->getLong()
+            );
+
+            if ($distance < $minDistance) {
+                $minDistance = $distance;
+                $nearestStop = $stop;
+            }
+        }
+
+        return $nearestStop;
+    }
+
+    /**
+     * Estimate progress along route for arrival prediction.
+     * Alias for calculateRouteProgress() with clearer naming for external use.
+     *
+     * @param list<array{stop_id: string, seq: int, arr: int|null, dep: int|null}>|null $stopTimes
+     *
+     * @return float|null Progress ratio (0.0-1.0)
+     */
+    public function estimateProgress(VehicleDto $vehicle, ?array $stopTimes = null): ?float
+    {
+        return $this->calculateRouteProgress($vehicle);
+    }
 }

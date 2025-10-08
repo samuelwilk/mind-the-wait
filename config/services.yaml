@@ -44,3 +44,4 @@ services:
     App\Service\Headway\StopTimeProviderInterface: '@App\Service\Headway\RealtimeStopTimeProvider'
     App\Service\Realtime\TrafficReasonProviderInterface: '@App\Service\Realtime\HeuristicTrafficReasonProvider'
     App\Repository\VehicleFeedbackRepositoryInterface: '@App\Repository\VehicleFeedbackRepository'
+    App\Service\Prediction\ArrivalPredictorInterface: '@App\Service\Prediction\ArrivalPredictor'

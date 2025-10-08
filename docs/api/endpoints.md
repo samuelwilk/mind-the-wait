@@ -14,6 +14,44 @@ Currently no authentication required. All endpoints are public.
 
 ---
 
+## GET /api/stops/{stopId}/predictions
+
+**⭐ NEW:** Get realtime arrival predictions for a specific stop with countdown timers and confidence levels.
+
+See complete documentation: [Arrival Predictions API](arrival-predictions.md)
+
+### Quick Example
+
+```bash
+curl https://localhost/api/stops/3734/predictions?limit=5
+```
+
+### Response
+
+```json
+{
+  "stop_id": "3734",
+  "stop_name": "Primrose / Lenore",
+  "predictions": [
+    {
+      "vehicle_id": "606",
+      "route_id": "14",
+      "arrival_in_sec": 180,
+      "arrival_at": 1759897380,
+      "confidence": "high",
+      "status": { /* vehicle status */ },
+      "current_location": {
+        "lat": 52.1234,
+        "lon": -106.5678,
+        "stops_away": 2
+      }
+    }
+  ]
+}
+```
+
+---
+
 ## GET /api/realtime
 
 Returns a complete snapshot of the current transit system state including vehicles, trips, alerts, and enriched status data.
