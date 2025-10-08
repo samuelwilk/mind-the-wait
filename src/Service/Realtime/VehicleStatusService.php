@@ -119,32 +119,76 @@ final readonly class VehicleStatusService
     {
         $absDelay = abs($delaySeconds);
 
+        // On time (within 1 minute)
         if ($absDelay <= 60) {
             return [
-                'color'    => VehicleStatusColor::GREEN,
+                'color'    => VehicleStatusColor::YELLOW,
                 'label'    => VehiclePunctualityLabel::ON_TIME,
-                'severity' => 'minor',
+                'severity' => '✓ vibing',
             ];
         }
 
+        // Running early
         if ($delaySeconds < -60) {
-            $severity = $absDelay >= 300 ? 'critical' : 'major';
-            $color    = $absDelay >= 300 ? VehicleStatusColor::RED : VehicleStatusColor::YELLOW;
+            if ($absDelay >= 600) {
+                // Wayyyy early (10+ min)
+                return [
+                    'color'    => VehicleStatusColor::GREEN,
+                    'label'    => VehiclePunctualityLabel::AHEAD,
+                    'severity' => '🚀 warp speed',
+                ];
+            }
 
+            if ($absDelay >= 180) {
+                // Moderately early (3-10 min)
+                return [
+                    'color'    => VehicleStatusColor::BLUE,
+                    'label'    => VehiclePunctualityLabel::AHEAD,
+                    'severity' => '⚡ zooming',
+                ];
+            }
+
+            // Slightly early (1-3 min)
             return [
-                'color'    => $color,
+                'color'    => VehicleStatusColor::BLUE,
                 'label'    => VehiclePunctualityLabel::AHEAD,
-                'severity' => $severity,
+                'severity' => '🏃 speedy',
             ];
         }
 
-        $severity = $absDelay >= 300 ? 'critical' : 'major';
-        $color    = $absDelay >= 300 ? VehicleStatusColor::RED : VehicleStatusColor::YELLOW;
+        // Running late
+        if ($absDelay >= 900) {
+            // Catastrophically late (15+ min)
+            return [
+                'color'    => VehicleStatusColor::PURPLE,
+                'label'    => VehiclePunctualityLabel::LATE,
+                'severity' => '💀 ghost bus',
+            ];
+        }
 
+        if ($absDelay >= 420) {
+            // Very late (7-15 min)
+            return [
+                'color'    => VehicleStatusColor::RED,
+                'label'    => VehiclePunctualityLabel::LATE,
+                'severity' => '🔥 yikes',
+            ];
+        }
+
+        if ($absDelay >= 180) {
+            // Moderately late (3-7 min)
+            return [
+                'color'    => VehicleStatusColor::ORANGE,
+                'label'    => VehiclePunctualityLabel::LATE,
+                'severity' => '😬 delayed',
+            ];
+        }
+
+        // Slightly late (1-3 min)
         return [
-            'color'    => $color,
+            'color'    => VehicleStatusColor::ORANGE,
             'label'    => VehiclePunctualityLabel::LATE,
-            'severity' => $severity,
+            'severity' => '🐌 fashionably late',
         ];
     }
 
