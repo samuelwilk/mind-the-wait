@@ -9,53 +9,64 @@ Get mind-the-wait running locally in 5 minutes.
 - 4GB RAM minimum
 - 5GB disk space
 
-## 1. Clone Repository
+## One-Command Setup
 
 ```bash
-git clone https://github.com/yourusername/mind-the-wait.git
+git clone https://github.com/samuelwilk/mind-the-wait.git
 cd mind-the-wait
+make setup
 ```
 
-## 2. Start Services
+That's it! The `make setup` command will:
+1. ✅ Build and start Docker containers
+2. ✅ Install Composer dependencies
+3. ✅ Create development database with migrations
+4. ✅ Create test database
+5. ✅ Load GTFS static data (routes, stops, trips)
+6. ✅ Collect initial weather data
+7. ✅ Run initial headway score calculation
 
+**Total Time:** ~3-7 minutes on first run
+
+Once complete, access the application at **https://localhost**
+
+## What's Running?
+
+After setup, you'll have:
+
+- **Dashboard** - https://localhost/ (overview with realtime metrics)
+- **PostgreSQL** - Port 5432 (GTFS static data, weather, performance history)
+- **Redis** - Port 6379 (realtime vehicle positions, scores)
+- **Nginx** - Ports 80/443 (reverse proxy with SSL)
+- **Python Parser** - Polls GTFS-RT feeds every 12 seconds
+- **Scheduler** - Runs score calculation (30s), weather collection (hourly), performance aggregation (daily)
+
+## Customizing GTFS Data Source
+
+By default, `make setup` loads from the configured ArcGIS endpoints. To use a different source:
+
+### Option A: From ZIP URL
+
+Set in `.env.local`:
+```env
+MTW_GTFS_STATIC_URL=https://your-transit-agency.com/gtfs.zip
+```
+
+Then reload:
 ```bash
-make docker-build
+docker compose exec php bin/console app:gtfs:load
 ```
 
-This will:
-- Build PHP/FrankenPHP container
-- Start PostgreSQL, Redis, nginx
-- Install Composer dependencies
-- Generate TLS certificates
-
-**Time:** ~2-3 minutes on first run
-
-## 3. Set Up Database
-
-```bash
-make database
-```
-
-This runs:
-- Drop existing database (if any)
-- Create fresh database
-- Run all migrations
-
-**Time:** ~5 seconds
-
-## 4. Load GTFS Data
-
-### Option A: From ZIP (Recommended)
+### Option B: From Local ZIP File
 
 ```bash
 docker compose exec php bin/console app:gtfs:load \
-  --source=https://your-transit-agency.com/gtfs.zip
+  --source=/path/to/gtfs.zip
 ```
 
-### Option B: From ArcGIS (If agency provides it)
+### Option C: From ArcGIS FeatureServer
 
-First, set environment variables in `.env.local`:
-
+Set in `.env.local`:
 ```env
 MTW_ARCGIS_ROUTE=https://...
 MTW_ARCGIS_STOP=https://...
@@ -63,15 +74,16 @@ MTW_ARCGIS_TRIP=https://...
 MTW_ARCGIS_STOP_TIME=https://...
 ```
 
-Then load:
-
+Then reload:
 ```bash
 docker compose exec php bin/console app:gtfs:load --mode=arcgis
 ```
 
 **Time:** 30 seconds - 5 minutes depending on feed size
 
-## 5. Configure Realtime Feed
+## Configure Realtime Feed (Optional)
+
+The default configuration uses Saskatoon Transit's GTFS-RT feeds. To use a different agency:
 
 Edit `compose.override.yaml` (create if missing):
 
@@ -90,7 +102,7 @@ Restart the parser:
 docker compose up -d pyparser
 ```
 
-## 6. Verify It Works
+## Verify It Works
 
 ### Check Realtime Data
 
@@ -109,6 +121,15 @@ curl -sk https://localhost/api/score | jq '.scores | length'
 
 Should return route/direction groups with grades.
 
+### Check Dashboard
+
+Open https://localhost in your browser to see:
+- System-wide performance grade
+- Active vehicle count
+- Top performing routes
+- Routes needing attention
+- Live weather banner with transit impact
+
 ### Check Status Enrichment
 
 ```bash
@@ -117,7 +138,7 @@ curl -sk https://localhost/api/realtime | jq '.vehicles[0].status'
 
 Should show color, severity, deviation_sec (or null if trip IDs don't match).
 
-## 7. Submit Test Feedback
+## Submit Test Feedback
 
 ```bash
 curl -X POST https://localhost/api/vehicle-feedback \

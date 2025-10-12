@@ -41,7 +41,7 @@ services:
             $arcgisStopTimesUrl: '%mtw_arcgis_stop_times_url%'
 
     App\Service\Headway\CrossingTimeEstimatorInterface: '@App\Service\Headway\PositionInterpolator'
-    App\Service\Headway\StopTimeProviderInterface: '@App\Service\Headway\RealtimeStopTimeProvider'
+    App\Service\Headway\StopTimeProviderInterface: '@App\Service\Headway\CompositeStopTimeProvider'
     App\Service\Realtime\TrafficReasonProviderInterface: '@App\Service\Realtime\HeuristicTrafficReasonProvider'
     App\Repository\VehicleFeedbackRepositoryInterface: '@App\Repository\VehicleFeedbackRepository'
     App\Service\Prediction\ArrivalPredictorInterface: '@App\Service\Prediction\ArrivalPredictor'

@@ -6,3 +6,5 @@ when@dev: &dev
             flush_once: true
 
 when@test: *dev
+    # Database reset is handled by DAMA\DoctrineTestBundle\PHPUnit\PHPUnitExtension
+    # which is configured in phpunit.dist.xml

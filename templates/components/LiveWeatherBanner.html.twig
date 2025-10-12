@@ -1,0 +1,95 @@
+<div {{ attributes }}>
+    {% set weather = this.weather %}
+
+    {% if weather is null %}
+        {# No weather data available #}
+        <div class="bg-gray-100 border border-gray-300 rounded-lg p-4">
+            <div class="flex items-center justify-center">
+                <div class="text-gray-600">
+                    <p class="text-sm">Weather data unavailable</p>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        {# Weather banner with transit impact #}
+        <div class="{{ this.impactColorClass }} border rounded-lg p-4 transition-colors duration-300">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                {# Left side: Weather info #}
+                <div class="flex items-center gap-3">
+                    <div class="text-4xl">{{ this.weatherIcon }}</div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-2xl font-bold text-gray-900">
+                                {{ weather.temperatureCelsius|round(1) }}°C
+                            </span>
+                            <span class="text-sm text-gray-600">
+                                {{ this.conditionLabel }}
+                            </span>
+                        </div>
+                        {% if weather.feelsLikeCelsius is not null %}
+                            <p class="text-xs text-gray-500">
+                                Feels like {{ weather.feelsLikeCelsius|round(1) }}°C
+                            </p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {# Center: Transit impact #}
+                <div class="flex-1 sm:text-center">
+                    <p class="text-sm font-semibold text-gray-900">
+                        Transit Impact: {{ this.impactLabel }}
+                    </p>
+                    {% if detailed %}
+                        <p class="text-xs text-gray-700 mt-1">
+                            {{ this.impactDescription }}
+                        </p>
+                    {% endif %}
+                </div>
+
+                {# Right side: Last updated #}
+                <div class="text-right">
+                    <p class="text-xs text-gray-500">
+                        Updated: {{ this.lastUpdateTime }}
+                    </p>
+                    {% if detailed and weather.windSpeedKmh is not null %}
+                        <p class="text-xs text-gray-500 mt-1">
+                            Wind: {{ weather.windSpeedKmh|round(0) }} km/h
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# Detailed weather info (only if detailed=true) #}
+            {% if detailed %}
+                <div class="mt-4 pt-4 border-t border-current border-opacity-20">
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                        {% if weather.precipitationMm is not null and weather.precipitationMm > 0 %}
+                            <div>
+                                <p class="text-gray-600">Precipitation</p>
+                                <p class="font-semibold text-gray-900">{{ weather.precipitationMm|round(1) }} mm</p>
+                            </div>
+                        {% endif %}
+                        {% if weather.snowfallCm is not null and weather.snowfallCm > 0 %}
+                            <div>
+                                <p class="text-gray-600">Snowfall</p>
+                                <p class="font-semibold text-gray-900">{{ weather.snowfallCm|round(1) }} cm</p>
+                            </div>
+                        {% endif %}
+                        {% if weather.visibilityKm is not null %}
+                            <div>
+                                <p class="text-gray-600">Visibility</p>
+                                <p class="font-semibold text-gray-900">{{ weather.visibilityKm|round(1) }} km</p>
+                            </div>
+                        {% endif %}
+                        {% if weather.snowDepthCm is not null and weather.snowDepthCm > 0 %}
+                            <div>
+                                <p class="text-gray-600">Snow Depth</p>
+                                <p class="font-semibold text-gray-900">{{ weather.snowDepthCm }} cm</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>

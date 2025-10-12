@@ -198,8 +198,8 @@ final readonly class HeadwayCalculator
         return $deltas[intdiv($count, 2)];
     }
 
-    public function grade(?int $observedSec, int $vehicleCount): ScoreGradeEnum
+    public function grade(?int $observedSec, int $vehicleCount, ?int $delaySec = null): ScoreGradeEnum
     {
-        return ScoreGradeEnum::fromObserved($observedSec, $vehicleCount);
+        return ScoreGradeEnum::fromObserved($observedSec, $vehicleCount, $delaySec);
     }
 }

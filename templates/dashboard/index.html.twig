@@ -1,105 +1,189 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Overview{% endblock %}
+{% block title %}Overview - Saskatoon Transit{% endblock %}
 
 {% block body %}
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <!-- Page Header -->
         <div class="mb-8">
             <h1 class="text-3xl font-bold text-gray-900">Saskatoon Transit Overview</h1>
-            <p class="mt-2 text-gray-600">Real-time performance insights and historical trends</p>
+            <p class="mt-2 text-gray-600">Real-time performance insights and system health</p>
         </div>
 
-        <!-- Metrics Grid -->
+        <!-- Live Weather Banner -->
+        <div class="mb-8">
+            <twig:LiveWeatherBanner />
+        </div>
+
+        <!-- Key Metrics Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {% include 'components/MetricCard.html.twig' with {
-                label: 'Average On-Time Performance',
-                value: '87.3%',
-                change: 2.4
+                label: 'System Grade',
+                value: metrics.systemGrade,
+                change: metrics.changeVsYesterday
             } %}
 
             {% include 'components/MetricCard.html.twig' with {
-                label: 'Active Routes',
-                value: '45',
-                change: 0
+                label: 'On-Time Performance',
+                value: metrics.onTimePercentage ~ '%',
+                change: metrics.changeVsYesterday
             } %}
 
             {% include 'components/MetricCard.html.twig' with {
-                label: 'Vehicles in Service',
-                value: '127',
-                change: -3.1
+                label: 'Active Vehicles',
+                value: metrics.activeVehicles,
+                change: null
             } %}
 
             {% include 'components/MetricCard.html.twig' with {
-                label: 'Average Headway',
-                value: '12.5 min',
-                change: 1.2
+                label: 'Total Routes',
+                value: metrics.totalRoutes,
+                change: null
             } %}
         </div>
 
-        <!-- Insights Section -->
+        <!-- Top Performers & Needs Attention -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Top Performers -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">
+                    <span class="text-success-600">⭐</span> Top Performers
+                </h2>
+                {% if metrics.topPerformers|length > 0 %}
+                    <div class="space-y-3">
+                        {% for route in metrics.topPerformers %}
+                            {% include 'components/RouteListItem.html.twig' with {
+                                route: route,
+                                metadata: route.activeVehicles is not null ? route.activeVehicles ~ ' vehicle' ~ (route.activeVehicles > 1 ? 's' : '') ~ ' active' : null,
+                                badgeFallbackBg: 'bg-primary-100',
+                                badgeFallbackText: 'text-primary-800',
+                                gradeColorClasses: 'bg-success-100 text-success-800'
+                            } %}
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-gray-500 text-sm">No data available</p>
+                {% endif %}
+            </div>
+
+            <!-- Routes Needing Attention -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">
+                    <span class="text-amber-600">⚠️</span> Needs Attention
+                </h2>
+                {% if metrics.needsAttention|length > 0 %}
+                    <div class="space-y-3">
+                        {% for route in metrics.needsAttention %}
+                            {% set issueText = route.issue is not null ? 'Issue: ' ~ (route.issue == 'limited_data' ? 'Limited data (1 vehicle)' : route.issue) : null %}
+                            {% include 'components/RouteListItem.html.twig' with {
+                                route: route,
+                                metadata: issueText,
+                                badgeFallbackBg: 'bg-amber-100',
+                                badgeFallbackText: 'text-amber-800',
+                                gradeColorClasses: route.grade == 'F' ? 'bg-danger-100 text-danger-800' : 'bg-warning-100 text-warning-800'
+                            } %}
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-gray-500 text-sm">No data available</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Historical Performance (30-Day Average) -->
         <div class="mb-8">
-            <h2 class="text-2xl font-semibold text-gray-900 mb-4">Key Insights</h2>
+            <h2 class="text-2xl font-semibold text-gray-900 mb-2">Historical Performance</h2>
+            <p class="text-sm text-gray-600 mb-4">Based on the last 30 days of recorded data</p>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Historical Top Performers -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <span class="text-success-600">📊</span> Most Reliable Routes
+                    </h3>
+                    {% if metrics.historicalTopPerformers|length > 0 %}
+                        <div class="space-y-3">
+                            {% for route in metrics.historicalTopPerformers %}
+                                {% include 'components/RouteListItem.html.twig' with {
+                                    route: route,
+                                    metadata: route.onTimePercentage|round(1) ~ '% on-time average',
+                                    badgeSize: 'sm',
+                                    badgeFallbackBg: 'bg-success-100',
+                                    badgeFallbackText: 'text-success-800',
+                                    gradeColorClasses: 'bg-success-100 text-success-800'
+                                } %}
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-gray-500 text-sm">Not enough historical data yet. Check back after a few days of operation.</p>
+                    {% endif %}
+                </div>
+
+                <!-- Historical Worst Performers -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <span class="text-danger-600">📉</span> Least Reliable Routes
+                    </h3>
+                    {% if metrics.historicalWorstPerformers|length > 0 %}
+                        <div class="space-y-3">
+                            {% for route in metrics.historicalWorstPerformers %}
+                                {% set gradeColor = route.grade == 'F' ? 'bg-danger-100 text-danger-800' : (route.grade == 'D' ? 'bg-warning-100 text-warning-800' : 'bg-amber-100 text-amber-800') %}
+                                {% include 'components/RouteListItem.html.twig' with {
+                                    route: route,
+                                    metadata: route.onTimePercentage|round(1) ~ '% on-time average',
+                                    badgeSize: 'sm',
+                                    badgeFallbackBg: 'bg-danger-100',
+                                    badgeFallbackText: 'text-danger-800',
+                                    gradeColorClasses: gradeColor
+                                } %}
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-gray-500 text-sm">Not enough historical data yet. Check back after a few days of operation.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Featured Insights -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-4">Featured Insights</h2>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {% include 'components/InsightCard.html.twig' with {
                     color: 'blue',
                     title: 'Winter Weather Impact',
-                    content: '<p>Routes experience an average <strong>33% drop</strong> in on-time performance during snow conditions compared to clear weather.</p>'
+                    content: '<p>Routes experience an average <strong>33% drop</strong> in on-time performance during snow conditions compared to clear weather.</p>',
+                    action: {
+                        label: 'View Full Analysis',
+                        url: path('app_weather')
+                    }
                 } %}
 
                 {% include 'components/InsightCard.html.twig' with {
                     color: 'amber',
                     title: 'Temperature Threshold',
-                    content: '<p>Performance begins to degrade sharply when temperatures drop below <strong>-20°C</strong>, with delays increasing by 5-7 minutes on average.</p>'
+                    content: '<p>Performance begins to degrade sharply when temperatures drop below <strong>-20°C</strong>, with delays increasing by 5-7 minutes on average.</p>',
+                    action: {
+                        label: 'View Full Analysis',
+                        url: path('app_weather')
+                    }
                 } %}
             </div>
         </div>
 
-        <!-- Sample Chart -->
-        <div class="mb-8">
-            <h2 class="text-2xl font-semibold text-gray-900 mb-4">Performance Trends</h2>
-            {% include 'components/ChartCard.html.twig' with {
-                title: 'Weekly On-Time Performance',
-                description: 'Past 7 days system-wide reliability',
-                chartOptions: {
-                    xAxis: {
-                        type: 'category',
-                        data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-                    },
-                    yAxis: {
-                        type: 'value',
-                        name: 'On-Time %',
-                        max: 100
-                    },
-                    series: [{
-                        name: 'On-Time %',
-                        type: 'line',
-                        data: [85, 87, 84, 89, 88, 92, 90],
-                        smooth: true,
-                        areaStyle: {
-                            opacity: 0.2
-                        }
-                    }],
-                    tooltip: {
-                        trigger: 'axis'
-                    }
-                }
-            } %}
-        </div>
-
-        <!-- Coming Soon Notice -->
-        <div class="bg-gradient-to-r from-primary-50 to-primary-100 border border-primary-200 rounded-lg p-6">
+        <!-- Phase 2 Complete Notice -->
+        <div class="bg-gradient-to-r from-success-50 to-success-100 border border-success-200 rounded-lg p-6">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <svg class="h-8 w-8 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    <svg class="h-8 w-8 text-success-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                 </div>
                 <div class="ml-4">
-                    <h3 class="text-lg font-semibold text-primary-900">Phase 1 Foundation Complete!</h3>
-                    <p class="mt-1 text-sm text-primary-800">
-                        Tailwind CSS, Stimulus, ECharts, and reusable components are ready.
-                        Next up: Building detailed route pages and weather impact analysis.
+                    <h3 class="text-lg font-semibold text-success-900">Phase 2 Complete!</h3>
+                    <p class="mt-1 text-sm text-success-800">
+                        Overview dashboard is now live with real-time metrics, system grades, and weather integration.
+                        Next: Route details and weather impact analysis pages.
                     </p>
                 </div>
             </div>

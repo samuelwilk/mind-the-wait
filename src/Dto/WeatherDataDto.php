@@ -57,4 +57,20 @@ final readonly class WeatherDataDto
             windSpeedKmh: isset($hourly['wind_speed_10m'][$index]) ? (float) $hourly['wind_speed_10m'][$index] : null,
         );
     }
+
+    /** @return array<string,mixed> */
+    public function toArray(): array
+    {
+        return [
+            'time'                         => $this->time->format('c'),
+            'temperature_celsius'          => $this->temperatureCelsius,
+            'apparent_temperature_celsius' => $this->apparentTemperatureCelsius,
+            'precipitation_mm'             => $this->precipitationMm,
+            'snowfall_cm'                  => $this->snowfallCm,
+            'snow_depth_cm'                => $this->snowDepthCm,
+            'weather_code'                 => $this->weatherCode,
+            'visibility_m'                 => $this->visibilityM,
+            'wind_speed_kmh'               => $this->windSpeedKmh,
+        ];
+    }
 }

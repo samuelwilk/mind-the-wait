@@ -92,8 +92,9 @@ services:
     depends_on:
       - php
       - redis
+      - database
     working_dir: /var/www/app
-    command: bash -lc 'while true; do php bin/console app:score:tick || true; sleep 30; done'
+    command: php bin/console messenger:consume scheduler_score_tick scheduler_weather_collection scheduler_performance_aggregation -vv
     volumes:
       - ./:/var/www/app:cached
     environment:

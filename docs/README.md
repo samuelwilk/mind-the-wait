@@ -5,9 +5,11 @@ Welcome to the mind-the-wait documentation! This transit headway monitoring syst
 ## Documentation Structure
 
 ### Getting Started
+- **[🚀 Getting Started Guide](GETTING_STARTED.md)** - Complete introduction for new users
 - [Quick Start Guide](development/quick-start.md) - Get up and running in 5 minutes
 - [Architecture Overview](architecture/overview.md) - System design and data flow
 - [Development Guide](development/setup.md) - Detailed development environment setup
+- [📝 Changelog](../CHANGELOG.md) - Recent changes and version history
 
 ### API Documentation
 - [REST API Reference](api/endpoints.md) - Complete API endpoint documentation

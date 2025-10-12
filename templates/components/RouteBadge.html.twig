@@ -1,0 +1,21 @@
+{# Reusable Route Badge Component #}
+{# Parameters:
+   - shortName: Route number/name to display
+   - colour: Optional hex color (6 chars, no #) from GTFS route_color
+   - size: Optional size ('sm', 'md', 'lg'), defaults to 'md'
+   - fallbackBg: Optional fallback background color class, defaults based on context
+   - fallbackText: Optional fallback text color class, defaults based on context
+#}
+{% set sizeClasses = {
+    'sm': 'w-8 h-8 text-xs',
+    'md': 'w-10 h-10 text-sm',
+    'lg': 'w-12 h-12 text-base'
+} %}
+{% set badgeSize = sizeClasses[size|default('md')] %}
+{% set defaultBg = fallbackBg|default('bg-gray-100') %}
+{% set defaultText = fallbackText|default('text-gray-800') %}
+
+<span class="inline-flex items-center justify-center {{ badgeSize }} rounded-full font-bold {% if colour %}{{ route_badge_classes(colour) }}{% else %}{{ defaultBg }} {{ defaultText }}{% endif %}"
+      {% if colour %}style="background-color: #{{ colour }}; {{ route_badge_text_style(colour) }}"{% endif %}>
+    {{ shortName }}
+</span>

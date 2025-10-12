@@ -24,11 +24,13 @@ final class WeatherObservationRepository extends BaseRepository
     }
 
     /**
-     * Find most recent weather observation.
+     * Find most recent weather observation (excludes future forecasts).
      */
     public function findLatest(): ?WeatherObservation
     {
         return $this->createQueryBuilder('w')
+            ->where('w.observedAt <= :now')
+            ->setParameter('now', new \DateTimeImmutable())
             ->orderBy('w.observedAt', 'DESC')
             ->setMaxResults(1)
             ->getQuery()

@@ -85,7 +85,7 @@ cs-fix: ## Automatically apply fixes from php-cs-fixer
 
 ##@ Tests
 
-test-phpunit: ## Runs PHPUnit
+test-phpunit: database-test ## Runs PHPUnit (resets test database first)
 	@docker compose exec php vendor/bin/phpunit --configuration phpunit.dist.xml
 
 ##@ Application
@@ -99,21 +99,45 @@ mailpit-delete-all-mail: ## Delete all mail from Mailpit
 
 ##@ Project
 
-setup: ## setup the project
-	make update-localdev-env
-	make update-cert
-	make docker-build
-	make composer-install
-	make database
-	make database-test
+setup: ## Complete application setup - builds, installs deps, creates databases, loads GTFS data
+	@echo "🚀 Starting complete mind-the-wait setup..."
+	@echo ""
+	@echo "📦 Step 1/7: Building and starting Docker containers..."
+	@make docker-build
+	@echo ""
+	@echo "📚 Step 2/7: Installing Composer dependencies..."
+	@make composer-install
+	@echo ""
+	@echo "🗄️  Step 3/7: Setting up development database..."
+	@make database
+	@echo ""
+	@echo "🧪 Step 4/7: Setting up test database..."
+	@make database-test
+	@echo ""
+	@echo "🚍 Step 5/7: Loading GTFS static data..."
+	@make gtfs-load
+	@echo ""
+	@echo "🌤️  Step 6/7: Collecting initial weather data..."
+	@make weather-collect
+	@echo ""
+	@echo "📊 Step 7/7: Running initial score calculation..."
+	@make score-tick
+	@echo ""
+	@echo "✅ Setup complete! Application is ready to use."
+	@echo ""
+	@echo "📍 Access the application at: https://localhost"
+	@echo "📊 Dashboard: https://localhost/"
+	@echo "🔧 API docs: See docs/api/endpoints.md"
+	@echo ""
+	@echo "💡 Next steps:"
+	@echo "  - Check realtime data: curl -sk https://localhost/api/realtime | jq"
+	@echo "  - View scheduler logs: docker compose logs -f scheduler"
+	@echo "  - Run tests: make test-phpunit"
 
-update-localdev-env: ## Update the localdev env file
-	git submodule update --init --remote --recursive
-	./bootstrap/bitwarden/pull_local_dev_env.sh localdev-ISK-STSI-Web
+gtfs-load: ## Load GTFS static data (uses ArcGIS by default, or set MTW_GTFS_STATIC_URL for ZIP)
+	@echo "Loading GTFS static data (this may take 1-5 minutes)..."
+	@docker compose exec php bin/console app:gtfs:load --mode=arcgis || \
+		docker compose exec php bin/console app:gtfs:load
 
-update-cert: ## Generate a local SSL certificate
-	mkdir -p bootstrap/nginx
-	mkcert -key-file bootstrap/nginx/key.pem -cert-file bootstrap/nginx/cert.pem stsi.local localhost
-
-user-setup: ## Sets up the application by loading in a default admin user. This is to used in live environemnts, or used in a run configuration to mock a live environment.
-	@docker compose exec php bin/console app:setup password
+weather-collect: ## Collect current weather data
+	@docker compose exec php bin/console app:collect:weather

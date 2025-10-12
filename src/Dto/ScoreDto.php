@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Dto;
 
+use App\Enum\ConfidenceLevel;
 use App\Enum\DirectionEnum;
 use App\Enum\ScoreGradeEnum;
 
@@ -16,6 +17,7 @@ final readonly class ScoreDto
         public ?int $scheduledHeadwaySec,
         public int $vehicles,
         public ScoreGradeEnum $grade,
+        public ConfidenceLevel $confidence,
         public int $asOfTs,
     ) {
     }
@@ -30,6 +32,7 @@ final readonly class ScoreDto
             'scheduled_headway_sec' => $this->scheduledHeadwaySec,
             'vehicles'              => $this->vehicles,
             'grade'                 => $this->grade->value,      // <- enum → 'A'|'B'|'C'|'D'
+            'confidence'            => $this->confidence->value, // <- enum → 'high'|'medium'|'low'
             'as_of'                 => $this->asOfTs,
         ];
     }

@@ -13,7 +13,9 @@
       "WebFetch(domain:opendata.saskatoon.ca)",
       "Bash(curl -s 'https://opendata.saskatoon.ca/api/3/action/package_search?q=transit&rows=20')",
       "Bash(curl -s 'https://opendata.saskatoon.ca/api/3/action/package_search?q=transit')",
-      "Bash(docker compose logs:*)"
+      "Bash(docker compose logs:*)",
+      "Bash(make test-phpunit:*)",
+      "Bash(make:*)"
     ],
     "deny": [],
     "ask": []

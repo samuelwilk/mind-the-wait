@@ -33,7 +33,7 @@ final class PerformanceAggregatorTest extends KernelTestCase
 
     protected function setUp(): void
     {
-        self::bootKernel();
+        self::bootKernel(['environment' => 'test', 'debug' => true]);
         $container = self::getContainer();
 
         $this->em             = $container->get(EntityManagerInterface::class);
@@ -47,15 +47,16 @@ final class PerformanceAggregatorTest extends KernelTestCase
     {
         $route = $this->createRoute();
         $stop  = $this->createStop();
+        $date  = new \DateTimeImmutable('2025-01-01');
 
         // Create 3 arrival logs with different delays
-        $this->createArrivalLog($route, $stop, delaySec: 10);
-        $this->createArrivalLog($route, $stop, delaySec: 20);
-        $this->createArrivalLog($route, $stop, delaySec: 30);
+        $this->createArrivalLog($route, $stop, $date, delaySec: 10);
+        $this->createArrivalLog($route, $stop, $date, delaySec: 20);
+        $this->createArrivalLog($route, $stop, $date, delaySec: 30);
 
         $this->em->flush();
 
-        $result = $this->aggregator->aggregateDate(new \DateTimeImmutable('today'));
+        $result = $this->aggregator->aggregateDate($date);
 
         self::assertSame(1, $result['success']);
         self::assertSame(0, $result['failed']);
@@ -65,16 +66,17 @@ final class PerformanceAggregatorTest extends KernelTestCase
     {
         $route = $this->createRoute('2');
         $stop  = $this->createStop('stop-2');
+        $date  = new \DateTimeImmutable('2025-01-02');
 
         // Create 4 arrival logs - median should be (20+30)/2 = 25
-        $this->createArrivalLog($route, $stop, delaySec: 10);
-        $this->createArrivalLog($route, $stop, delaySec: 20);
-        $this->createArrivalLog($route, $stop, delaySec: 30);
-        $this->createArrivalLog($route, $stop, delaySec: 40);
+        $this->createArrivalLog($route, $stop, $date, delaySec: 10);
+        $this->createArrivalLog($route, $stop, $date, delaySec: 20);
+        $this->createArrivalLog($route, $stop, $date, delaySec: 30);
+        $this->createArrivalLog($route, $stop, $date, delaySec: 40);
 
         $this->em->flush();
 
-        $result = $this->aggregator->aggregateDate(new \DateTimeImmutable('today'));
+        $result = $this->aggregator->aggregateDate($date);
 
         self::assertSame(1, $result['success']);
         self::assertSame(0, $result['failed']);
@@ -84,15 +86,16 @@ final class PerformanceAggregatorTest extends KernelTestCase
     {
         $route = $this->createRoute('3');
         $stop  = $this->createStop('stop-3');
+        $date  = new \DateTimeImmutable('2025-01-03');
 
-        $this->createArrivalLog($route, $stop, confidence: PredictionConfidence::HIGH);
-        $this->createArrivalLog($route, $stop, confidence: PredictionConfidence::HIGH);
-        $this->createArrivalLog($route, $stop, confidence: PredictionConfidence::MEDIUM);
-        $this->createArrivalLog($route, $stop, confidence: PredictionConfidence::LOW);
+        $this->createArrivalLog($route, $stop, $date, confidence: PredictionConfidence::HIGH);
+        $this->createArrivalLog($route, $stop, $date, confidence: PredictionConfidence::HIGH);
+        $this->createArrivalLog($route, $stop, $date, confidence: PredictionConfidence::MEDIUM);
+        $this->createArrivalLog($route, $stop, $date, confidence: PredictionConfidence::LOW);
 
         $this->em->flush();
 
-        $result = $this->aggregator->aggregateDate(new \DateTimeImmutable('today'));
+        $result = $this->aggregator->aggregateDate($date);
 
         self::assertSame(1, $result['success']);
         // Expected: 2 high, 1 medium, 1 low, total 4
@@ -104,7 +107,7 @@ final class PerformanceAggregatorTest extends KernelTestCase
         $this->createRoute('4');
         $this->em->flush();
 
-        $result = $this->aggregator->aggregateDate(new \DateTimeImmutable('today'));
+        $result = $this->aggregator->aggregateDate(new \DateTimeImmutable('2025-01-04'));
 
         // Should skip routes with no activity
         self::assertSame(0, $result['success']);
@@ -113,12 +116,14 @@ final class PerformanceAggregatorTest extends KernelTestCase
 
     public function testLinksWeatherObservationFromNoontime(): void
     {
-        $route = $this->createRoute('5');
-        $stop  = $this->createStop('stop-5');
+        $route       = $this->createRoute('5');
+        $stop        = $this->createStop('stop-5');
+        $date        = new \DateTimeImmutable('2025-01-05');
+        $weatherTime = new \DateTimeImmutable('2025-01-05 12:00:00');
 
         // Create weather observation at noon
         $weather = new WeatherObservation();
-        $weather->setObservedAt(new \DateTimeImmutable('today 12:00:00'));
+        $weather->setObservedAt($weatherTime);
         $weather->setTemperatureCelsius('2.4');
         $weather->setWeatherCondition('snow');
         $weather->setWeatherCode(71);
@@ -126,10 +131,10 @@ final class PerformanceAggregatorTest extends KernelTestCase
         $weather->setDataSource('test');
         $this->em->persist($weather);
 
-        $this->createArrivalLog($route, $stop, delaySec: 100);
+        $this->createArrivalLog($route, $stop, $date, delaySec: 100);
         $this->em->flush();
 
-        $result = $this->aggregator->aggregateDate(new \DateTimeImmutable('today'));
+        $result = $this->aggregator->aggregateDate($date);
 
         self::assertSame(1, $result['success']);
     }
@@ -138,15 +143,16 @@ final class PerformanceAggregatorTest extends KernelTestCase
     {
         $route = $this->createRoute('6');
         $stop  = $this->createStop('stop-6');
+        $date  = new \DateTimeImmutable('2025-01-06');
 
         // Create logs with null delay
-        $this->createArrivalLog($route, $stop, delaySec: null);
-        $this->createArrivalLog($route, $stop, delaySec: 100);
-        $this->createArrivalLog($route, $stop, delaySec: 200);
+        $this->createArrivalLog($route, $stop, $date, delaySec: null);
+        $this->createArrivalLog($route, $stop, $date, delaySec: 100);
+        $this->createArrivalLog($route, $stop, $date, delaySec: 200);
 
         $this->em->flush();
 
-        $result = $this->aggregator->aggregateDate(new \DateTimeImmutable('today'));
+        $result = $this->aggregator->aggregateDate($date);
 
         self::assertSame(1, $result['success']);
         // Total predictions = 3, but only 2 have delay data
@@ -158,7 +164,7 @@ final class PerformanceAggregatorTest extends KernelTestCase
         $route->setGtfsId($gtfsId);
         $route->setShortName($gtfsId);
         $route->setLongName('Test Route '.$gtfsId);
-        $route->setRouteType(RouteTypeEnum::BUS);
+        $route->setRouteType(RouteTypeEnum::Bus);
         $this->em->persist($route);
 
         return $route;
@@ -170,7 +176,7 @@ final class PerformanceAggregatorTest extends KernelTestCase
         $stop->setGtfsId($gtfsId);
         $stop->setName('Test Stop '.$gtfsId);
         $stop->setLat(52.1324);
-        $stop->setLon(-106.6607);
+        $stop->setLong(-106.6607);
         $this->em->persist($stop);
 
         return $stop;
@@ -179,6 +185,7 @@ final class PerformanceAggregatorTest extends KernelTestCase
     private function createArrivalLog(
         Route $route,
         Stop $stop,
+        \DateTimeImmutable $date,
         ?int $delaySec = 0,
         PredictionConfidence $confidence = PredictionConfidence::HIGH,
     ): ArrivalLog {
@@ -187,8 +194,8 @@ final class PerformanceAggregatorTest extends KernelTestCase
         $log->setStop($stop);
         $log->setVehicleId('veh-test-'.random_int(1000, 9999));
         $log->setTripId('trip-test-'.random_int(1000, 9999));
-        $log->setPredictedArrival(new \DateTimeImmutable());
-        $log->setPredictedAt(new \DateTimeImmutable());
+        $log->setPredictedArrivalAt($date);
+        $log->setPredictedAt($date);
         $log->setConfidence($confidence);
         $log->setDelaySec($delaySec);
         $this->em->persist($log);

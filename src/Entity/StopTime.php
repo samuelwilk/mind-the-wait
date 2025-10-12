@@ -6,17 +6,9 @@ use App\Repository\StopTimeRepository;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: StopTimeRepository::class)]
-#[ORM\Table(
-    indexes: [
-        new ORM\Index(name: 'idx_stop_time_trip', columns: ['trip_id']),
-    ],
-    uniqueConstraints: [
-        new ORM\UniqueConstraint(
-            name: 'stop_time_trip_seq_unique',
-            columns: ['trip_id', 'stop_sequence']
-        ),
-    ]
-)]
+#[ORM\Table]
+#[ORM\Index(name: 'idx_stop_time_trip', columns: ['trip_id'])]
+#[ORM\UniqueConstraint(name: 'stop_time_trip_seq_unique', columns: ['trip_id', 'stop_sequence'])]
 class StopTime
 {
     #[ORM\Id]
