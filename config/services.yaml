@@ -45,3 +45,8 @@ services:
     App\Service\Realtime\TrafficReasonProviderInterface: '@App\Service\Realtime\HeuristicTrafficReasonProvider'
     App\Repository\VehicleFeedbackRepositoryInterface: '@App\Repository\VehicleFeedbackRepository'
     App\Service\Prediction\ArrivalPredictorInterface: '@App\Service\Prediction\ArrivalPredictor'
+
+when@test:
+    services:
+        _defaults:
+            public: true

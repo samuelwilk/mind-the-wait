@@ -59,7 +59,7 @@ database-migrations-execute: ## Runs the current set of migrations against the D
 database-test: ## Sets up the test database
 	@make database-create-test
 	@make database-migrations-execute-test
-	@make database-fixtures-test
+#	@make database-fixtures-test  # Optional: add if you create test fixtures
 
 database-create-test: ## Creates the database
 	@docker compose exec -e APP_ENV=test php bin/console doctrine:database:drop --if-exists --force

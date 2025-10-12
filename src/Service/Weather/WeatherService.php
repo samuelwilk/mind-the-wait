@@ -248,7 +248,7 @@ final readonly class WeatherService
     {
         return match (true) {
             $code === 0                => 'clear',
-            $code >= 1  && $code <= 3   => 'cloudy',
+            $code >= 1  && $code <= 3  => 'cloudy',
             $code >= 51 && $code <= 67 => 'rain',
             $code >= 71 && $code <= 77 => 'snow',
             $code >= 80 && $code <= 86 => 'showers',
