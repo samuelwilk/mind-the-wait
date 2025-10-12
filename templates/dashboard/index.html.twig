@@ -1,0 +1,108 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Overview{% endblock %}
+
+{% block body %}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Page Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Saskatoon Transit Overview</h1>
+            <p class="mt-2 text-gray-600">Real-time performance insights and historical trends</p>
+        </div>
+
+        <!-- Metrics Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {% include 'components/MetricCard.html.twig' with {
+                label: 'Average On-Time Performance',
+                value: '87.3%',
+                change: 2.4
+            } %}
+
+            {% include 'components/MetricCard.html.twig' with {
+                label: 'Active Routes',
+                value: '45',
+                change: 0
+            } %}
+
+            {% include 'components/MetricCard.html.twig' with {
+                label: 'Vehicles in Service',
+                value: '127',
+                change: -3.1
+            } %}
+
+            {% include 'components/MetricCard.html.twig' with {
+                label: 'Average Headway',
+                value: '12.5 min',
+                change: 1.2
+            } %}
+        </div>
+
+        <!-- Insights Section -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-4">Key Insights</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {% include 'components/InsightCard.html.twig' with {
+                    color: 'blue',
+                    title: 'Winter Weather Impact',
+                    content: '<p>Routes experience an average <strong>33% drop</strong> in on-time performance during snow conditions compared to clear weather.</p>'
+                } %}
+
+                {% include 'components/InsightCard.html.twig' with {
+                    color: 'amber',
+                    title: 'Temperature Threshold',
+                    content: '<p>Performance begins to degrade sharply when temperatures drop below <strong>-20°C</strong>, with delays increasing by 5-7 minutes on average.</p>'
+                } %}
+            </div>
+        </div>
+
+        <!-- Sample Chart -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-4">Performance Trends</h2>
+            {% include 'components/ChartCard.html.twig' with {
+                title: 'Weekly On-Time Performance',
+                description: 'Past 7 days system-wide reliability',
+                chartOptions: {
+                    xAxis: {
+                        type: 'category',
+                        data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                    },
+                    yAxis: {
+                        type: 'value',
+                        name: 'On-Time %',
+                        max: 100
+                    },
+                    series: [{
+                        name: 'On-Time %',
+                        type: 'line',
+                        data: [85, 87, 84, 89, 88, 92, 90],
+                        smooth: true,
+                        areaStyle: {
+                            opacity: 0.2
+                        }
+                    }],
+                    tooltip: {
+                        trigger: 'axis'
+                    }
+                }
+            } %}
+        </div>
+
+        <!-- Coming Soon Notice -->
+        <div class="bg-gradient-to-r from-primary-50 to-primary-100 border border-primary-200 rounded-lg p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <svg class="h-8 w-8 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-semibold text-primary-900">Phase 1 Foundation Complete!</h3>
+                    <p class="mt-1 text-sm text-primary-800">
+                        Tailwind CSS, Stimulus, ECharts, and reusable components are ready.
+                        Next up: Building detailed route pages and weather impact analysis.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

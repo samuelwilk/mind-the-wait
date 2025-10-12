@@ -1,17 +1,118 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" class="h-full">
     <head>
         <meta charset="UTF-8">
-        <title>{% block title %}Welcome!{% endblock %}</title>
-        <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.2em%22 font-size=%2296%22>⚫️</text><text y=%221.3em%22 x=%220.2em%22 font-size=%2276%22 fill=%22%23fff%22>sf</text></svg>">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{% block title %}Mind the Wait{% endblock %} | Saskatoon Transit Insights</title>
+        <meta name="description" content="{% block description %}Real-time transit reliability monitoring and historical performance insights for Saskatoon Transit{% endblock %}">
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.2em%22 font-size=%2296%22>🚌</text></svg>">
+
         {% block stylesheets %}
+            <link rel="stylesheet" href="{{ asset('styles/app.css') }}">
         {% endblock %}
 
         {% block javascripts %}
             {% block importmap %}{{ importmap('app') }}{% endblock %}
         {% endblock %}
     </head>
-    <body>
-        {% block body %}{% endblock %}
+    <body class="h-full flex flex-col">
+        <!-- Navigation -->
+        <nav class="bg-white shadow-sm border-b border-gray-200" data-controller="mobile-menu">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex">
+                        <!-- Logo/Brand -->
+                        <div class="flex-shrink-0 flex items-center">
+                            <a href="{{ path('app_dashboard') }}" class="text-2xl font-bold text-primary-600 no-underline hover:text-primary-700">
+                                🚌 Mind the Wait
+                            </a>
+                        </div>
+
+                        <!-- Navigation Links -->
+                        <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
+                            <a href="{{ path('app_dashboard') }}"
+                               class="{% if app.request.get('_route') == 'app_dashboard' %}border-primary-500 text-gray-900{% else %}border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700{% endif %} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium no-underline">
+                                Overview
+                            </a>
+                            <a href="{{ path('app_routes') }}"
+                               class="{% if app.request.get('_route') starts with 'app_routes' %}border-primary-500 text-gray-900{% else %}border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700{% endif %} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium no-underline">
+                                Routes
+                            </a>
+                            <a href="{{ path('app_weather') }}"
+                               class="{% if app.request.get('_route') starts with 'app_weather' %}border-primary-500 text-gray-900{% else %}border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700{% endif %} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium no-underline">
+                                Weather Impact
+                            </a>
+                            <a href="{{ path('app_analysis') }}"
+                               class="{% if app.request.get('_route') starts with 'app_analysis' %}border-primary-500 text-gray-900{% else %}border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700{% endif %} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium no-underline">
+                                Analysis
+                            </a>
+                            <a href="{{ path('app_live') }}"
+                               class="{% if app.request.get('_route') == 'app_live' %}border-primary-500 text-gray-900{% else %}border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700{% endif %} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium no-underline">
+                                Live Monitor
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Mobile menu button -->
+                    <div class="flex items-center sm:hidden">
+                        <button type="button"
+                                data-action="click->mobile-menu#toggle"
+                                class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500">
+                            <span class="sr-only">Open main menu</span>
+                            <!-- Heroicon: menu -->
+                            <svg class="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile menu -->
+            <div class="hidden sm:hidden" data-mobile-menu-target="menu">
+                <div class="pt-2 pb-3 space-y-1">
+                    <a href="{{ path('app_dashboard') }}"
+                       class="{% if app.request.get('_route') == 'app_dashboard' %}bg-primary-50 border-primary-500 text-primary-700{% else %}border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium no-underline">
+                        Overview
+                    </a>
+                    <a href="{{ path('app_routes') }}"
+                       class="{% if app.request.get('_route') starts with 'app_routes' %}bg-primary-50 border-primary-500 text-primary-700{% else %}border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium no-underline">
+                        Routes
+                    </a>
+                    <a href="{{ path('app_weather') }}"
+                       class="{% if app.request.get('_route') starts with 'app_weather' %}bg-primary-50 border-primary-500 text-primary-700{% else %}border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium no-underline">
+                        Weather Impact
+                    </a>
+                    <a href="{{ path('app_analysis') }}"
+                       class="{% if app.request.get('_route') starts with 'app_analysis' %}bg-primary-50 border-primary-500 text-primary-700{% else %}border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium no-underline">
+                        Analysis
+                    </a>
+                    <a href="{{ path('app_live') }}"
+                       class="{% if app.request.get('_route') == 'app_live' %}bg-primary-50 border-primary-500 text-primary-700{% else %}border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium no-underline">
+                        Live Monitor
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="flex-1">
+            {% block body %}{% endblock %}
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-white border-t border-gray-200 mt-12">
+            <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                <p class="text-center text-sm text-gray-500">
+                    Mind the Wait | Saskatoon Transit Insights
+                    <span class="mx-2">•</span>
+                    Data updates hourly
+                    <span class="mx-2">•</span>
+                    <a href="https://github.com/yourusername/mind-the-wait" target="_blank" rel="noopener" class="text-primary-600 hover:text-primary-700">
+                        Open Source
+                    </a>
+                </p>
+            </div>
+        </footer>
     </body>
 </html>

@@ -1,0 +1,22 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Live Monitor{% endblock %}
+
+{% block body %}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Live Transit Monitor</h1>
+            <p class="mt-2 text-gray-600">Real-time vehicle positions and arrival predictions</p>
+        </div>
+
+        <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-12 text-center border-2 border-green-200">
+            <svg class="mx-auto h-16 w-16 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            <h3 class="mt-4 text-lg font-bold text-green-900">Coming Soon: Phase 6</h3>
+            <p class="mt-2 text-sm text-green-800 max-w-2xl mx-auto">
+                Live map with real-time vehicle positions, arrival predictions, and auto-updating data using Turbo Streams.
+            </p>
+        </div>
+    </div>
+{% endblock %}
