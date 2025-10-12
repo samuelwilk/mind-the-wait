@@ -83,6 +83,13 @@ class RoutePerformanceDaily
     #[ORM\Column(type: Types::INTEGER)]
     private int $bunchingIncidents = 0;
 
+    /**
+     * Representative weather observation for this day (nullable for historical data).
+     */
+    #[ORM\ManyToOne(targetEntity: WeatherObservation::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?WeatherObservation $weatherObservation = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -228,6 +235,18 @@ class RoutePerformanceDaily
     public function setBunchingIncidents(int $bunchingIncidents): self
     {
         $this->bunchingIncidents = $bunchingIncidents;
+
+        return $this;
+    }
+
+    public function getWeatherObservation(): ?WeatherObservation
+    {
+        return $this->weatherObservation;
+    }
+
+    public function setWeatherObservation(?WeatherObservation $weatherObservation): self
+    {
+        $this->weatherObservation = $weatherObservation;
 
         return $this;
     }

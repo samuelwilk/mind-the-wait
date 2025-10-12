@@ -9,6 +9,7 @@ use App\Enum\PredictionConfidence;
 use App\Repository\ArrivalLogRepository;
 use App\Repository\RoutePerformanceDailyRepository;
 use App\Repository\RouteRepository;
+use App\Repository\WeatherObservationRepository;
 use Psr\Log\LoggerInterface;
 
 use function array_sum;
@@ -28,6 +29,7 @@ final readonly class PerformanceAggregator
         private ArrivalLogRepository $arrivalLogRepo,
         private RoutePerformanceDailyRepository $performanceRepo,
         private RouteRepository $routeRepo,
+        private WeatherObservationRepository $weatherRepo,
         private LoggerInterface $logger,
     ) {
     }
@@ -41,6 +43,10 @@ final readonly class PerformanceAggregator
     {
         $startOfDay = $date->setTime(0, 0, 0);
         $endOfDay   = $date->setTime(23, 59, 59);
+
+        // Find representative weather for this day (around noon)
+        $noonTime = $date->setTime(12, 0, 0);
+        $weather  = $this->weatherRepo->findClosestTo($noonTime);
 
         $routes  = $this->routeRepo->findAll();
         $success = 0;
@@ -72,6 +78,9 @@ final readonly class PerformanceAggregator
                 $performance->setLatePercentage($metrics->latePercentage !== null ? (string) $metrics->latePercentage : null);
                 $performance->setEarlyPercentage($metrics->earlyPercentage !== null ? (string) $metrics->earlyPercentage : null);
 
+                // Link weather observation for weather-correlated analysis
+                $performance->setWeatherObservation($weather);
+
                 $this->performanceRepo->save($performance, flush: true);
                 ++$success;
 
@@ -80,6 +89,11 @@ final readonly class PerformanceAggregator
                     'route_short_name'  => $route->getShortName(),
                     'date'              => $date->format('Y-m-d'),
                     'total_predictions' => $metrics->totalPredictions,
+                    'weather'           => $weather ? sprintf('%s°C, %s (%s)',
+                        $weather->getTemperatureCelsius(),
+                        $weather->getWeatherCondition(),
+                        $weather->getTransitImpact()->value
+                    ) : 'none',
                 ]);
             } catch (\Exception $e) {
                 ++$failed;
