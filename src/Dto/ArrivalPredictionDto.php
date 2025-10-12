@@ -19,6 +19,7 @@ final readonly class ArrivalPredictionDto
         public ?VehicleStatusDto $status = null,
         public ?array $currentLocation = null,  // ['lat' => float, 'lon' => float, 'stops_away' => int]
         public ?array $feedbackSummary = null,
+        public ?int $delaySec = null,           // Seconds behind (-) or ahead (+) of schedule
     ) {
     }
 
@@ -43,6 +44,7 @@ final readonly class ArrivalPredictionDto
             'status'           => $this->status?->toArray(),
             'current_location' => $this->currentLocation,
             'feedback_summary' => $this->feedbackSummary,
+            'delay_sec'        => $this->delaySec,
         ];
     }
 }

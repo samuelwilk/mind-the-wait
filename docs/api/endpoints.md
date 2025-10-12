@@ -14,6 +14,95 @@ Currently no authentication required. All endpoints are public.
 
 ---
 
+## GET /api/stops
+
+**⭐ NEW:** Search for transit stops by location (GPS coordinates) or name.
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `lat` | float | Conditional* | Latitude for proximity search |
+| `lon` | float | Conditional* | Longitude for proximity search |
+| `name` | string | Conditional* | Stop name search (case-insensitive partial match) |
+| `limit` | integer | No | Max results (default: 10 for location, 20 for name) |
+
+\* Either `lat`+`lon` OR `name` must be provided
+
+### Search by Location
+
+Returns stops sorted by distance from coordinates:
+
+```bash
+curl 'https://localhost/api/stops?lat=52.1674652&lon=-106.5755517&limit=5'
+```
+
+**Response:**
+```json
+[
+  {
+    "gtfs_id": "3900",
+    "name": "Evergreen / Wyant",
+    "lat": 52.168249,
+    "lon": -106.575778,
+    "distance_km": 0.09
+  },
+  {
+    "gtfs_id": "3921",
+    "name": "Zary / Evergreen",
+    "lat": 52.166906,
+    "lon": -106.576557,
+    "distance_km": 0.09
+  }
+]
+```
+
+### Search by Name
+
+Returns stops matching name query:
+
+```bash
+curl 'https://localhost/api/stops?name=evergreen&limit=5'
+```
+
+**Response:**
+```json
+[
+  {
+    "gtfs_id": "3900",
+    "name": "Evergreen / Wyant",
+    "lat": 52.168249,
+    "lon": -106.575778
+  },
+  {
+    "gtfs_id": "3901",
+    "name": "Evergreen / Salloum",
+    "lat": 52.170604,
+    "lon": -106.573167
+  }
+]
+```
+
+### Use Case: Finding Your Stop
+
+To find stops for a route from address A to address B:
+
+1. **Get GPS coordinates** from your map application or browser
+2. **Search near origin:**
+   ```bash
+   curl 'https://localhost/api/stops?lat=52.1674652&lon=-106.5755517&limit=3'
+   ```
+3. **Search near destination:**
+   ```bash
+   curl 'https://localhost/api/stops?lat=52.132582&lon=-106.6675509&limit=3'
+   ```
+4. **Check predictions** for each stop:
+   ```bash
+   curl 'https://localhost/api/stops/3900/predictions?limit=5'
+   ```
+
+---
+
 ## GET /api/stops/{stopId}/predictions
 
 **⭐ NEW:** Get realtime arrival predictions for a specific stop with countdown timers and confidence levels.

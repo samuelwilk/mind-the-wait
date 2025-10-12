@@ -10,6 +10,26 @@ The arrival prediction system uses a 3-tier fallback strategy to provide the mos
 2. **MEDIUM confidence** - GPS interpolation (position + schedule calculations)
 3. **LOW confidence** - Static schedule (timetable fallback)
 
+## Quick Start
+
+**Step 1: Find your stop ID**
+
+```bash
+# Search by location (returns stops sorted by distance)
+curl 'https://localhost/api/stops?lat=52.1674652&lon=-106.5755517&limit=3'
+
+# Or search by name
+curl 'https://localhost/api/stops?name=evergreen&limit=5'
+```
+
+**Step 2: Get arrival predictions**
+
+```bash
+curl 'https://localhost/api/stops/3900/predictions?limit=5'
+```
+
+See [Stop Search API](endpoints.md#get-apistops) for complete documentation.
+
 ## Endpoints
 
 ### GET /api/stops/{stopId}/predictions
@@ -52,6 +72,7 @@ interface ArrivalPrediction {
   arrival_in_sec: number;            // Countdown timer (seconds)
   arrival_at: number;                // Unix timestamp
   confidence: 'high' | 'medium' | 'low';
+  delay_sec: number | null;          // Schedule deviation (negative=early, positive=late)
   status: VehicleStatus | null;      // Punctuality status
   current_location: {
     lat: number;
@@ -83,6 +104,7 @@ interface ArrivalPrediction {
       "arrival_in_sec": 180,
       "arrival_at": 1759897380,
       "confidence": "high",
+      "delay_sec": 120,
       "status": {
         "color": "yellow",
         "label": "on_time",
@@ -117,6 +139,7 @@ interface ArrivalPrediction {
       "arrival_in_sec": 840,
       "arrival_at": 1759898040,
       "confidence": "medium",
+      "delay_sec": 360,
       "status": {
         "color": "orange",
         "label": "late",
@@ -177,6 +200,33 @@ arrival_in_sec = max(0, arrival_at - current_time)
 ```
 
 Always ≥ 0 (never negative). If vehicle has passed, countdown stops at 0.
+
+### delay_sec
+
+Schedule deviation in seconds. Compares the realtime predicted arrival with the static GTFS schedule.
+
+- **Negative values** = Bus is early (e.g., `-120` = 2 minutes ahead of schedule)
+- **Positive values** = Bus is late (e.g., `360` = 6 minutes behind schedule)
+- **Zero** = Bus is exactly on time
+- **null** = No static schedule available for this trip/stop combination
+
+**Calculation:**
+```
+delay_sec = realtime_arrival - scheduled_arrival
+```
+
+**Example:**
+- Scheduled arrival: 6:51 PM (from GTFS `stop_times.txt`)
+- Realtime prediction: 6:57 PM (from TripUpdate or GPS interpolation)
+- Result: `delay_sec = 360` (6 minutes late)
+
+**Use cases:**
+- Show "6 min late" badges in rider-facing UIs
+- Track on-time performance metrics
+- Trigger alerts when delays exceed thresholds
+- Compare against crowd feedback votes (ahead/on_time/late)
+
+**Note:** This field complements the `status.deviation_sec` field from the vehicle status system, but uses static schedule as the baseline instead of dynamic headway calculations.
 
 ### stops_away
 

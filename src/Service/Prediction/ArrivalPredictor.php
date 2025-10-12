@@ -14,6 +14,7 @@ use App\Repository\TripRepository;
 use App\Repository\VehicleFeedbackRepositoryInterface;
 use App\Service\Headway\PositionInterpolator;
 use App\Service\Headway\StopTimeProviderInterface;
+use App\Service\History\ArrivalLogger;
 use App\Service\Realtime\VehicleStatusService;
 
 use function array_slice;
@@ -34,6 +35,7 @@ final readonly class ArrivalPredictor implements ArrivalPredictorInterface
         private PositionInterpolator $positionInterpolator,
         private VehicleStatusService $statusService,
         private VehicleFeedbackRepositoryInterface $feedbackRepo,
+        private ArrivalLogger $arrivalLogger,
     ) {
     }
 
@@ -66,9 +68,13 @@ final readonly class ArrivalPredictor implements ArrivalPredictorInterface
     {
         $snapshot = $this->realtimeRepo->snapshot();
         $vehicles = $snapshot['vehicles'] ?? [];
+        $trips    = $snapshot['trips']    ?? [];
         $now      = time();
 
         $predictions = [];
+        $seenTrips   = [];
+
+        // First pass: predictions for active vehicles (with GPS positions)
         foreach ($vehicles as $rawVehicle) {
             if (!isset($rawVehicle['trip'])) {
                 continue;
@@ -83,7 +89,28 @@ final readonly class ArrivalPredictor implements ArrivalPredictorInterface
             $prediction = $this->predictArrivalForVehicle($stopId, $vehicle, $rawVehicle);
 
             if ($prediction !== null && $prediction->arrivalAt >= $now - self::MAX_PAST_ARRIVAL_SEC) {
-                $predictions[] = $prediction;
+                $predictions[]               = $prediction;
+                $seenTrips[$vehicle->tripId] = true;
+            }
+        }
+
+        // Second pass: scheduled arrivals from TripUpdate feed (for trips without active vehicles)
+        // This ensures predictions show even when buses haven't started their route yet
+        foreach ($trips as $trip) {
+            $tripId = $trip['trip'] ?? null;
+            if ($tripId === null || isset($seenTrips[$tripId])) {
+                continue; // Skip if already predicted from active vehicle
+            }
+
+            // Filter by route if specified
+            if ($routeId !== null && ($trip['route'] ?? null) !== $routeId) {
+                continue;
+            }
+
+            $prediction = $this->predictArrivalFromTripUpdate($stopId, $trip, $now);
+            if ($prediction !== null) {
+                $predictions[]      = $prediction;
+                $seenTrips[$tripId] = true;
             }
         }
 
@@ -102,6 +129,56 @@ final readonly class ArrivalPredictor implements ArrivalPredictorInterface
         $vehicleId = $rawVehicle['id'] ?? $vehicle->tripId; // Fallback to trip if no vehicle ID
 
         return $this->predictArrival($stopId, $vehicle->tripId, $vehicleId);
+    }
+
+    /**
+     * Predict arrival from TripUpdate feed for trips without active vehicles.
+     * This handles scheduled arrivals before the bus has started moving.
+     */
+    private function predictArrivalFromTripUpdate(string $stopId, array $trip, int $now): ?ArrivalPredictionDto
+    {
+        $tripId    = $trip['trip']  ?? null;
+        $routeId   = $trip['route'] ?? null;
+        $stopTimes = $trip['stops'] ?? [];
+
+        if ($tripId === null || $routeId === null) {
+            return null;
+        }
+
+        foreach ($stopTimes as $stop) {
+            if ($stop['stop_id'] !== $stopId) {
+                continue;
+            }
+
+            $arrivalTime = $stop['arr'] ?? $stop['dep'] ?? null;
+            if ($arrivalTime === null) {
+                continue;
+            }
+
+            // Only show arrivals in the future (or very recent past)
+            if ($arrivalTime < $now - self::MAX_PAST_ARRIVAL_SEC) {
+                continue;
+            }
+
+            // Create a minimal vehicle DTO for this scheduled trip
+            $vehicle = new VehicleDto(
+                routeId: $routeId,
+                direction: null, // Direction not available for scheduled trips
+                timestamp: $now,
+                lat: null,
+                lon: null,
+                tripId: $tripId
+            );
+
+            return $this->buildPrediction(
+                vehicle: $vehicle,
+                stopId: $stopId,
+                arrivalAt: $arrivalTime,
+                confidence: PredictionConfidence::MEDIUM // Medium confidence until vehicle is active
+            );
+        }
+
+        return null;
     }
 
     /**
@@ -256,7 +333,10 @@ final readonly class ArrivalPredictor implements ArrivalPredictorInterface
         $vehicleId       = $vehicle->tripId ?? ''; // TODO: better vehicle ID resolution
         $feedbackSummary = $this->feedbackRepo->getSummary($vehicleId);
 
-        return new ArrivalPredictionDto(
+        // Calculate delay (realtime vs scheduled)
+        $delaySec = $this->calculateDelay($vehicle->tripId ?? '', $stopId, $arrivalAt);
+
+        $prediction = new ArrivalPredictionDto(
             vehicleId: $vehicleId,
             routeId: $vehicle->routeId,
             tripId: $vehicle->tripId ?? '',
@@ -266,8 +346,14 @@ final readonly class ArrivalPredictor implements ArrivalPredictorInterface
             confidence: $confidence,
             status: $status,
             currentLocation: $currentLocation,
-            feedbackSummary: $feedbackSummary
+            feedbackSummary: $feedbackSummary,
+            delaySec: $delaySec
         );
+
+        // Log prediction for historical analysis
+        $this->arrivalLogger->logPrediction($prediction, $vehicle);
+
+        return $prediction;
     }
 
     private function findVehicleById(array $vehicles, string $vehicleId): ?VehicleDto
@@ -333,5 +419,47 @@ final readonly class ArrivalPredictor implements ArrivalPredictorInterface
         }
 
         return max(0, $targetSeq - $nearestSeq);
+    }
+
+    /**
+     * Calculate delay by comparing realtime arrival with static schedule.
+     *
+     * @return int|null Delay in seconds (negative = early, positive = late), or null if schedule unavailable
+     */
+    private function calculateDelay(string $tripId, string $stopId, int $realtimeArrival): ?int
+    {
+        // Get scheduled arrival from static GTFS
+        $stopTimes = $this->staticStopTimeRepo->getStopTimesForTrip($tripId);
+        if ($stopTimes === null) {
+            return null;
+        }
+
+        // Find the scheduled time for this stop
+        $scheduledArrivalSec = null;
+        foreach ($stopTimes as $st) {
+            if ($st['stop_id'] === $stopId) {
+                $scheduledArrivalSec = $st['arr'] ?? $st['dep'] ?? null;
+                break;
+            }
+        }
+
+        if ($scheduledArrivalSec === null) {
+            return null;
+        }
+
+        // Convert scheduled time from seconds-since-midnight to Unix timestamp
+        // Assume the trip is scheduled for today
+        $todayMidnight        = strtotime('today');
+        $scheduledArrivalUnix = $todayMidnight + $scheduledArrivalSec;
+
+        // If scheduled time is in the past (yesterday's trip), add 24 hours
+        // This handles trips that run after midnight (e.g., 25:30:00 = 1:30 AM next day)
+        if ($scheduledArrivalUnix < time() - 43200) { // More than 12 hours ago
+            $scheduledArrivalUnix += 86400; // Add 24 hours
+        }
+
+        // Calculate delay: realtime - scheduled
+        // Positive = late, Negative = early
+        return $realtimeArrival - $scheduledArrivalUnix;
     }
 }

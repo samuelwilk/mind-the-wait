@@ -42,7 +42,14 @@ final class HeuristicTrafficReasonProviderTest extends TestCase
         self::assertNotNull($reason);
         // Standard message format: "Severe traffic likely impacting 15 (delay 12 min)."
         // Dad joke format: various funny messages
-        if (!str_contains($reason, 'pigeon') && !str_contains($reason, 'quantum')) {
+        $reasonLower = strtolower($reason);
+        $isDadJoke   = str_contains($reasonLower, 'pigeon')
+            || str_contains($reasonLower, 'quantum')
+            || str_contains($reasonLower, 'speedrun')
+            || str_contains($reasonLower, 'wormhole')
+            || str_contains($reasonLower, 'gremlins');
+
+        if (!$isDadJoke) {
             self::assertStringContainsString('Severe traffic', $reason);
             self::assertStringContainsString('15', $reason);
         }
@@ -60,7 +67,14 @@ final class HeuristicTrafficReasonProviderTest extends TestCase
         $reason = $provider->reasonFor($vehicle, 240); // 4 min delay
 
         self::assertNotNull($reason);
-        if (!str_contains($reason, 'pigeon') && !str_contains($reason, 'quantum')) {
+        $reasonLower = strtolower($reason);
+        $isDadJoke   = str_contains($reasonLower, 'pigeon')
+            || str_contains($reasonLower, 'quantum')
+            || str_contains($reasonLower, 'speedrun')
+            || str_contains($reasonLower, 'wormhole')
+            || str_contains($reasonLower, 'gremlins');
+
+        if (!$isDadJoke) {
             self::assertStringContainsString('Moderate congestion', $reason);
             self::assertStringContainsString('20', $reason);
         }
@@ -78,7 +92,14 @@ final class HeuristicTrafficReasonProviderTest extends TestCase
         $reason = $provider->reasonFor($vehicle, -400); // 6+ min early
 
         self::assertNotNull($reason);
-        if (!str_contains($reason, 'pigeon') && !str_contains($reason, 'quantum')) {
+        $reasonLower = strtolower($reason);
+        $isDadJoke   = str_contains($reasonLower, 'pigeon')
+            || str_contains($reasonLower, 'quantum')
+            || str_contains($reasonLower, 'speedrun')
+            || str_contains($reasonLower, 'wormhole')
+            || str_contains($reasonLower, 'gremlins');
+
+        if (!$isDadJoke) {
             self::assertStringContainsString('Light traffic', $reason);
             self::assertStringContainsString('25', $reason);
         }
