@@ -1,0 +1,55 @@
+{#
+    Insight Story Card Component
+
+    Displays an insight explanation with icon, title, content, and optional action.
+
+    Props:
+    - icon: Emoji or icon to display
+    - title: Card title
+    - content: HTML content (supports paragraphs, lists, etc.)
+    - color: Color theme (blue, amber, green, red)
+    - action: Optional {label, url} for CTA button
+#}
+
+{% set colorClasses = {
+    'blue': 'bg-primary-50 border-primary-200 text-primary-900',
+    'amber': 'bg-amber-50 border-amber-200 text-amber-900',
+    'green': 'bg-success-50 border-success-200 text-success-900',
+    'red': 'bg-danger-50 border-danger-200 text-danger-900',
+    'purple': 'bg-purple-50 border-purple-200 text-purple-900',
+} %}
+
+{% set iconColorClasses = {
+    'blue': 'text-primary-600',
+    'amber': 'text-amber-600',
+    'green': 'text-success-600',
+    'red': 'text-danger-600',
+    'purple': 'text-purple-600',
+} %}
+
+<div class="border rounded-lg p-6 {{ colorClasses[color]|default('bg-gray-50 border-gray-200 text-gray-900') }} h-full flex flex-col">
+    <div class="flex items-start flex-1">
+        {% if icon is defined %}
+            <div class="flex-shrink-0 text-4xl {{ iconColorClasses[color]|default('text-gray-600') }} mr-4">
+                {{ icon }}
+            </div>
+        {% endif %}
+        <div class="flex-1 flex flex-col">
+            <h3 class="text-xl font-semibold mb-3">{{ title }}</h3>
+            <div class="prose prose-sm max-w-none flex-1">
+                {{ content|raw }}
+            </div>
+            {% if action is defined %}
+                <div class="mt-4 pt-4">
+                    <a href="{{ action.url }}"
+                       class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors">
+                        {{ action.label }}
+                        <svg class="ml-2 -mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>

@@ -11,6 +11,8 @@ final readonly class SystemMetricsDto
      * @param array<int, RouteMetricDto> $needsAttention
      * @param array<int, RouteMetricDto> $historicalTopPerformers
      * @param array<int, RouteMetricDto> $historicalWorstPerformers
+     * @param string                     $winterWeatherImpactInsight  AI-generated insight card (HTML)
+     * @param string                     $temperatureThresholdInsight AI-generated insight card (HTML)
      */
     public function __construct(
         public string $systemGrade,
@@ -23,6 +25,8 @@ final readonly class SystemMetricsDto
         public array $needsAttention,
         public array $historicalTopPerformers,
         public array $historicalWorstPerformers,
+        public string $winterWeatherImpactInsight,
+        public string $temperatureThresholdInsight,
         public int $timestamp,
     ) {
     }

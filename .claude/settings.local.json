@@ -17,7 +17,8 @@
       "Bash(make test-phpunit:*)",
       "Bash(make:*)",
       "Bash(curl -sk \"https://localhost/routes?sort=grade\")",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(composer require:*)"
     ],
     "deny": [],
     "ask": []

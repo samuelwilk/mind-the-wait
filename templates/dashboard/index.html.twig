@@ -51,7 +51,7 @@
                 <!-- Historical Top Performers -->
                 <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                     <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                        <span class="text-success-600">📊</span> Most Reliable Routes
+                        Most Reliable Routes
                     </h3>
                     {% if metrics.historicalTopPerformers|length > 0 %}
                         <div class="space-y-3">
@@ -76,7 +76,7 @@
                 <!-- Historical Worst Performers -->
                 <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                     <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                        <span class="text-danger-600">📉</span> Least Reliable Routes
+                        Least Reliable Routes
                     </h3>
                     {% if metrics.historicalWorstPerformers|length > 0 %}
                         <div class="space-y-3">
@@ -118,7 +118,7 @@
                 {% include 'components/InsightCard.html.twig' with {
                     color: 'blue',
                     title: 'Winter Weather Impact',
-                    content: '<p>Routes experience an average <strong>33% drop</strong> in on-time performance during snow conditions compared to clear weather.</p>',
+                    content: metrics.winterWeatherImpactInsight,
                     action: {
                         label: 'View Full Analysis',
                         url: path('app_weather')
@@ -128,7 +128,7 @@
                 {% include 'components/InsightCard.html.twig' with {
                     color: 'amber',
                     title: 'Temperature Threshold',
-                    content: '<p>Performance begins to degrade sharply when temperatures drop below <strong>-20°C</strong>, with delays increasing by 5-7 minutes on average.</p>',
+                    content: metrics.temperatureThresholdInsight,
                     action: {
                         label: 'View Full Analysis',
                         url: path('app_weather')

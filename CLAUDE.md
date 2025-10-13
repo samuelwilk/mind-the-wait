@@ -50,6 +50,11 @@ make score-tick
 # Only use in development - DO NOT use in production
 docker compose exec php bin/console app:seed:performance-data --clear
 
+# Pre-warm AI insight cache for fast page loads
+# Generates 7 AI-powered insights (2 dashboard + 5 weather analysis)
+# Runs nightly at 2:00 AM via Symfony Scheduler in production
+docker compose exec php bin/console app:warm-insight-cache
+
 # Submit rider feedback (votes: ahead|on_time|late)
 curl -X POST https://localhost/api/vehicle-feedback \
   -H 'Content-Type: application/json' \
@@ -88,13 +93,17 @@ curl -X POST https://localhost/api/vehicle-feedback \
 - `GtfsLoadCommand`: ETL for static GTFS data (ZIP or ArcGIS)
 - `TickGtfsCommand`: Dispatches async messages to poll GTFS-RT feeds (currently disabled; Python sidecar handles this)
 - `ScoreTickCommand`: Orchestrates headway calculation and scoring
+- `WarmInsightCacheCommand`: Pre-generates AI insights for instant page loads
 
-- **Services:**
+**Services:**
   - `VehicleGrouper`: Groups vehicles by route + direction
   - `HeadwayCalculator`: Computes mean headway and assigns A-F grade
   - `HeadwayScorer`: Coordinates grouping + calculation, outputs `ScoreDto[]`
   - `VehicleStatusService`: Builds red/yellow/green punctuality with feedback + heuristics
   - `HeuristicTrafficReasonProvider`: Generates placeholder traffic reasons for delays/early running
+  - `InsightGeneratorService`: Generates AI-powered narrative insights using OpenAI GPT-4o-mini
+  - `OverviewService`: Dashboard system metrics with AI insight cards
+  - `WeatherAnalysisService`: Weather impact analysis with AI-generated narratives
 
 **Repositories:**
 - `RealtimeRepository`: Redis-backed storage for vehicles, trips, alerts, scores
@@ -120,7 +129,7 @@ curl -X POST https://localhost/api/vehicle-feedback \
 - **database**: PostgreSQL 16
 - **redis**: Redis 7 (realtime data store)
 - **pyparser**: Python sidecar that polls GTFS-RT protobuf feeds and writes to Redis
-- **scheduler**: Runs `app:score:tick` every 30 seconds
+- **scheduler**: Runs `app:score:tick` every 30 seconds and `app:warm-insight-cache` nightly at 2:00 AM
 - **worker**: Symfony Messenger consumer (disabled by default; requires `--profile queue`)
 
 ### Important Patterns
@@ -158,6 +167,10 @@ DATABASE_URL=postgresql://user:pass@127.0.0.1:5432/mindthewait
 # Redis
 REDIS_URL=redis://redis:6379
 MESSENGER_TRANSPORT_DSN=redis://redis:6379/messages
+
+# OpenAI API (for AI-generated insights)
+# Get your key from https://platform.openai.com/api-keys
+OPENAI_API_KEY=your-openai-api-key-here
 ```
 
 ## Testing & CI
@@ -214,6 +227,36 @@ docker compose exec php bin/console dbal:run-sql "SELECT COUNT(*) FROM weather_o
 ```
 
 **Important:** This command generates synthetic data with realistic patterns (weather impact, day-of-week variations, etc.) but is NOT real transit data. In production, use `app:collect:arrival-logs` and `app:collect:daily-performance` to collect and aggregate real data instead.
+
+**Working with AI-generated insights:**
+```bash
+# Pre-warm insight cache (generates all 7 insights)
+docker compose exec php bin/console app:warm-insight-cache
+
+# Clear insight cache to force regeneration
+docker compose exec php bin/console cache:pool:clear cache.app
+
+# Check Symfony scheduler status
+docker compose exec php bin/console debug:scheduler
+
+# View scheduler logs (includes nightly cache warming at 2:00 AM)
+docker compose logs -f scheduler
+```
+
+**AI Insight Features:**
+- **Dashboard Overview**: 2 AI-generated insight cards (Winter Weather Impact, Temperature Threshold)
+- **Weather Impact Page**: 5 AI-generated narratives (Winter Operations, Temperature Threshold, Weather Impact Matrix, Bunching Analysis, Key Takeaway)
+- **Caching**: 24-hour cache with automatic nightly refresh at 2:00 AM
+- **Model**: OpenAI GPT-4o-mini (fast, cost-effective)
+- **Cost**: ~$0.05/month (~60 cents/year) with 24-hour caching (7 insights/day)
+- **Fallback**: Graceful fallback message if API fails or rate limits hit
+- **Retry Logic**: 2 automatic retries with 5-second delays for rate limit handling
+
+**Cache Key Strategy:**
+Insights are cached with content-based keys using `md5(serialize($stats))`. This means:
+- Same data = same cached insight (fast)
+- Changed data = new insight generated (dynamic content)
+- Cache duration: 24 hours (refreshed nightly)
 
 ## Known Issues & Limitations
 

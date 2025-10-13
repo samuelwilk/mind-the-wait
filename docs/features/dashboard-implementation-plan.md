@@ -750,24 +750,31 @@ assets/
 
 ---
 
-### Phase 4: Weather Impact Analysis ⭐ (Week 4)
+### Phase 4: Weather Impact Analysis ⭐ ✅ **COMPLETE** (Week 4)
 
-**Goal:** YOUR EXCITING INSIGHTS PAGE!
+**Goal:** AI-POWERED INSIGHTS PAGE WITH DYNAMIC NARRATIVES!
 
 **Tasks:**
-- [ ] Create `WeatherImpactController`
-- [ ] Create `WeatherAnalysisService` with SQL queries:
-  - [ ] Winter Operations Report query
-  - [ ] Temperature Threshold query
-  - [ ] Weather Impact Matrix query
-  - [ ] Bunching by Weather query
-- [ ] Build LiveWeatherBanner (detailed version)
-- [ ] Implement Winter Operations Report chart (grouped bar)
-- [ ] Implement Temperature Threshold chart (scatter + line)
-- [ ] Implement Weather Impact Matrix (heatmap)
-- [ ] Implement Bunching by Weather chart (bar)
-- [ ] Create story cards for each insight
-- [ ] Add insight explanations and recommendations
+- [x] Create `WeatherImpactController`
+- [x] Create `WeatherAnalysisService` with SQL queries:
+  - [x] Winter Operations Report query
+  - [x] Temperature Threshold query
+  - [x] Weather Impact Matrix query
+  - [x] Bunching by Weather query
+- [x] Build LiveWeatherBanner (detailed version)
+- [x] Implement Winter Operations Report chart (grouped bar)
+- [x] Implement Temperature Threshold chart (scatter + line)
+- [x] Implement Weather Impact Matrix (heatmap)
+- [x] Implement Bunching by Weather chart (bar)
+- [x] Create story cards for each insight
+- [x] **AI Integration:** Create `InsightGeneratorService` using OpenAI GPT-4o-mini
+- [x] **AI-Generated Narratives:** Replace static text with dynamic, data-driven insights
+- [x] **Dashboard Insights:** Add AI-generated cards to overview page
+- [x] **Cache Warming:** Create `WarmInsightCacheCommand` for nightly pre-generation
+- [x] **Scheduler:** Set up nightly cache warming at 2:00 AM
+- [x] **Design:** Fix card height alignment with flexbox
+- [x] **Optimization:** Reduce AI text length for better readability
+- [x] **Remove emojis:** Clean up all templates except LiveWeatherBanner
 
 **Files Created:**
 ```
@@ -777,17 +784,40 @@ src/
   Service/
     Dashboard/
       WeatherAnalysisService.php
+      InsightGeneratorService.php (NEW)
+  Command/
+    WarmInsightCacheCommand.php (NEW)
+  Scheduler/
+    InsightCacheWarmingSchedule.php (NEW)
   Dto/
     WeatherImpactDto.php
 
 templates/
   dashboard/
-    weather_impact.html.twig
+    weather.html.twig
   components/
     InsightStoryCard.html.twig
+
+composer.json:
+  openai-php/client (NEW)
 ```
 
-**Deliverable:** Complete Weather Impact page with all insights!
+**Deliverable:** ✅ Complete Weather Impact page with:
+- 4 insights with AI-generated narratives
+- Dashboard overview with 2 AI insight cards
+- Nightly cache warming for instant page loads
+- Equal height card alignment
+- Concise, data-driven explanations
+
+**Important Notes:**
+- **AI Integration:** Uses OpenAI GPT-4o-mini (~$0.05/month with caching)
+- **Caching:** 24-hour cache with automatic nightly refresh at 2:00 AM
+- **Retry Logic:** Handles rate limits with exponential backoff
+- **Cost:** Negligible (~60 cents/year) due to aggressive caching
+- **Scheduler:** `InsightCacheWarmingSchedule` runs via Symfony Scheduler
+- **Manual Run:** `docker compose exec php bin/console app:warm-insight-cache`
+- **Design:** Equal-height cards using flexbox grid system
+- **Text Length:** Reduced to 120-150 words per insight for readability
 
 ---
 

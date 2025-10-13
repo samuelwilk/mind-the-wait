@@ -26,12 +26,6 @@ final class DashboardController extends AbstractController
         ]);
     }
 
-    #[Route('/weather', name: 'app_weather')]
-    public function weather(): Response
-    {
-        return $this->render('dashboard/weather.html.twig');
-    }
-
     #[Route('/analysis', name: 'app_analysis')]
     public function analysis(): Response
     {

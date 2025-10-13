@@ -46,6 +46,10 @@ services:
     App\Repository\VehicleFeedbackRepositoryInterface: '@App\Repository\VehicleFeedbackRepository'
     App\Service\Prediction\ArrivalPredictorInterface: '@App\Service\Prediction\ArrivalPredictor'
 
+    App\Service\Dashboard\InsightGeneratorService:
+        arguments:
+            $openaiApiKey: '%env(OPENAI_API_KEY)%'
+
 when@test:
     services:
         _defaults:

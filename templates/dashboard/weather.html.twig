@@ -1,23 +1,135 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Weather Impact{% endblock %}
+{% block title %}Weather Impact Analysis - Saskatoon Transit{% endblock %}
 
 {% block body %}
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Page Header -->
         <div class="mb-8">
             <h1 class="text-3xl font-bold text-gray-900">Weather Impact Analysis</h1>
-            <p class="mt-2 text-gray-600">How weather conditions affect transit reliability</p>
+            <p class="mt-2 text-gray-600">Comprehensive insights on how weather conditions affect transit reliability</p>
         </div>
 
-        <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-12 text-center border-2 border-blue-200">
-            <svg class="mx-auto h-16 w-16 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
-            </svg>
-            <h3 class="mt-4 text-lg font-bold text-blue-900">Coming Soon: Phase 4 ⭐</h3>
-            <p class="mt-2 text-sm text-blue-800 max-w-2xl mx-auto">
-                This will be the exciting page with winter operations reports, temperature threshold analysis,
-                weather impact matrices, and bunching correlations!
-            </p>
+        <!-- Live Weather Banner -->
+        <div class="mb-8">
+            <twig:LiveWeatherBanner detailed="true" />
+        </div>
+
+        <!-- Insight 1: Winter Operations Report -->
+        <div class="mb-12">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Winter Operations Report</h2>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Chart -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col">
+                    <div
+                        data-controller="chart"
+                        data-chart-options-value="{{ insights.winterOperationsChart|json_encode|e('html_attr') }}"
+                        class="flex-1"
+                        style="width: 100%; min-height: 500px; position: relative; z-index: 1;">
+                    </div>
+                </div>
+
+                <!-- Story Card -->
+                <div class="flex">
+                    {% include 'components/InsightStoryCard.html.twig' with {
+                        title: 'Winter Performance Impact',
+                        color: 'purple',
+                        content: insights.winterOperationsNarrative
+                    } %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Insight 2: Temperature Threshold Analysis -->
+        <div class="mb-12">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Temperature Threshold Analysis</h2>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Story Card (left on this one) -->
+                <div class="flex">
+                    {% include 'components/InsightStoryCard.html.twig' with {
+                        title: 'Critical Temperature Threshold',
+                        color: 'amber',
+                        content: insights.temperatureThresholdNarrative
+                    } %}
+                </div>
+
+                <!-- Chart -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col">
+                    <div
+                        data-controller="chart"
+                        data-chart-options-value="{{ insights.temperatureThresholdChart|json_encode|e('html_attr') }}"
+                        class="flex-1"
+                        style="width: 100%; min-height: 500px; position: relative; z-index: 1;">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Insight 3: Weather Impact Matrix -->
+        <div class="mb-12">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Weather Impact Matrix</h2>
+
+            <div class="mb-6">
+                {% include 'components/InsightStoryCard.html.twig' with {
+                    title: 'Route Vulnerability Analysis',
+                    color: 'blue',
+                    content: insights.weatherImpactNarrative
+                } %}
+            </div>
+
+            <!-- Chart (full width) -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div
+                    data-controller="chart"
+                    data-chart-options-value="{{ insights.weatherImpactMatrix|json_encode|e('html_attr') }}"
+                    style="width: 100%; height: 600px; min-height: 600px; position: relative; z-index: 1;">
+                </div>
+            </div>
+        </div>
+
+        <!-- Insight 4: Bunching by Weather -->
+        <div class="mb-12">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Bunching by Weather Conditions</h2>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Chart -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col">
+                    <div
+                        data-controller="chart"
+                        data-chart-options-value="{{ insights.bunchingByWeatherChart|json_encode|e('html_attr') }}"
+                        class="flex-1"
+                        style="width: 100%; min-height: 400px; position: relative; z-index: 1;">
+                    </div>
+                </div>
+
+                <!-- Story Card -->
+                <div class="flex">
+                    {% include 'components/InsightStoryCard.html.twig' with {
+                        title: 'Weather-Related Bunching',
+                        color: 'red',
+                        content: insights.bunchingByWeatherNarrative
+                    } %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Section -->
+        <div class="bg-gradient-to-r from-primary-50 to-primary-100 border border-primary-200 rounded-lg p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <svg class="h-8 w-8 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-semibold text-primary-900">Key Takeaway</h3>
+                    <div class="mt-1 text-sm text-primary-800">
+                        {{ insights.keyTakeaway|raw }}
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 {% endblock %}
