@@ -15,7 +15,9 @@
       "Bash(curl -s 'https://opendata.saskatoon.ca/api/3/action/package_search?q=transit')",
       "Bash(docker compose logs:*)",
       "Bash(make test-phpunit:*)",
-      "Bash(make:*)"
+      "Bash(make:*)",
+      "Bash(curl -sk \"https://localhost/routes?sort=grade\")",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

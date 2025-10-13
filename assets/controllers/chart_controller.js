@@ -1,15 +1,9 @@
 import { Controller } from '@hotwired/stimulus';
-import * as echarts from 'echarts';
+import * as echarts from 'echarts/dist/echarts.js';
 import { mindTheWaitTheme } from '../themes/echarts-theme.js';
 
 /**
- * ECharts controller for rendering interactive charts
- *
- * Usage:
- *   <div data-controller="chart"
- *        data-chart-options-value="{{ chartOptions|json_encode }}"
- *        data-chart-theme-value="mindTheWait"
- *        style="height: 400px;"></div>
+ * ECharts controller - using full dist bundle for AssetMapper compatibility
  */
 export default class extends Controller {
     static values = {
@@ -18,54 +12,58 @@ export default class extends Controller {
     };
 
     connect() {
+        requestAnimationFrame(() => {
+            this.initializeChart();
+        });
+    }
+
+    initializeChart() {
+        if (this.element.clientWidth === 0 || this.element.clientHeight === 0) {
+            console.error('Chart container has zero dimensions!');
+            return;
+        }
+
         // Register custom theme
         echarts.registerTheme('mindTheWait', mindTheWaitTheme);
 
-        // Initialize chart
+        // Initialize with full bundle and custom theme
         this.chart = echarts.init(this.element, this.themeValue);
-        this.chart.setOption(this.optionsValue);
 
-        // Handle window resize
+        // Fix heatmap formatter (can't be passed from PHP as a string)
+        const options = this.optionsValue;
+        if (options.series && options.series[0]?.type === 'heatmap') {
+            options.series[0].label.formatter = function(params) {
+                return params.value[2] + '%';
+            };
+            // Also fix tooltip formatter
+            options.tooltip.formatter = function(params) {
+                const day = params.name;
+                const time = params.value[1];
+                const performance = params.value[2];
+                return `<strong>${day}</strong><br/>Time: ${options.yAxis.data[time]}<br/>Performance: ${performance}%`;
+            };
+        }
+
+        // Set the options from PHP
+        this.chart.setOption(options);
+
+        // Handle resize
         this.resizeObserver = new ResizeObserver(() => {
-            this.chart.resize();
+            if (this.chart) {
+                this.chart.resize();
+            }
         });
         this.resizeObserver.observe(this.element);
 
-        // Also listen to window resize for mobile
-        this.boundResize = this.resize.bind(this);
-        window.addEventListener('resize', this.boundResize);
+        window.addEventListener('resize', () => this.chart.resize());
     }
 
     disconnect() {
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
         }
-        window.removeEventListener('resize', this.boundResize);
         if (this.chart) {
             this.chart.dispose();
         }
-    }
-
-    resize() {
-        if (this.chart) {
-            this.chart.resize();
-        }
-    }
-
-    /**
-     * Update chart with new options
-     * Can be called from other controllers or via actions
-     */
-    updateOptions(newOptions) {
-        if (this.chart) {
-            this.chart.setOption(newOptions, true);
-        }
-    }
-
-    /**
-     * Get chart instance for advanced usage
-     */
-    getChart() {
-        return this.chart;
     }
 }

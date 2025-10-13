@@ -45,6 +45,11 @@ docker compose exec php bin/console app:gtfs:tick
 # Compute headway scores from realtime vehicle positions
 make score-tick
 
+# Seed synthetic performance data for development/demo (⚠️ GENERATES FAKE DATA)
+# Creates 30 days of realistic-looking route performance and weather data
+# Only use in development - DO NOT use in production
+docker compose exec php bin/console app:seed:performance-data --clear
+
 # Submit rider feedback (votes: ahead|on_time|late)
 curl -X POST https://localhost/api/vehicle-feedback \
   -H 'Content-Type: application/json' \
@@ -191,6 +196,24 @@ make database-migrations-generate
 # Review migration, then:
 make database-migrations-execute
 ```
+
+**Seeding sample data for development:**
+```bash
+# ⚠️ Only for development/demo - generates FAKE but realistic-looking data
+# Creates 30 days of performance records and weather observations
+
+# Seed data (clears existing performance data first)
+docker compose exec php bin/console app:seed:performance-data --clear
+
+# Check what was created
+docker compose exec php bin/console dbal:run-sql "SELECT COUNT(*) FROM route_performance_daily"
+docker compose exec php bin/console dbal:run-sql "SELECT COUNT(*) FROM weather_observation"
+
+# View a route detail page to see charts populated with fake data
+# https://localhost/routes/14514
+```
+
+**Important:** This command generates synthetic data with realistic patterns (weather impact, day-of-week variations, etc.) but is NOT real transit data. In production, use `app:collect:arrival-logs` and `app:collect:daily-performance` to collect and aggregate real data instead.
 
 ## Known Issues & Limitations
 

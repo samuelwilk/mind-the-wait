@@ -693,39 +693,60 @@ templates/
 
 ---
 
-### Phase 3: Route Pages (Week 3)
+### Phase 3: Route Pages ✅ **COMPLETE** (Week 3)
 
 **Goal:** Route list + detail pages with first ECharts
 
 **Tasks:**
-- [ ] Create `RouteController`
-- [ ] Create `RoutePerformanceService`
-- [ ] Build route list page with filters
-- [ ] Build route detail page layout
-- [ ] Implement 30-day performance trend chart (ECharts line)
-- [ ] Add weather overlay to performance chart
-- [ ] Create weather impact comparison chart (ECharts bar)
-- [ ] Add time-of-day heatmap (ECharts)
-- [ ] Make charts responsive
+- [x] Create `RouteController`
+- [x] Create `RoutePerformanceService`
+- [x] Build route list page with filters and search (Live Component)
+- [x] Build route detail page layout
+- [x] Implement 30-day performance trend chart (ECharts line)
+- [x] Add weather overlay to performance chart
+- [x] Create weather impact comparison chart (ECharts bar)
+- [x] Add time-of-day heatmap (ECharts)
+- [x] Make charts responsive
+- [x] Add summary statistics cards
 
 **Files Created:**
 ```
 src/
   Controller/
-    RouteController.php
+    DashboardController.php (routes list, route detail)
   Service/
     Dashboard/
       RoutePerformanceService.php
   Dto/
     RouteDetailDto.php
+    RouteMetricDto.php
+  Twig/
+    Components/
+      RouteSearch.php (Live Component)
 
 templates/
   dashboard/
-    route_list.html.twig
+    routes_list.html.twig
     route_detail.html.twig
+  components/
+    RouteSearch.html.twig
+    RouteBadge.html.twig
+    RouteListItem.html.twig
+
+assets/
+  controllers/
+    chart_controller.js
+  themes/
+    echarts-theme.js (custom Mind the Wait theme)
 ```
 
-**Deliverable:** Complete route exploration experience
+**Deliverable:** ✅ Complete route exploration experience with interactive charts
+
+**Important Notes:**
+- **ECharts + AssetMapper:** Use the full dist bundle (`echarts/dist/echarts.js`) instead of modular imports. AssetMapper cannot properly resolve ECharts' complex internal module dependencies.
+- **Custom Theme:** Custom Tailwind-matched ECharts theme works perfectly once loaded correctly
+- **Date Formatting:** Dates formatted as "Sep 14" instead of "2025-09-14" for better readability
+- **Heatmap Formatters:** Tooltip formatters must be added in JavaScript (can't be serialized from PHP)
 
 ---
 

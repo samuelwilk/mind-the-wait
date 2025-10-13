@@ -28,7 +28,7 @@ return [
     '@symfony/ux-live-component' => [
         'path' => './vendor/symfony/ux-live-component/assets/dist/live_controller.js',
     ],
-    'echarts' => [
+    'echarts/dist/echarts.js' => [
         'version' => '6.0.0',
     ],
     'flowbite' => [
@@ -208,5 +208,8 @@ return [
     'flowbite/dist/flowbite.min.css' => [
         'version' => '3.1.2',
         'type' => 'css',
+    ],
+    'apexcharts' => [
+        'version' => '5.3.5',
     ],
 ];

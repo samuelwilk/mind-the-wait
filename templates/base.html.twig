@@ -34,7 +34,7 @@
                                class="{% if app.request.get('_route') == 'app_dashboard' %}border-primary-500 text-gray-900{% else %}border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700{% endif %} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium no-underline">
                                 Overview
                             </a>
-                            <a href="{{ path('app_routes') }}"
+                            <a href="{{ path('app_routes_list') }}"
                                class="{% if app.request.get('_route') starts with 'app_routes' %}border-primary-500 text-gray-900{% else %}border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700{% endif %} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium no-underline">
                                 Routes
                             </a>
@@ -75,7 +75,7 @@
                        class="{% if app.request.get('_route') == 'app_dashboard' %}bg-primary-50 border-primary-500 text-primary-700{% else %}border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium no-underline">
                         Overview
                     </a>
-                    <a href="{{ path('app_routes') }}"
+                    <a href="{{ path('app_routes_list') }}"
                        class="{% if app.request.get('_route') starts with 'app_routes' %}bg-primary-50 border-primary-500 text-primary-700{% else %}border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium no-underline">
                         Routes
                     </a>
