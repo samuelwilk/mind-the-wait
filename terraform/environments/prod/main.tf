@@ -237,7 +237,7 @@ module "ecs_service_scheduler" {
     image     = "${module.ecr.repository_urls["php"]}:latest"
     essential = true
 
-    command = ["php", "bin/console", "messenger:consume", "scheduler_default", "-vv"]
+    command = ["php", "bin/console", "messenger:consume", "scheduler_score_tick", "scheduler_weather_collection", "scheduler_performance_aggregation", "scheduler_insight_cache_warming", "-vv"]
 
     environment = [
       { name = "APP_ENV", value = "prod" },
