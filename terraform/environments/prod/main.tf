@@ -152,7 +152,11 @@ module "ecs_service_php" {
       { name = "REDIS_URL", value = local.redis_url },
       { name = "MESSENGER_TRANSPORT_DSN", value = local.messenger_transport_dsn },
       { name = "OPENAI_API_KEY", value = var.openai_api_key },
-      { name = "MTW_GTFS_STATIC_URL", value = var.gtfs_static_url }
+      { name = "MTW_GTFS_STATIC_URL", value = var.gtfs_static_url },
+      { name = "MTW_ARCGIS_ROUTE", value = var.arcgis_routes_url },
+      { name = "MTW_ARCGIS_STOP", value = var.arcgis_stops_url },
+      { name = "MTW_ARCGIS_TRIP", value = var.arcgis_trips_url },
+      { name = "MTW_ARCGIS_STOP_TIME", value = var.arcgis_stop_times_url }
     ]
 
     logConfiguration = {
@@ -191,8 +195,11 @@ module "ecs_service_pyparser" {
     essential = true
 
     environment = [
-      { name = "REDIS_HOST", value = module.elasticache.endpoint },
-      { name = "REDIS_PORT", value = tostring(module.elasticache.port) }
+      { name = "REDIS_URL", value = local.redis_url },
+      { name = "VEH_URL", value = var.gtfs_rt_vehicles_url },
+      { name = "TRIP_URL", value = var.gtfs_rt_trips_url },
+      { name = "ALERT_URL", value = var.gtfs_rt_alerts_url },
+      { name = "POLL_SEC", value = "12" }
     ]
 
     logConfiguration = {
@@ -239,7 +246,11 @@ module "ecs_service_scheduler" {
       { name = "REDIS_URL", value = local.redis_url },
       { name = "MESSENGER_TRANSPORT_DSN", value = local.messenger_transport_dsn },
       { name = "OPENAI_API_KEY", value = var.openai_api_key },
-      { name = "MTW_GTFS_STATIC_URL", value = var.gtfs_static_url }
+      { name = "MTW_GTFS_STATIC_URL", value = var.gtfs_static_url },
+      { name = "MTW_ARCGIS_ROUTE", value = var.arcgis_routes_url },
+      { name = "MTW_ARCGIS_STOP", value = var.arcgis_stops_url },
+      { name = "MTW_ARCGIS_TRIP", value = var.arcgis_trips_url },
+      { name = "MTW_ARCGIS_STOP_TIME", value = var.arcgis_stop_times_url }
     ]
 
     logConfiguration = {

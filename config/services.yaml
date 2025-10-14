@@ -7,10 +7,10 @@ parameters:
     mtw_gtfs_static_url: '%env(MTW_GTFS_STATIC_URL)%'
     mtw_gtfs_static_fallback: '%env(default::MTW_GTFS_STATIC_FALLBACK)%'
 
-    mtw_arcgis_routes_url: '%env(MTW_ARCGIS_ROUTE)%'
-    mtw_arcgis_stops_url: '%env(MTW_ARCGIS_STOP)%'
-    mtw_arcgis_trips_url: '%env(MTW_ARCGIS_TRIP)%'
-    mtw_arcgis_stop_times_url: '%env(MTW_ARCGIS_STOP_TIME)%'
+    mtw_arcgis_routes_url: '%env(default::MTW_ARCGIS_ROUTE)%'
+    mtw_arcgis_stops_url: '%env(default::MTW_ARCGIS_STOP)%'
+    mtw_arcgis_trips_url: '%env(default::MTW_ARCGIS_TRIP)%'
+    mtw_arcgis_stop_times_url: '%env(default::MTW_ARCGIS_STOP_TIME)%'
 
 services:
     # default configuration for services in *this* file

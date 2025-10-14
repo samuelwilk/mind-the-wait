@@ -144,6 +144,42 @@ variable "gtfs_static_url" {
   type        = string
 }
 
+variable "arcgis_routes_url" {
+  description = "ArcGIS Routes FeatureServer URL"
+  type        = string
+}
+
+variable "arcgis_stops_url" {
+  description = "ArcGIS Stops FeatureServer URL"
+  type        = string
+}
+
+variable "arcgis_trips_url" {
+  description = "ArcGIS Trips FeatureServer URL"
+  type        = string
+}
+
+variable "arcgis_stop_times_url" {
+  description = "ArcGIS Stop Times FeatureServer URL"
+  type        = string
+}
+
+# GTFS-RT (Realtime) Configuration
+variable "gtfs_rt_vehicles_url" {
+  description = "GTFS-RT Vehicle Positions feed URL"
+  type        = string
+}
+
+variable "gtfs_rt_trips_url" {
+  description = "GTFS-RT Trip Updates feed URL"
+  type        = string
+}
+
+variable "gtfs_rt_alerts_url" {
+  description = "GTFS-RT Service Alerts feed URL"
+  type        = string
+}
+
 # CloudWatch Configuration
 variable "log_retention_days" {
   description = "CloudWatch log retention in days"
