@@ -97,6 +97,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
+          target: frankenphp_prod
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
