@@ -10,7 +10,7 @@ output "name_servers" {
 
 output "certificate_arn" {
   description = "ACM certificate ARN"
-  value       = aws_acm_certificate_validation.this.certificate_arn
+  value       = aws_acm_certificate.this.arn
 }
 
 output "domain_name" {
