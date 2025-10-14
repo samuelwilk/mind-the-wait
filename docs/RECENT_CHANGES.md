@@ -1,9 +1,135 @@
 # Recent Changes Summary
 
-**Date**: October 12, 2025
-**Changes**: Scheduler refactor, timezone fixes, enhanced setup, comprehensive documentation
+**Date**: October 14, 2025
+**Changes**: Route detail heatmap implementation, Dockerfile fixes, production deployment improvements
+
+**Previous Changes**: [October 12 changes](#october-12-2025---scheduler-refactor-and-setup-improvements)
 
 ---
+
+## 🎯 October 14, 2025 - Latest Changes
+
+### 1. Route Detail Heatmap Implementation
+
+**Problem**: The "Performance by Day & Time" chart on route detail pages was showing randomly generated placeholder data instead of real arrival log data.
+
+**Solution**: Replaced hardcoded fake data with SQL query that pulls real data from the `arrival_log` table.
+
+**Changes Made**:
+
+#### Updated Files
+- `src/Service/Dashboard/RoutePerformanceService.php:286-349` - Implemented real data query
+
+**Implementation Details**:
+```php
+// Queries arrival_log table grouped by day of week and hour bucket
+SELECT
+    EXTRACT(DOW FROM predicted_at) as day_of_week,
+    CASE
+        WHEN EXTRACT(HOUR FROM predicted_at) < 6  THEN 0
+        WHEN EXTRACT(HOUR FROM predicted_at) < 9  THEN 1
+        // ... (7 hour buckets total)
+    END as hour_bucket,
+    COUNT(*) as total,
+    SUM(CASE WHEN delay_sec BETWEEN -180 AND 180 THEN 1 ELSE 0 END) as on_time
+FROM arrival_log
+WHERE route_id = :route_id
+    AND predicted_at >= :start_date
+    AND predicted_at < :end_date
+GROUP BY day_of_week, hour_bucket
+```
+
+**Benefits**:
+- ✅ No more fake/random data in production
+- ✅ Accurate performance visualization by time of day and day of week
+- ✅ Gracefully handles empty data (shows gray cells with null values)
+- ✅ Will auto-populate as arrival_log data accumulates
+- ✅ On-time threshold: ±3 minutes (consistent with system-wide standard)
+
+---
+
+### 2. Development Docker Build Fix
+
+**Problem**: Docker build was failing with `"/docker/php.ini": not found` error.
+
+**Solution**: Fixed incorrect file path in Dockerfile.
+
+**Changes Made**:
+
+#### Updated Files
+- `docker/dev/Dockerfile:20` - Changed `COPY docker/php.ini` to `COPY docker/dev/php.ini`
+
+**Impact**:
+- ✅ `make docker-build` and `make docker-up` now work without errors
+- ✅ Containers build successfully on fresh clones
+- ✅ No disruption to existing running containers
+
+---
+
+### 3. Production Timezone Fix
+
+**Issue**: Dashboard showed "last updated at 9:11:11 PM" on mobile, which was UTC time instead of local Saskatchewan time.
+
+**Solution**: Already fixed in previous deployment (October 12) - timezone set to `America/Regina`.
+
+**Status**:
+- ✅ Fixed in `frankenphp/conf.d/10-app.ini:4`
+- ✅ Deployed to production in v0.4.0
+- ✅ All timestamps now show Saskatoon local time (CST/CDT)
+
+---
+
+## 🔄 Deployment Notes
+
+### What's New in This Deployment
+
+1. **Route Detail Pages**:
+   - Heatmap now shows real data (or empty gray cells if no data yet)
+   - No more placeholder values of 65 ± 10
+
+2. **Development Setup**:
+   - Dockerfile fixed for clean builds
+   - No breaking changes
+
+3. **Production**:
+   - Timezone already deployed (working correctly)
+   - Weather collection running hourly
+   - All schedulers operational
+
+### Data Collection Timeline
+
+The heatmap will populate as arrival logging accumulates:
+- **Day 1**: Empty (gray cells with null values)
+- **After 1 day**: Sparse data for times with predictions
+- **After 1 week**: Good coverage during peak hours
+- **After 30 days**: Full heatmap with statistical significance
+
+---
+
+## ✅ Verification Checklist
+
+After this deployment:
+
+- [ ] Route detail page loads without errors
+- [ ] Heatmap shows either real data or gray cells (not random numbers)
+- [ ] Dashboard timestamps show Saskatoon local time
+- [ ] Weather banner displays current conditions (if available)
+
+---
+
+## 📊 October 14, 2025 Metrics
+
+**Files Changed**: 3
+- `src/Service/Dashboard/RoutePerformanceService.php`
+- `docker/dev/Dockerfile`
+- `CHANGELOG.md`
+
+**Lines Changed**: ~70
+**Type**: Bug fix + Feature implementation
+
+---
+
+## 🎯 October 12, 2025 - Scheduler Refactor and Setup Improvements
 
 ## 🎯 Major Improvements
 

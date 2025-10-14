@@ -17,7 +17,7 @@ RUN pecl install protobuf \
 # --------------------------------
 
 # Recommended PHP settings for dev
-COPY docker/php.ini /usr/local/etc/php/php.ini
+COPY docker/dev/php.ini /usr/local/etc/php/php.ini
 
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

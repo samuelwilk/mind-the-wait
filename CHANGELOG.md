@@ -134,6 +134,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - PHP timezone: `America/Regina` (was UTC)
   - All timestamps now display in Saskatoon local time
   - Scheduled tasks run at expected local times (e.g., 1:00 AM local for aggregation)
+- **Route Detail Page Heatmap** - Implemented real data query for "Performance by Day & Time" chart
+  - Queries `arrival_log` table grouped by day of week and hour bucket
+  - Calculates on-time percentage (±3 minutes = on-time) for each time period
+  - Returns null for cells with no data (displays as gray in chart)
+  - Removed hardcoded placeholder data that generated random values
 - **Weather Repository** - Fixed `findLatest()` to exclude future forecasts
   - Only returns observations with `observed_at <= NOW()`
   - Prevents displaying forecast data as current conditions
@@ -159,6 +164,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Previously assigned default "C" grade to single-vehicle routes
   - Now calculates delay based on vehicle position vs schedule
   - Grades: A (on-time), B (1-3 min late), C (3-5 min), D (5-10 min), F (>10 min)
+- **Development Docker Build** - Fixed php.ini path in Dockerfile
+  - Changed from `COPY docker/php.ini` to `COPY docker/dev/php.ini`
+  - Resolves "file not found" error during container build
 
 ### Improved
 - **Documentation** - Comprehensive updates

@@ -285,23 +285,66 @@ final readonly class RoutePerformanceService
      */
     private function buildTimeOfDayHeatmap(Route $route, \DateTimeImmutable $startDate, \DateTimeImmutable $endDate): array
     {
-        // This would require arrival_log data grouped by hour and day of week
-        // For now, return a placeholder structure
-        // TODO: Implement when we have hourly performance data
-
         $days  = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         $hours = ['0-6', '6-9', '9-12', '12-15', '15-18', '18-21', '21-24'];
 
-        // Generate sample data (replace with real query)
-        $data = [];
+        // Query arrival_log data grouped by day of week and hour bucket
+        // Use native SQL for performance (Doctrine DQL doesn't have good date functions)
+        $conn = $this->performanceRepo->getEntityManager()->getConnection();
+
+        $sql = <<<'SQL'
+            SELECT
+                EXTRACT(DOW FROM predicted_at) as day_of_week,  -- 0=Sun, 1=Mon, ... 6=Sat
+                CASE
+                    WHEN EXTRACT(HOUR FROM predicted_at) < 6  THEN 0
+                    WHEN EXTRACT(HOUR FROM predicted_at) < 9  THEN 1
+                    WHEN EXTRACT(HOUR FROM predicted_at) < 12 THEN 2
+                    WHEN EXTRACT(HOUR FROM predicted_at) < 15 THEN 3
+                    WHEN EXTRACT(HOUR FROM predicted_at) < 18 THEN 4
+                    WHEN EXTRACT(HOUR FROM predicted_at) < 21 THEN 5
+                    ELSE 6
+                END as hour_bucket,
+                COUNT(*) as total,
+                SUM(CASE WHEN delay_sec IS NOT NULL AND delay_sec BETWEEN -180 AND 180 THEN 1 ELSE 0 END) as on_time,
+                AVG(CASE WHEN delay_sec IS NOT NULL THEN delay_sec ELSE NULL END) as avg_delay
+            FROM arrival_log
+            WHERE route_id = :route_id
+                AND predicted_at >= :start_date
+                AND predicted_at < :end_date
+                AND delay_sec IS NOT NULL
+            GROUP BY day_of_week, hour_bucket
+            ORDER BY day_of_week, hour_bucket
+        SQL;
+
+        $results = $conn->executeQuery($sql, [
+            'route_id'   => $route->getId(),
+            'start_date' => $startDate->format('Y-m-d H:i:s'),
+            'end_date'   => $endDate->format('Y-m-d H:i:s'),
+        ])->fetchAllAssociative();
+
+        // Build heatmap data array
+        $data      = [];
+        $resultMap = [];
+
+        // Index results by [day][hour] for O(1) lookup
+        foreach ($results as $row) {
+            $dow = (int) $row['day_of_week'];
+            // Convert PostgreSQL DOW (0=Sun, 1=Mon, ..., 6=Sat) to our array index (0=Mon, ..., 6=Sun)
+            $dayIndex         = $dow === 0 ? 6 : $dow - 1;
+            $hourIndex        = (int) $row['hour_bucket'];
+            $total            = (int) $row['total'];
+            $onTime           = (int) $row['on_time'];
+            $onTimePercentage = $total > 0 ? round(($onTime / $total) * 100, 1) : 0;
+
+            $resultMap[$dayIndex][$hourIndex] = $onTimePercentage;
+        }
+
+        // Fill in heatmap data (7 days × 7 hour buckets)
         for ($d = 0; $d < count($days); ++$d) {
             for ($h = 0; $h < count($hours); ++$h) {
-                // Placeholder: vary performance by time (peak hours = worse)
-                $basePerf = 75;
-                if ($h === 1 || $h === 4) { // Morning/afternoon peak
-                    $basePerf = 65;
-                }
-                $data[] = [$d, $h, $basePerf + random_int(-10, 10)];
+                // Use real data if available, otherwise use null (will show as gray in chart)
+                $value  = $resultMap[$d][$h] ?? null;
+                $data[] = [$d, $h, $value];
             }
         }
 
