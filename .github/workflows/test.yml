@@ -105,8 +105,8 @@ jobs:
       - name: Build Python parser image
         uses: docker/build-push-action@v5
         with:
-          context: ./pyparser
-          file: ./pyparser/Dockerfile
+          context: ./docker/pyparser
+          file: ./docker/pyparser/Dockerfile
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max

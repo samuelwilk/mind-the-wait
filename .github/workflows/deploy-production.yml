@@ -78,8 +78,8 @@ jobs:
       - name: Build and push Python parser image
         uses: docker/build-push-action@v5
         with:
-          context: ./pyparser
-          file: ./pyparser/Dockerfile
+          context: ./docker/pyparser
+          file: ./docker/pyparser/Dockerfile
           push: true
           tags: |
             ${{ env.ECR_REGISTRY }}/mind-the-wait/pyparser:${{ steps.tags.outputs.sha_short }}
