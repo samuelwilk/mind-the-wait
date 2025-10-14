@@ -72,6 +72,8 @@ jobs:
         run: php bin/console doctrine:migrations:migrate --no-interaction
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/mindthewait_test
+          REDIS_URL: redis://localhost:6379
+          OPENAI_API_KEY: test-key
 
       - name: Run PHPUnit tests
         run: vendor/bin/phpunit --coverage-text

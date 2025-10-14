@@ -1,0 +1,100 @@
+{
+	{$CADDY_GLOBAL_OPTIONS}
+
+	frankenphp {
+		{$FRANKENPHP_CONFIG}
+	}
+
+	# https://caddyserver.com/docs/caddyfile/directives#sorting-algorithm
+	order mercure after encode
+	order vulcain after reverse_proxy
+}
+
+{$CADDY_EXTRA_CONFIG}
+
+{$SERVER_NAME:localhost}
+
+log {
+	# Redact the authorization query parameter that can be set by Mercure
+	format filter {
+		wrap console
+		fields {
+			uri query {
+				replace authorization REDACTED
+			}
+		}
+	}
+}
+
+# HTTP server for internal metrics
+:2019 {
+	metrics /metrics
+}
+
+# Main application server
+route {
+	# Mercure Hub (optional - for realtime updates)
+	mercure {
+		# Transport to use (connect to an installed Mercure hub)
+		transport_url {$MERCURE_TRANSPORT_URL:bolt:///data/mercure.db}
+		# Publisher JWT key
+		publisher_jwt {env.MERCURE_PUBLISHER_JWT_KEY} {env.MERCURE_PUBLISHER_JWT_ALG}
+		# Subscriber JWT key
+		subscriber_jwt {env.MERCURE_SUBSCRIBER_JWT_KEY} {env.MERCURE_SUBSCRIBER_JWT_ALG}
+		# Allow anonymous subscribers (for demo - disable in production)
+		anonymous
+		# Enable the subscription API (Mercure Hub API)
+		subscriptions
+		# Extra directives
+		{$MERCURE_EXTRA_DIRECTIVES}
+	}
+
+	# Vulcain (optional - for HTTP/2 Server Push)
+	vulcain
+
+	# Add trailing slash for directory URLs
+	@canonicalPath {
+		file {path}/index.php
+		not path */
+	}
+	redir @canonicalPath {path}/ 308
+
+	# If the requested file does not exist, try index files
+	@indexFiles file {
+		try_files {path} {path}/index.php index.php
+		split_path .php
+	}
+	rewrite @indexFiles {http.matchers.file.relative}
+
+	# FrankenPHP!
+	@phpFiles path *.php
+	php @phpFiles
+	encode zstd br gzip
+
+	# Security headers
+	header {
+		# Disable FLoC tracking
+		Permissions-Policy interest-cohort=()
+		# Enable HSTS (uncomment after testing HTTPS works)
+		# Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		# Disable clients from sniffing the media type
+		X-Content-Type-Options nosniff
+		# Clickjacking protection
+		X-Frame-Options DENY
+		# Keep referrer data off of HTTP connections
+		Referrer-Policy no-referrer-when-downgrade
+		-Server
+		-X-Powered-By
+	}
+
+	# Deny access to sensitive files
+	@dotFiles path */.*
+	handle @dotFiles {
+		respond 403
+	}
+
+	file_server {
+		# Enable compression
+		precompressed br gzip
+	}
+}
