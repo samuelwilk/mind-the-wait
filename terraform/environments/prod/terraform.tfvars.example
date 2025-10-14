@@ -1,0 +1,65 @@
+#######################################
+# Production Configuration Template
+#
+# INSTRUCTIONS:
+# 1. Copy this file to terraform.tfvars:
+#    cp terraform.tfvars.example terraform.tfvars
+#
+# 2. Fill in your actual values (marked with CHANGEME)
+#
+# 3. NEVER commit terraform.tfvars to git!
+#    It's already in .gitignore
+#######################################
+
+# AWS Configuration
+aws_region  = "ca-central-1"
+domain_name = "mind-the-wait.ca"
+
+# Network Configuration
+vpc_cidr            = "10.0.0.0/16"
+availability_zones  = ["ca-central-1a", "ca-central-1b"]
+public_subnets      = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnets     = ["10.0.10.0/24", "10.0.11.0/24"]
+
+# ECS Task Sizing - Budget configuration (0.25 vCPU, 0.5 GB RAM)
+php_cpu             = 256   # 0.25 vCPU
+php_memory          = 512   # 0.5 GB RAM
+php_desired_count   = 1
+
+pyparser_cpu        = 256   # 0.25 vCPU
+pyparser_memory     = 512   # 0.5 GB RAM
+
+scheduler_cpu       = 256   # 0.25 vCPU
+scheduler_memory    = 512   # 0.5 GB RAM
+
+# Auto-Scaling - Conservative limits for budget config
+php_min_capacity = 1
+php_max_capacity = 2
+php_cpu_target   = 75
+
+# RDS Configuration - Budget: db.t3.micro
+rds_instance_class    = "db.t3.micro"
+rds_allocated_storage = 20
+rds_multi_az          = false
+
+database_name     = "mindthewait"
+database_username = "mindthewait_admin"
+database_password = "CHANGEME_GENERATE_SECURE_PASSWORD"  # Generate with: openssl rand -base64 48 | head -c 32
+
+# ElastiCache Configuration - Budget: cache.t3.micro
+redis_node_type = "cache.t3.micro"
+
+# Application Secrets
+openai_api_key  = "CHANGEME_YOUR_OPENAI_API_KEY"  # Get from https://platform.openai.com/api-keys
+gtfs_static_url = "https://apps2.saskatoon.ca/transit/..."
+
+# CloudWatch Logging
+log_retention_days = 3  # Keep logs for 3 days
+
+# Tags
+tags = {
+  Environment = "production"
+  Project     = "mind-the-wait"
+  ManagedBy   = "terraform"
+  CostProfile = "budget-optimized"
+}

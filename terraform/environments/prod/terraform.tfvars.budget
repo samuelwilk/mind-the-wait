@@ -1,0 +1,70 @@
+#######################################
+# Budget-Optimized Configuration
+# Target Cost: ~$70/month
+#
+# Use this configuration for:
+# - Initial deployment with low traffic
+# - Learning AWS ECS/Terraform
+# - Cost-conscious operation
+#
+# Upgrade to standard when:
+# - CPU > 70% sustained
+# - Memory > 80% sustained
+# - Response time > 2s
+#######################################
+
+# AWS Configuration
+aws_region  = "ca-central-1"
+domain_name = "mind-the-wait.ca"
+
+# Network Configuration
+vpc_cidr            = "10.0.0.0/16"
+availability_zones  = ["ca-central-1a", "ca-central-1b"]
+public_subnets      = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnets     = ["10.0.10.0/24", "10.0.11.0/24"]
+
+# ECS Task Sizing - BUDGET: Reduced to 0.25 vCPU, 0.5 GB RAM
+# Saves $9/month compared to standard (0.5 vCPU, 1 GB)
+php_cpu             = 256   # 0.25 vCPU (was 512)
+php_memory          = 512   # 0.5 GB RAM (was 1024)
+php_desired_count   = 1
+
+pyparser_cpu        = 256   # 0.25 vCPU (no change)
+pyparser_memory     = 512   # 0.5 GB RAM (no change)
+
+scheduler_cpu       = 256   # 0.25 vCPU (no change)
+scheduler_memory    = 512   # 0.5 GB RAM (no change)
+
+# Auto-Scaling - Conservative limits for budget config
+php_min_capacity = 1
+php_max_capacity = 2      # Reduced from 3
+php_cpu_target   = 75     # Scale up at 75% CPU (was 70%)
+
+# RDS Configuration - BUDGET: db.t3.micro instead of db.t4g.micro
+# Saves $3/month (Intel instead of Graviton2)
+rds_instance_class    = "db.t3.micro"    # Was: db.t4g.micro
+rds_allocated_storage = 20               # Auto-scales to 100 GB
+rds_multi_az          = false            # Single-AZ for cost savings
+
+database_name     = "mindthewait"
+database_username = "mindthewait_admin"
+database_password = "CHANGE_ME_STRONG_PASSWORD_32_CHARS_MIN"  # CHANGE THIS
+
+# ElastiCache Configuration - BUDGET: cache.t3.micro instead of cache.t4g.micro
+# Saves $2/month (Intel instead of Graviton2)
+redis_node_type = "cache.t3.micro"  # Was: cache.t4g.micro
+
+# Application Secrets
+openai_api_key  = "sk-proj-..."  # CHANGE THIS - Get from https://platform.openai.com/api-keys
+gtfs_static_url = "https://apps2.saskatoon.ca/transit/..."  # CHANGE THIS if needed
+
+# CloudWatch Logging - Reduced retention to save costs
+log_retention_days = 3  # Reduced from 7 days (saves $2/month)
+
+# Tags
+tags = {
+  Environment = "production"
+  Project     = "mind-the-wait"
+  ManagedBy   = "terraform"
+  CostProfile = "budget-optimized"
+}

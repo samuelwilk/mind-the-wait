@@ -1,0 +1,158 @@
+name: Deploy to Production
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Docker image tag to deploy (e.g., v1.0.0 or latest)'
+        required: true
+        default: 'latest'
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ca-central-1
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ca-central-1.amazonaws.com
+  ECS_CLUSTER: mind-the-wait-prod
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.event_name == 'release'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Deploying version: ${TAG}"
+
+      - name: Build and push PHP image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/mind-the-wait/php:${{ steps.version.outputs.tag }}
+            ${{ env.ECR_REGISTRY }}/mind-the-wait/php:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Python parser image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./pyparser
+          file: ./pyparser/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/mind-the-wait/pyparser:${{ steps.version.outputs.tag }}
+            ${{ env.ECR_REGISTRY }}/mind-the-wait/pyparser:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to ECS
+    runs-on: ubuntu-latest
+    environment: production
+    needs: build-and-push
+    if: always() && (needs.build-and-push.result == 'success' || github.event_name == 'workflow_dispatch')
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Determine image tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            TAG=${GITHUB_REF#refs/tags/}
+            echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update PHP service
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ secrets.ECS_SERVICE_PHP }} \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Update Python parser service
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ secrets.ECS_SERVICE_PYPARSER }} \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Update Scheduler service
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ secrets.ECS_SERVICE_SCHEDULER }} \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Wait for PHP service to stabilize
+        run: |
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ secrets.ECS_SERVICE_PHP }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Wait for Python parser service to stabilize
+        run: |
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ secrets.ECS_SERVICE_PYPARSER }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Wait for Scheduler service to stabilize
+        run: |
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ secrets.ECS_SERVICE_SCHEDULER }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Deployment summary
+        run: |
+          echo "✅ Deployment completed successfully!"
+          echo "Version: ${{ steps.tag.outputs.tag }}"
+          echo "Cluster: ${{ env.ECS_CLUSTER }}"
+          echo "Region: ${{ env.AWS_REGION }}"
+          echo ""
+          echo "Services updated:"
+          echo "  - ${{ secrets.ECS_SERVICE_PHP }}"
+          echo "  - ${{ secrets.ECS_SERVICE_PYPARSER }}"
+          echo "  - ${{ secrets.ECS_SERVICE_SCHEDULER }}"
