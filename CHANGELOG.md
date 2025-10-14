@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2](https://github.com/samuelwilk/mind-the-wait/compare/v0.4.1...v0.4.2) (2025-10-14)
+
+
+### Bug Fixes
+
+* implement real data query for route detail heatmap ([faec5a0](https://github.com/samuelwilk/mind-the-wait/commit/faec5a02b98ed7b42a15d4c148b11868e26cbf81))
+
 ## [0.4.1](https://github.com/samuelwilk/mind-the-wait/compare/v0.4.0...v0.4.1) (2025-10-14)
 
 
