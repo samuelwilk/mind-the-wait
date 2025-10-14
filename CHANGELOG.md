@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1](https://github.com/samuelwilk/mind-the-wait/compare/v0.3.0...v0.3.1) (2025-10-14)
+
+
+### Bug Fixes
+
+* add asset-map:compile for production deployment ([e141f9a](https://github.com/samuelwilk/mind-the-wait/commit/e141f9a29548a29de7e97fcde12cbc8a795d0ce7))
+* add MESSENGER_TRANSPORT_DSN to production environment ([bb084a4](https://github.com/samuelwilk/mind-the-wait/commit/bb084a4d55bed77d7f4e1b6dfc20bc76ec1fb110))
+* build Tailwind CSS in production Docker image ([416b77c](https://github.com/samuelwilk/mind-the-wait/commit/416b77c08aba6f1213351360017be25028f300a0))
+
 ## [0.3.0](https://github.com/samuelwilk/mind-the-wait/compare/v0.2.5...v0.3.0) (2025-10-14)
 
 
