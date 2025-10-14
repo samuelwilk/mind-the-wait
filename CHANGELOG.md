@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4](https://github.com/samuelwilk/mind-the-wait/compare/v0.2.3...v0.2.4) (2025-10-14)
+
+
+### Bug Fixes
+
+* configure FrankenPHP to listen on port 8080 ([0fee8a7](https://github.com/samuelwilk/mind-the-wait/commit/0fee8a749aaae61cbaac2758f281b3c1b0fe9499))
+
 ## [0.2.3](https://github.com/samuelwilk/mind-the-wait/compare/v0.2.2...v0.2.3) (2025-10-14)
 
 
