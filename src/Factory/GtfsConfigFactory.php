@@ -10,7 +10,7 @@ final readonly class GtfsConfigFactory
 {
     public function __construct(
         private string $gtfsStaticUrl,
-        private string $gtfsStaticFallback,
+        private ?string $gtfsStaticFallback,
         private string $arcgisRoutesUrl,
         private string $arcgisStopsUrl,
         private string $arcgisTripsUrl,
