@@ -23,8 +23,15 @@ final readonly class InsightCacheWarmingSchedule implements ScheduleProviderInte
             ->add(
                 RecurringMessage::cron(
                     '0 2 * * *', // 2:00 AM daily
-                    'app:warm-insight-cache'
+                    new InsightCacheWarmingMessage()
                 )
             );
     }
+}
+
+/**
+ * Message for nightly insight cache warming.
+ */
+final readonly class InsightCacheWarmingMessage
+{
 }
