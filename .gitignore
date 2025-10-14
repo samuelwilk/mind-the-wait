@@ -78,6 +78,8 @@ docker/certs/*.key
 docker/certs/*.crt
 ###< aws/secrets ###
 
-# Documentation (can add later if needed)
+# IDE and AI assistant files
 CLAUDE.md
 IMPLEMENTATION_NOTES.md
+.claude/
+.codex/
