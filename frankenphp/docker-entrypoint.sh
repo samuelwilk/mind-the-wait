@@ -43,6 +43,28 @@ if [ "$1" = 'frankenphp' ] || [ "$1" = 'php' ] || [ "$1" = 'bin/console' ]; then
 			echo "The database is now ready and reachable"
 		fi
 
+		# Wait for Redis to be ready
+		if grep -q "^REDIS_URL=" .env 2>/dev/null || [ -n "${REDIS_URL:-}" ]; then
+			echo "Waiting for Redis to be ready..."
+			ATTEMPTS_LEFT_TO_REACH_REDIS=60
+			# Extract Redis host and port from REDIS_URL (format: redis://host:port)
+			REDIS_HOST=$(echo "$REDIS_URL" | sed -E 's|redis://([^:]+):.*|\1|')
+			REDIS_PORT=$(echo "$REDIS_URL" | sed -E 's|redis://[^:]+:([0-9]+).*|\1|')
+
+			until [ $ATTEMPTS_LEFT_TO_REACH_REDIS -eq 0 ] || nc -z "$REDIS_HOST" "$REDIS_PORT" > /dev/null 2>&1; do
+				sleep 1
+				ATTEMPTS_LEFT_TO_REACH_REDIS=$((ATTEMPTS_LEFT_TO_REACH_REDIS - 1))
+				echo "Still waiting for Redis to be ready... $ATTEMPTS_LEFT_TO_REACH_REDIS attempts left."
+			done
+
+			if [ $ATTEMPTS_LEFT_TO_REACH_REDIS -eq 0 ]; then
+				echo "Warning: Redis is not reachable at $REDIS_HOST:$REDIS_PORT"
+				echo "Continuing anyway - some features may not work"
+			else
+				echo "Redis is now ready and reachable"
+			fi
+		fi
+
 		# Run migrations in production
 		if [ "$APP_ENV" = 'prod' ]; then
 			echo "Running database migrations..."

@@ -146,6 +146,7 @@ module "ecs_service_php" {
 
     environment = [
       { name = "APP_ENV", value = "prod" },
+      { name = "APP_SECRET", value = var.app_secret },
       { name = "DATABASE_URL", value = local.database_url },
       { name = "REDIS_URL", value = local.redis_url },
       { name = "OPENAI_API_KEY", value = var.openai_api_key },
@@ -231,6 +232,7 @@ module "ecs_service_scheduler" {
 
     environment = [
       { name = "APP_ENV", value = "prod" },
+      { name = "APP_SECRET", value = var.app_secret },
       { name = "DATABASE_URL", value = local.database_url },
       { name = "REDIS_URL", value = local.redis_url },
       { name = "OPENAI_API_KEY", value = var.openai_api_key },

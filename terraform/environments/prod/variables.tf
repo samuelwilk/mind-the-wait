@@ -127,6 +127,12 @@ variable "scheduler_memory" {
 }
 
 # Application Configuration
+variable "app_secret" {
+  description = "Symfony APP_SECRET for encryption and security"
+  type        = string
+  sensitive   = true
+}
+
 variable "openai_api_key" {
   description = "OpenAI API key for AI-generated insights"
   type        = string
