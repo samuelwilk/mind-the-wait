@@ -107,8 +107,9 @@ module "ecs_cluster" {
 
 # Build connection strings
 locals {
-  database_url = "postgresql://${var.database_username}:${var.database_password}@${module.rds.address}:${module.rds.port}/${var.database_name}"
-  redis_url    = "redis://${module.elasticache.endpoint}:${module.elasticache.port}"
+  database_url           = "postgresql://${var.database_username}:${var.database_password}@${module.rds.address}:${module.rds.port}/${var.database_name}"
+  redis_url              = "redis://${module.elasticache.endpoint}:${module.elasticache.port}"
+  messenger_transport_dsn = "redis://${module.elasticache.endpoint}:${module.elasticache.port}/messages"
 }
 
 # ECS Service: PHP (Web Application)
@@ -149,6 +150,7 @@ module "ecs_service_php" {
       { name = "APP_SECRET", value = var.app_secret },
       { name = "DATABASE_URL", value = local.database_url },
       { name = "REDIS_URL", value = local.redis_url },
+      { name = "MESSENGER_TRANSPORT_DSN", value = local.messenger_transport_dsn },
       { name = "OPENAI_API_KEY", value = var.openai_api_key },
       { name = "MTW_GTFS_STATIC_URL", value = var.gtfs_static_url }
     ]
@@ -235,6 +237,7 @@ module "ecs_service_scheduler" {
       { name = "APP_SECRET", value = var.app_secret },
       { name = "DATABASE_URL", value = local.database_url },
       { name = "REDIS_URL", value = local.redis_url },
+      { name = "MESSENGER_TRANSPORT_DSN", value = local.messenger_transport_dsn },
       { name = "OPENAI_API_KEY", value = var.openai_api_key },
       { name = "MTW_GTFS_STATIC_URL", value = var.gtfs_static_url }
     ]
