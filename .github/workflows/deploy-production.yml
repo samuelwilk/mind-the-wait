@@ -1,6 +1,9 @@
 name: Deploy to Production
 
 on:
+  push:
+    branches:
+      - main
   release:
     types: [published]
   workflow_dispatch:
@@ -24,7 +27,6 @@ jobs:
     name: Build and Push Docker Images
     runs-on: ubuntu-latest
     environment: production
-    if: github.event_name == 'release'
 
     steps:
       - name: Checkout code
@@ -44,12 +46,20 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Extract version from tag
-        id: version
+      - name: Determine image tags
+        id: tags
         run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "Deploying version: ${TAG}"
+          # Always tag with commit SHA and latest
+          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+          # If this is a release, also tag with version
+          if [ "${{ github.event_name }}" == "release" ]; then
+            TAG=${GITHUB_REF#refs/tags/}
+            echo "version=${TAG}" >> $GITHUB_OUTPUT
+            echo "Building release version: ${TAG}"
+          else
+            echo "Building from commit: $(git rev-parse --short HEAD)"
+          fi
 
       - name: Build and push PHP image
         uses: docker/build-push-action@v5
@@ -58,8 +68,9 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/mind-the-wait/php:${{ steps.version.outputs.tag }}
             ${{ env.ECR_REGISTRY }}/mind-the-wait/php:latest
+            ${{ env.ECR_REGISTRY }}/mind-the-wait/php:${{ steps.tags.outputs.sha_short }}
+            ${{ github.event_name == 'release' && format('{0}/mind-the-wait/php:{1}', env.ECR_REGISTRY, steps.tags.outputs.version) || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -70,8 +81,9 @@ jobs:
           file: ./pyparser/Dockerfile
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/mind-the-wait/pyparser:${{ steps.version.outputs.tag }}
             ${{ env.ECR_REGISTRY }}/mind-the-wait/pyparser:latest
+            ${{ env.ECR_REGISTRY }}/mind-the-wait/pyparser:${{ steps.tags.outputs.sha_short }}
+            ${{ github.event_name == 'release' && format('{0}/mind-the-wait/pyparser:{1}', env.ECR_REGISTRY, steps.tags.outputs.version) || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -80,7 +92,10 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     needs: build-and-push
-    if: always() && (needs.build-and-push.result == 'success' || github.event_name == 'workflow_dispatch')
+    if: |
+      always() &&
+      needs.build-and-push.result == 'success' &&
+      (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
 
     steps:
       - name: Configure AWS credentials
