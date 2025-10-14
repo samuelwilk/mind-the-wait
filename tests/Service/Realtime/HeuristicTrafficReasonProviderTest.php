@@ -40,14 +40,7 @@ final class HeuristicTrafficReasonProviderTest extends TestCase
 
         // Could be either dad joke or standard message
         self::assertNotNull($reason);
-        // Standard message format: "Severe traffic likely impacting 15 (delay 12 min)."
-        // Dad joke format: various funny messages
-        $reasonLower = strtolower($reason);
-        $isDadJoke   = str_contains($reasonLower, 'pigeon')
-            || str_contains($reasonLower, 'quantum')
-            || str_contains($reasonLower, 'speedrun')
-            || str_contains($reasonLower, 'wormhole')
-            || str_contains($reasonLower, 'gremlins');
+        $isDadJoke = $this->isDadJoke($reason);
 
         if (!$isDadJoke) {
             self::assertStringContainsString('Severe traffic', $reason);
@@ -67,12 +60,7 @@ final class HeuristicTrafficReasonProviderTest extends TestCase
         $reason = $provider->reasonFor($vehicle, 240); // 4 min delay
 
         self::assertNotNull($reason);
-        $reasonLower = strtolower($reason);
-        $isDadJoke   = str_contains($reasonLower, 'pigeon')
-            || str_contains($reasonLower, 'quantum')
-            || str_contains($reasonLower, 'speedrun')
-            || str_contains($reasonLower, 'wormhole')
-            || str_contains($reasonLower, 'gremlins');
+        $isDadJoke = $this->isDadJoke($reason);
 
         if (!$isDadJoke) {
             self::assertStringContainsString('Moderate congestion', $reason);
@@ -92,12 +80,7 @@ final class HeuristicTrafficReasonProviderTest extends TestCase
         $reason = $provider->reasonFor($vehicle, -400); // 6+ min early
 
         self::assertNotNull($reason);
-        $reasonLower = strtolower($reason);
-        $isDadJoke   = str_contains($reasonLower, 'pigeon')
-            || str_contains($reasonLower, 'quantum')
-            || str_contains($reasonLower, 'speedrun')
-            || str_contains($reasonLower, 'wormhole')
-            || str_contains($reasonLower, 'gremlins');
+        $isDadJoke = $this->isDadJoke($reason);
 
         if (!$isDadJoke) {
             self::assertStringContainsString('Light traffic', $reason);
@@ -118,18 +101,32 @@ final class HeuristicTrafficReasonProviderTest extends TestCase
         $gotJoke = false;
         for ($i = 0; $i < 100; ++$i) {
             $reason = $provider->reasonFor($vehicle, 300);
-            if ($reason !== null && (
-                str_contains($reason, 'pigeon')
-                || str_contains($reason, 'quantum')
-                || str_contains($reason, 'wormhole')
-                || str_contains($reason, 'gremlins')
-                || str_contains($reason, 'speedrun')
-            )) {
+            if ($reason !== null && $this->isDadJoke($reason)) {
                 $gotJoke = true;
                 break;
             }
         }
 
         self::assertTrue($gotJoke, 'Expected to receive at least one dad joke in 100 attempts');
+    }
+
+    /**
+     * Check if a reason string is a dad joke by looking for known keywords.
+     * Based on DAD_JOKES constant in HeuristicTrafficReasonProvider.
+     */
+    private function isDadJoke(string $reason): bool
+    {
+        $reasonLower = strtolower($reason);
+
+        return str_contains($reasonLower, 'sale')
+            || str_contains($reasonLower, 'pigeon')
+            || str_contains($reasonLower, 'speedrun')
+            || str_contains($reasonLower, 'time traveler')
+            || str_contains($reasonLower, 'daylight savings')
+            || str_contains($reasonLower, 'quantum')
+            || str_contains($reasonLower, 'gremlins')
+            || str_contains($reasonLower, 'scenic route')
+            || str_contains($reasonLower, 'wormhole')
+            || str_contains($reasonLower, 'coffee');
     }
 }
