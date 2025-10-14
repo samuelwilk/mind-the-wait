@@ -96,7 +96,11 @@ jobs:
     if: |
       always() &&
       needs.build-and-push.result == 'success' &&
-      (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
+      (
+        github.event_name == 'release' ||
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release'))
+      )
 
     steps:
       - name: Configure AWS credentials
