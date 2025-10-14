@@ -40,7 +40,8 @@ resource "aws_lb_target_group" "php" {
   })
 }
 
-# HTTP Listener - Temporary: Forward traffic directly (change to redirect after cert validation)
+# HTTP Listener - Temporary: Forward traffic directly
+# After certificate validation, change type to "redirect" and add redirect block
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.this.arn
   port              = 80
@@ -50,16 +51,6 @@ resource "aws_lb_listener" "http" {
     type             = "forward"
     target_group_arn = aws_lb_target_group.php.arn
   }
-
-  # After certificate validation, change to redirect:
-  # default_action {
-  #   type = "redirect"
-  #   redirect {
-  #     port        = "443"
-  #     protocol    = "HTTPS"
-  #     status_code = "HTTP_301"
-  #   }
-  # }
 }
 
 # HTTPS Listener - Commented until certificate is validated
