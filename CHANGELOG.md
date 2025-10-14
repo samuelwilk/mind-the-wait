@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3](https://github.com/samuelwilk/mind-the-wait/compare/v0.2.2...v0.2.3) (2025-10-14)
+
+
+### Bug Fixes
+
+* disable Mercure and Vulcain in production Caddyfile ([cc13231](https://github.com/samuelwilk/mind-the-wait/commit/cc13231620c43d39d25fdfafc35f3f06962272f5))
+
 ## [0.2.2](https://github.com/samuelwilk/mind-the-wait/compare/v0.2.1...v0.2.2) (2025-10-14)
 
 
