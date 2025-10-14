@@ -70,7 +70,7 @@ jobs:
           push: true
           tags: |
             ${{ env.ECR_REGISTRY }}/mind-the-wait/php:${{ steps.tags.outputs.sha_short }}
-            ${{ github.event_name == 'release' && format('{0}/mind-the-wait/php:latest', env.ECR_REGISTRY) || '' }}
+            ${{ env.ECR_REGISTRY }}/mind-the-wait/php:latest
             ${{ github.event_name == 'release' && format('{0}/mind-the-wait/php:{1}', env.ECR_REGISTRY, steps.tags.outputs.version) || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -83,7 +83,7 @@ jobs:
           push: true
           tags: |
             ${{ env.ECR_REGISTRY }}/mind-the-wait/pyparser:${{ steps.tags.outputs.sha_short }}
-            ${{ github.event_name == 'release' && format('{0}/mind-the-wait/pyparser:latest', env.ECR_REGISTRY) || '' }}
+            ${{ env.ECR_REGISTRY }}/mind-the-wait/pyparser:latest
             ${{ github.event_name == 'release' && format('{0}/mind-the-wait/pyparser:{1}', env.ECR_REGISTRY, steps.tags.outputs.version) || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
