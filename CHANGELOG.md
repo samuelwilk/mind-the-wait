@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2](https://github.com/samuelwilk/mind-the-wait/compare/v0.2.1...v0.2.2) (2025-10-14)
+
+
+### Bug Fixes
+
+* always push :latest tag to ECR on all builds ([609db63](https://github.com/samuelwilk/mind-the-wait/commit/609db635ce63e17ec5eadca6ca9033be492da073))
+* deploy to ECS when Release Please PRs are merged ([c3134f2](https://github.com/samuelwilk/mind-the-wait/commit/c3134f20bb3a18762fb3749f5033aa59dc2d24f0))
+* update Caddyfile comment to bust Docker build cache ([e8c2ef4](https://github.com/samuelwilk/mind-the-wait/commit/e8c2ef4b62382029affc4c528decebd36d2b0ffa))
+
 ## [0.2.1](https://github.com/samuelwilk/mind-the-wait/compare/v0.2.0...v0.2.1) (2025-10-14)
 
 
