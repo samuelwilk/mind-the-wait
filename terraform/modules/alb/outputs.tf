@@ -18,7 +18,7 @@ output "target_group_arn" {
   value       = aws_lb_target_group.php.arn
 }
 
-output "https_listener_arn" {
-  description = "HTTPS listener ARN"
-  value       = aws_lb_listener.https.arn
-}
+# output "https_listener_arn" {
+#   description = "HTTPS listener ARN"
+#   value       = aws_lb_listener.https.arn
+# }
