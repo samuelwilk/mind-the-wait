@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/samuelwilk/mind-the-wait/compare/v0.2.5...v0.3.0) (2025-10-14)
+
+
+### Features
+
+* add Redis readiness check and auto-migrations ([f418ff9](https://github.com/samuelwilk/mind-the-wait/commit/f418ff9374fe44e6575dc4bda89599811f3a39ef))
+
 ## [0.2.5](https://github.com/samuelwilk/mind-the-wait/compare/v0.2.4...v0.2.5) (2025-10-14)
 
 
