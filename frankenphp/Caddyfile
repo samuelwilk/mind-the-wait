@@ -26,7 +26,8 @@ log {
 	}
 }
 
-# HTTP server for internal metrics (disabled - causes parsing error)
+# HTTP server for internal metrics - disabled due to FrankenPHP parsing error
+# The :2019 directive is not recognized by this version of FrankenPHP
 # :2019 {
 # 	metrics /metrics
 # }
