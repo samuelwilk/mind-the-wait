@@ -40,30 +40,32 @@ resource "aws_lb_target_group" "php" {
   })
 }
 
-# HTTP Listener - Temporary: Forward traffic directly
-# After certificate validation, change type to "redirect" and add redirect block
+# HTTP Listener - Redirect to HTTPS
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.this.arn
   port              = 80
   protocol          = "HTTP"
 
   default_action {
+    type = "redirect"
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+}
+
+# HTTPS Listener
+resource "aws_lb_listener" "https" {
+  load_balancer_arn = aws_lb.this.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  certificate_arn   = var.certificate_arn
+
+  default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.php.arn
   }
 }
-
-# HTTPS Listener - Commented until certificate is validated
-# Uncomment after DNS propagation and certificate validation complete
-# resource "aws_lb_listener" "https" {
-#   load_balancer_arn = aws_lb.this.arn
-#   port              = 443
-#   protocol          = "HTTPS"
-#   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-#   certificate_arn   = var.certificate_arn
-#
-#   default_action {
-#     type             = "forward"
-#     target_group_arn = aws_lb_target_group.php.arn
-#   }
-# }

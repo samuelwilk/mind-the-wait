@@ -46,12 +46,10 @@ resource "aws_route53_record" "cert_validation" {
 }
 
 # Certificate validation
-# Commented out temporarily - will hang until domain nameservers point to Route 53
-# After updating Porkbun nameservers, uncomment this and run terraform apply again
-# resource "aws_acm_certificate_validation" "this" {
-#   certificate_arn         = aws_acm_certificate.this.arn
-#   validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
-# }
+resource "aws_acm_certificate_validation" "this" {
+  certificate_arn         = aws_acm_certificate.this.arn
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
+}
 
 # A record pointing to ALB
 resource "aws_route53_record" "alb" {
