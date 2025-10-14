@@ -523,21 +523,26 @@ final readonly class WeatherAnalysisService
     /**
      * Build bunching by weather chart.
      *
-     * Note: Placeholder implementation - we don't have bunching data yet.
+     * Note: Bunching detection not yet implemented.
+     * Returns empty chart that will populate once bunching detection is available.
      *
      * @return array<string, mixed>
      */
     private function buildBunchingByWeatherChart(): array
     {
         // TODO: Implement when bunching detection is ready
-        // For now, return sample data for demonstration
+        // Bunching detection would require:
+        // - Tracking vehicle arrival patterns at stops
+        // - Detecting when 2+ vehicles arrive within short intervals (e.g., < 2 minutes)
+        // - Logging bunching incidents with weather correlation
 
         $conditions = ['Snow', 'Rain', 'Cloudy', 'Clear'];
-        $incidents  = [87, 32, 28, 24]; // Sample data
+        $incidents  = []; // Empty - no bunching data available yet
 
         return [
             'title' => [
                 'text'      => 'Bunching Incidents by Weather',
+                'subtext'   => 'Data collection in progress',
                 'left'      => 'center',
                 'textStyle' => ['fontSize' => 18, 'fontWeight' => 'bold'],
             ],
@@ -552,12 +557,14 @@ final readonly class WeatherAnalysisService
             'yAxis' => [
                 'type' => 'value',
                 'name' => 'Incidents',
+                'min'  => 0,
+                'max'  => 100,
             ],
             'series' => [
                 [
                     'name' => 'Bunching Incidents',
                     'type' => 'bar',
-                    'data' => array_map(function ($condition, $count) {
+                    'data' => array_map(function ($condition) {
                         $colors = [
                             'Snow'   => '#ede9fe',
                             'Rain'   => '#dbeafe',
@@ -566,14 +573,28 @@ final readonly class WeatherAnalysisService
                         ];
 
                         return [
-                            'value'     => $count,
+                            'value'     => 0, // No data yet
                             'itemStyle' => ['color' => $colors[$condition] ?? '#94a3b8'],
                         ];
-                    }, $conditions, $incidents),
+                    }, $conditions),
                     'label' => [
-                        'show'      => true,
+                        'show'      => false,
                         'position'  => 'top',
                         'formatter' => '{c} incidents',
+                    ],
+                ],
+            ],
+            'graphic' => [
+                [
+                    'type'  => 'text',
+                    'left'  => 'center',
+                    'top'   => 'middle',
+                    'style' => [
+                        'text'       => "Bunching detection coming soon\n\nData will populate once bunching\ntracking infrastructure is implemented",
+                        'fontSize'   => 14,
+                        'fill'       => '#94a3b8',
+                        'textAlign'  => 'center',
+                        'fontWeight' => 'normal',
                     ],
                 ],
             ],
@@ -594,13 +615,14 @@ final readonly class WeatherAnalysisService
     private function buildBunchingByWeatherStats(): array
     {
         // TODO: Implement when bunching detection is ready
-        // For now, return sample stats
+        // Returns empty stats until bunching infrastructure is implemented
 
         return [
-            'snowIncidents'  => 87,
-            'rainIncidents'  => 32,
-            'clearIncidents' => 24,
-            'multiplier'     => 3.6,
+            'snowIncidents'  => 0,
+            'rainIncidents'  => 0,
+            'clearIncidents' => 0,
+            'multiplier'     => 0.0,
+            'hasData'        => false, // Flag to indicate no data available
         ];
     }
 }
