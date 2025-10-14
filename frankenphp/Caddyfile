@@ -26,10 +26,10 @@ log {
 	}
 }
 
-# HTTP server for internal metrics
-:2019 {
-	metrics /metrics
-}
+# HTTP server for internal metrics (disabled - causes parsing error)
+# :2019 {
+# 	metrics /metrics
+# }
 
 # Main application server
 route {
