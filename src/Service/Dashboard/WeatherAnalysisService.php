@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Dashboard;
 
 use App\Dto\WeatherImpactDto;
+use App\Repository\BunchingIncidentRepository;
 use App\Repository\RoutePerformanceDailyRepository;
 
 use function array_flip;
@@ -26,6 +27,7 @@ final readonly class WeatherAnalysisService
 {
     public function __construct(
         private RoutePerformanceDailyRepository $performanceRepo,
+        private BunchingIncidentRepository $bunchingRepo,
         private InsightGeneratorService $insightGenerator,
     ) {
     }
@@ -523,26 +525,51 @@ final readonly class WeatherAnalysisService
     /**
      * Build bunching by weather chart.
      *
-     * Note: Bunching detection not yet implemented.
-     * Returns empty chart that will populate once bunching detection is available.
+     * Queries bunching_incident table for real data grouped by weather condition.
      *
      * @return array<string, mixed>
      */
     private function buildBunchingByWeatherChart(): array
     {
-        // TODO: Implement when bunching detection is ready
-        // Bunching detection would require:
-        // - Tracking vehicle arrival patterns at stops
-        // - Detecting when 2+ vehicles arrive within short intervals (e.g., < 2 minutes)
-        // - Logging bunching incidents with weather correlation
+        $endDate   = new \DateTimeImmutable('today');
+        $startDate = $endDate->modify('-30 days');
 
-        $conditions = ['Snow', 'Rain', 'Cloudy', 'Clear'];
-        $incidents  = []; // Empty - no bunching data available yet
+        // Query bunching incidents grouped by weather condition
+        $results = $this->bunchingRepo->countByWeatherCondition($startDate, $endDate);
+
+        // Build data arrays
+        $conditionMap = [
+            'snow'   => ['label' => 'Snow', 'color' => '#ede9fe'],
+            'rain'   => ['label' => 'Rain', 'color' => '#dbeafe'],
+            'cloudy' => ['label' => 'Cloudy', 'color' => '#e5e7eb'],
+            'clear'  => ['label' => 'Clear', 'color' => '#fef3c7'],
+        ];
+
+        $data = [];
+        foreach ($conditionMap as $condition => $config) {
+            $count = 0;
+            foreach ($results as $dto) {
+                if (strtolower($dto->weatherCondition) === $condition) {
+                    $count = $dto->incidentCount;
+
+                    break;
+                }
+            }
+            $data[] = [
+                'value'     => $count,
+                'itemStyle' => ['color' => $config['color']],
+            ];
+        }
+
+        $conditions = array_column($conditionMap, 'label');
+
+        $totalIncidents = array_sum(array_column($data, 'value'));
+        $hasData        = $totalIncidents > 0;
 
         return [
             'title' => [
                 'text'      => 'Bunching Incidents by Weather',
-                'subtext'   => 'Data collection in progress',
+                'subtext'   => $hasData ? 'Last 30 days' : 'No data available yet',
                 'left'      => 'center',
                 'textStyle' => ['fontSize' => 18, 'fontWeight' => 'bold'],
             ],
@@ -558,39 +585,26 @@ final readonly class WeatherAnalysisService
                 'type' => 'value',
                 'name' => 'Incidents',
                 'min'  => 0,
-                'max'  => 100,
             ],
             'series' => [
                 [
-                    'name' => 'Bunching Incidents',
-                    'type' => 'bar',
-                    'data' => array_map(function ($condition) {
-                        $colors = [
-                            'Snow'   => '#ede9fe',
-                            'Rain'   => '#dbeafe',
-                            'Cloudy' => '#e5e7eb',
-                            'Clear'  => '#fef3c7',
-                        ];
-
-                        return [
-                            'value'     => 0, // No data yet
-                            'itemStyle' => ['color' => $colors[$condition] ?? '#94a3b8'],
-                        ];
-                    }, $conditions),
+                    'name'  => 'Bunching Incidents',
+                    'type'  => 'bar',
+                    'data'  => $data,
                     'label' => [
-                        'show'      => false,
+                        'show'      => $hasData,
                         'position'  => 'top',
                         'formatter' => '{c} incidents',
                     ],
                 ],
             ],
-            'graphic' => [
+            'graphic' => $hasData ? [] : [
                 [
                     'type'  => 'text',
                     'left'  => 'center',
                     'top'   => 'middle',
                     'style' => [
-                        'text'       => "Bunching detection coming soon\n\nData will populate once bunching\ntracking infrastructure is implemented",
+                        'text'       => "No bunching data yet\n\nRun 'app:detect:bunching' command\nto analyze arrival patterns",
                         'fontSize'   => 14,
                         'fill'       => '#94a3b8',
                         'textAlign'  => 'center',
@@ -614,15 +628,36 @@ final readonly class WeatherAnalysisService
      */
     private function buildBunchingByWeatherStats(): array
     {
-        // TODO: Implement when bunching detection is ready
-        // Returns empty stats until bunching infrastructure is implemented
+        $endDate   = new \DateTimeImmutable('today');
+        $startDate = $endDate->modify('-30 days');
+
+        // Query bunching incidents grouped by weather condition
+        $results = $this->bunchingRepo->countByWeatherCondition($startDate, $endDate);
+
+        $snowIncidents  = 0;
+        $rainIncidents  = 0;
+        $clearIncidents = 0;
+
+        foreach ($results as $dto) {
+            $condition = strtolower($dto->weatherCondition);
+
+            match ($condition) {
+                'snow'  => $snowIncidents  = $dto->incidentCount,
+                'rain'  => $rainIncidents  = $dto->incidentCount,
+                'clear' => $clearIncidents = $dto->incidentCount,
+                default => null,
+            };
+        }
+
+        $multiplier = $clearIncidents                                     > 0 ? round($snowIncidents / $clearIncidents, 1) : 0.0;
+        $hasData    = ($snowIncidents + $rainIncidents + $clearIncidents) > 0;
 
         return [
-            'snowIncidents'  => 0,
-            'rainIncidents'  => 0,
-            'clearIncidents' => 0,
-            'multiplier'     => 0.0,
-            'hasData'        => false, // Flag to indicate no data available
+            'snowIncidents'  => $snowIncidents,
+            'rainIncidents'  => $rainIncidents,
+            'clearIncidents' => $clearIncidents,
+            'multiplier'     => $multiplier,
+            'hasData'        => $hasData,
         ];
     }
 }

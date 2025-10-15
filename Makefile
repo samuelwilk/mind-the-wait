@@ -8,15 +8,15 @@ help:  ## Display this help
 ##@ Docker
 docker-build: ## Build the docker containers
 	@echo "Building and Starting Docker containers detached..."
-	@INSTALL_DEPENDENCIES=true docker compose -f docker/compose.yaml --env-file .env up --build -d
+	@INSTALL_DEPENDENCIES=true docker compose -f docker/compose.yaml --env-file .env.local up --build -d
 
 docker-up: ## Start the docker containers, without building them first.
 	@echo "Starting main Docker containers detached..."
-	@docker compose -f docker/compose.yaml --env-file .env up -d
+	@docker compose -f docker/compose.yaml --env-file .env.local up -d
 
 docker-up-with-logs: ## Start the docker containers, without building them first.
 	@echo "Starting main Docker containers with log..."
-	@docker compose -f docker/compose.yaml --env-file .env up
+	@docker compose -f docker/compose.yaml --env-file .env.local up
 
 docker-down: ## Close down docker containers.
 	@echo "Closing down Docker containers..."
@@ -131,7 +131,7 @@ setup: ## Complete application setup - builds, installs deps, creates databases,
 	@echo ""
 	@echo "💡 Next steps:"
 	@echo "  - Check realtime data: curl -sk https://localhost/api/realtime | jq"
-	@echo "  - View scheduler logs: docker compose -f docker/compose.yaml logs -f scheduler"
+	@echo "  - View scheduler logs: docker compose -f docker/compose.yaml --env-file .env.local logs -f scheduler"
 	@echo "  - Run tests: make test-phpunit"
 
 gtfs-load: ## Load GTFS static data (uses ArcGIS by default, or set MTW_GTFS_STATIC_URL for ZIP)

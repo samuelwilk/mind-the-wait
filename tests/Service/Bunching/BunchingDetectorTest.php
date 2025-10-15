@@ -1,0 +1,251 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Service\Bunching;
+
+use App\Entity\ArrivalLog;
+use App\Entity\Route;
+use App\Entity\Stop;
+use App\Entity\WeatherObservation;
+use App\Enum\PredictionConfidence;
+use App\Enum\RouteTypeEnum;
+use App\Enum\TransitImpact;
+use App\Repository\BunchingIncidentRepository;
+use App\Service\Bunching\BunchingDetector;
+use App\Tests\InjectableHelperTrait;
+use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\CoversClass;
+use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+
+/**
+ * Integration tests for BunchingDetector using real database.
+ *
+ * Tests the actual SQL window function logic and database interactions.
+ */
+#[CoversClass(BunchingDetector::class)]
+final class BunchingDetectorTest extends KernelTestCase
+{
+    use InjectableHelperTrait;
+
+    private EntityManagerInterface $em;
+    private BunchingDetector $detector;
+    private BunchingIncidentRepository $bunchingRepo;
+
+    protected function setUp(): void
+    {
+        self::bootKernel(['environment' => 'test', 'debug' => true]);
+
+        $this->em           = $this->getInjectable(EntityManagerInterface::class);
+        $this->detector     = $this->getInjectable(BunchingDetector::class);
+        $this->bunchingRepo = $this->getInjectable(BunchingIncidentRepository::class);
+
+        // Clear bunching_incident table before each test to ensure isolation
+        $this->em->getConnection()->executeStatement('DELETE FROM bunching_incident');
+    }
+
+    public function testDetectsBasicBunchingIncident(): void
+    {
+        $route = $this->createRoute('route-1');
+        $stop  = $this->createStop('stop-1');
+        $date  = new \DateTimeImmutable('2025-01-15');
+
+        // Create 2 vehicles arriving within 2 minutes (bunching!)
+        $this->createArrivalLog($route, $stop, $date->setTime(10, 0, 0), 'veh-1');
+        $this->createArrivalLog($route, $stop, $date->setTime(10, 1, 30), 'veh-2'); // 90 seconds later
+
+        $this->em->flush();
+
+        $result = $this->detector->detectForDate($date);
+
+        $this->assertEquals(1, $result['detected'], 'Should detect 1 bunching incident');
+        $this->assertEquals(0, $result['skipped']);
+    }
+
+    public function testDoesNotDetectNormalSpacing(): void
+    {
+        $route = $this->createRoute('route-2');
+        $stop  = $this->createStop('stop-2');
+        $date  = new \DateTimeImmutable('2025-01-16');
+
+        // Create 2 vehicles arriving 10 minutes apart (normal spacing)
+        $this->createArrivalLog($route, $stop, $date->setTime(10, 0, 0), 'veh-1');
+        $this->createArrivalLog($route, $stop, $date->setTime(10, 10, 0), 'veh-2');
+
+        $this->em->flush();
+
+        $result = $this->detector->detectForDate($date);
+
+        $this->assertEquals(0, $result['detected'], 'Should not detect bunching for normal spacing');
+    }
+
+    public function testDetectsMultipleBunchingIncidents(): void
+    {
+        $route = $this->createRoute('route-3');
+        $stop  = $this->createStop('stop-3');
+        $date  = new \DateTimeImmutable('2025-01-17');
+
+        // First bunching: 10:00 and 10:01
+        $this->createArrivalLog($route, $stop, $date->setTime(10, 0, 0), 'veh-1');
+        $this->createArrivalLog($route, $stop, $date->setTime(10, 1, 0), 'veh-2');
+
+        // Second bunching: 14:00 and 14:01:30
+        $this->createArrivalLog($route, $stop, $date->setTime(14, 0, 0), 'veh-3');
+        $this->createArrivalLog($route, $stop, $date->setTime(14, 1, 30), 'veh-4');
+
+        $this->em->flush();
+
+        $result = $this->detector->detectForDate($date);
+
+        $this->assertEquals(2, $result['detected'], 'Should detect 2 separate bunching incidents');
+    }
+
+    public function testLinksWeatherObservation(): void
+    {
+        $route = $this->createRoute('route-4');
+        $stop  = $this->createStop('stop-4');
+        $date  = new \DateTimeImmutable('2025-01-18');
+
+        // Create weather observation
+        $weather = new WeatherObservation();
+        $weather->setObservedAt($date->setTime(9, 55, 0)); // 5 minutes before bunching
+        $weather->setTemperatureCelsius('-10.0');
+        $weather->setWeatherCondition('Snow');
+        $weather->setWeatherCode(71);
+        $weather->setTransitImpact(TransitImpact::MODERATE);
+        $weather->setDataSource('test');
+        $this->em->persist($weather);
+
+        // Create bunching at 10:00 and 10:01
+        $this->createArrivalLog($route, $stop, $date->setTime(10, 0, 0), 'veh-1');
+        $this->createArrivalLog($route, $stop, $date->setTime(10, 1, 0), 'veh-2');
+
+        $this->em->flush();
+
+        $result = $this->detector->detectForDate($date);
+
+        $this->assertEquals(1, $result['detected']);
+
+        // Verify weather was linked
+        $incidents = $this->bunchingRepo->findByDateRange(
+            $date->setTime(0, 0, 0),
+            $date->setTime(23, 59, 59)
+        );
+
+        $this->assertCount(1, $incidents);
+        $this->assertNotNull($incidents[0]->getWeatherObservation());
+        $this->assertEquals('Snow', $incidents[0]->getWeatherObservation()->getWeatherCondition());
+    }
+
+    public function testCustomTimeWindow(): void
+    {
+        $route = $this->createRoute('route-5');
+        $stop  = $this->createStop('stop-5');
+        $date  = new \DateTimeImmutable('2025-01-19');
+
+        // Create vehicles 90 seconds apart
+        $this->createArrivalLog($route, $stop, $date->setTime(10, 0, 0), 'veh-1');
+        $this->createArrivalLog($route, $stop, $date->setTime(10, 1, 30), 'veh-2');
+
+        $this->em->flush();
+
+        // With 60-second window, should NOT detect bunching
+        $result60 = $this->detector->detectForDate($date, 60);
+        $this->assertEquals(0, $result60['detected'], 'Should not detect with 60s window');
+
+        // With 120-second window, SHOULD detect bunching
+        $result120 = $this->detector->detectForDate($date, 120);
+        $this->assertEquals(1, $result120['detected'], 'Should detect with 120s window');
+    }
+
+    public function testHandlesSameVehicleGracefully(): void
+    {
+        $route = $this->createRoute('route-6');
+        $stop  = $this->createStop('stop-6');
+        $date  = new \DateTimeImmutable('2025-01-20');
+
+        // Same vehicle reporting at same stop twice (should be ignored)
+        $this->createArrivalLog($route, $stop, $date->setTime(10, 0, 0), 'veh-1');
+        $this->createArrivalLog($route, $stop, $date->setTime(10, 0, 30), 'veh-1'); // Same vehicle
+
+        $this->em->flush();
+
+        $result = $this->detector->detectForDate($date);
+
+        $this->assertEquals(0, $result['detected'], 'Should not count same vehicle as bunching');
+    }
+
+    public function testHandlesNoData(): void
+    {
+        $date = new \DateTimeImmutable('2025-01-21');
+
+        // No arrival logs for this date
+        $result = $this->detector->detectForDate($date);
+
+        $this->assertEquals(0, $result['detected']);
+        $this->assertEquals(0, $result['skipped']);
+    }
+
+    public function testHandlesDifferentRoutesAtSameStop(): void
+    {
+        $route1 = $this->createRoute('route-7');
+        $route2 = $this->createRoute('route-8');
+        $stop   = $this->createStop('stop-7');
+        $date   = new \DateTimeImmutable('2025-01-22');
+
+        // Different routes at same stop within 2 minutes (should NOT be bunching)
+        $this->createArrivalLog($route1, $stop, $date->setTime(10, 0, 0), 'veh-1');
+        $this->createArrivalLog($route2, $stop, $date->setTime(10, 1, 0), 'veh-2');
+
+        $this->em->flush();
+
+        $result = $this->detector->detectForDate($date);
+
+        $this->assertEquals(0, $result['detected'], 'Different routes should not be counted as bunching');
+    }
+
+    private function createRoute(string $gtfsId): Route
+    {
+        $route = new Route();
+        $route->setGtfsId($gtfsId);
+        $route->setShortName($gtfsId);
+        $route->setLongName('Test Route '.$gtfsId);
+        $route->setColour('FF0000');
+        $route->setRouteType(RouteTypeEnum::Bus);
+        $this->em->persist($route);
+
+        return $route;
+    }
+
+    private function createStop(string $gtfsId): Stop
+    {
+        $stop = new Stop();
+        $stop->setGtfsId($gtfsId);
+        $stop->setName('Test Stop '.$gtfsId);
+        $stop->setLat(52.1332);
+        $stop->setLong(-106.6700);
+        $this->em->persist($stop);
+
+        return $stop;
+    }
+
+    private function createArrivalLog(
+        Route $route,
+        Stop $stop,
+        \DateTimeImmutable $arrivalTime,
+        string $vehicleId,
+    ): ArrivalLog {
+        $log = new ArrivalLog();
+        $log->setRoute($route);
+        $log->setStop($stop);
+        $log->setVehicleId($vehicleId);
+        $log->setTripId('trip-'.random_int(1000, 9999));
+        $log->setPredictedArrivalAt($arrivalTime);
+        $log->setPredictedAt($arrivalTime->modify('-5 minutes')); // Predicted 5 minutes before arrival
+        $log->setConfidence(PredictionConfidence::HIGH);
+        $log->setDelaySec(0);
+        $this->em->persist($log);
+
+        return $log;
+    }
+}

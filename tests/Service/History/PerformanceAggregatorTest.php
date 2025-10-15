@@ -15,6 +15,7 @@ use App\Repository\ArrivalLogRepository;
 use App\Repository\RouteRepository;
 use App\Repository\WeatherObservationRepository;
 use App\Service\History\PerformanceAggregator;
+use App\Tests\InjectableHelperTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
@@ -25,6 +26,8 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
  */
 final class PerformanceAggregatorTest extends KernelTestCase
 {
+    use InjectableHelperTrait;
+
     private EntityManagerInterface $em;
     private RouteRepository $routeRepo;
     private ArrivalLogRepository $arrivalLogRepo;
@@ -34,13 +37,12 @@ final class PerformanceAggregatorTest extends KernelTestCase
     protected function setUp(): void
     {
         self::bootKernel(['environment' => 'test', 'debug' => true]);
-        $container = self::getContainer();
 
-        $this->em             = $container->get(EntityManagerInterface::class);
-        $this->routeRepo      = $container->get(RouteRepository::class);
-        $this->arrivalLogRepo = $container->get(ArrivalLogRepository::class);
-        $this->weatherRepo    = $container->get(WeatherObservationRepository::class);
-        $this->aggregator     = $container->get(PerformanceAggregator::class);
+        $this->em             = $this->getInjectable(EntityManagerInterface::class);
+        $this->routeRepo      = $this->getInjectable(RouteRepository::class);
+        $this->arrivalLogRepo = $this->getInjectable(ArrivalLogRepository::class);
+        $this->weatherRepo    = $this->getInjectable(WeatherObservationRepository::class);
+        $this->aggregator     = $this->getInjectable(PerformanceAggregator::class);
     }
 
     public function testCalculatesCorrectMedianForOddNumberOfDelays(): void
