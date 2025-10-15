@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0](https://github.com/samuelwilk/mind-the-wait/compare/v0.4.2...v0.5.0) (2025-10-15)
+
+
+### Features
+
+* add vehicle bunching detection infrastructure with comprehensive tests ([93d0503](https://github.com/samuelwilk/mind-the-wait/commit/93d0503eaf353040a33c275a4585214b0fe26dce))
+* automate daily bunching detection with scheduler ([995013a](https://github.com/samuelwilk/mind-the-wait/commit/995013a17b49e2112f3c83241d07185e4b8c812a))
+
+
+### Bug Fixes
+
+* add missing MESSENGER_TRANSPORT_DSN to CI workflow ([3f7d3d7](https://github.com/samuelwilk/mind-the-wait/commit/3f7d3d7389a858bfbe668f9c7191e2bda8c5e282))
+* remove hardcoded data from bunching by weather chart ([dafeeea](https://github.com/samuelwilk/mind-the-wait/commit/dafeeeae6e07fdcf6fd82b4bdebc57e29a59f720))
+
+
+### Code Refactoring
+
+* remove unused repository dependencies ([30d00a3](https://github.com/samuelwilk/mind-the-wait/commit/30d00a35d02beb544e3d581de7ce17233792f7e4))
+
 ## [0.4.2](https://github.com/samuelwilk/mind-the-wait/compare/v0.4.1...v0.4.2) (2025-10-14)
 
 
