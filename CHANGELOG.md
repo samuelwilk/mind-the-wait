@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0](https://github.com/samuelwilk/mind-the-wait/compare/v0.5.1...v0.6.0) (2025-10-15)
+
+
+### Features
+
+* add temporary debug endpoint for database verification ([b49637e](https://github.com/samuelwilk/mind-the-wait/commit/b49637e39c923cb565efd5388712514f56ba0be9))
+* add temporary debug endpoint with security tests ([558afe2](https://github.com/samuelwilk/mind-the-wait/commit/558afe257f74da780552840e64ccf31f011b2bb1))
+
 ## [0.5.1](https://github.com/samuelwilk/mind-the-wait/compare/v0.5.0...v0.5.1) (2025-10-15)
 
 
