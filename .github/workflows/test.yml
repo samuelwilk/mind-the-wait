@@ -74,6 +74,7 @@ jobs:
           APP_ENV: test
           DATABASE_URL: postgresql://test:test@localhost:5432/mindthewait
           REDIS_URL: redis://localhost:6379
+          MESSENGER_TRANSPORT_DSN: redis://localhost:6379/messages
           OPENAI_API_KEY: test-key
 
       - name: Run database migrations
@@ -82,13 +83,16 @@ jobs:
           APP_ENV: test
           DATABASE_URL: postgresql://test:test@localhost:5432/mindthewait
           REDIS_URL: redis://localhost:6379
+          MESSENGER_TRANSPORT_DSN: redis://localhost:6379/messages
           OPENAI_API_KEY: test-key
 
       - name: Run PHPUnit tests
         run: vendor/bin/phpunit --coverage-text
         env:
+          APP_ENV: test
           DATABASE_URL: postgresql://test:test@localhost:5432/mindthewait
           REDIS_URL: redis://localhost:6379
+          MESSENGER_TRANSPORT_DSN: redis://localhost:6379/messages
           OPENAI_API_KEY: test-key
 
   docker-build-test:
