@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1](https://github.com/samuelwilk/mind-the-wait/compare/v0.5.0...v0.5.1) (2025-10-15)
+
+
+### Documentation
+
+* add comprehensive analytics implementation plan ([b05b99e](https://github.com/samuelwilk/mind-the-wait/commit/b05b99e64b284811824bd923dbc8ae6801e5c1d1))
+* add least-privilege IAM policies for AWS access ([2681011](https://github.com/samuelwilk/mind-the-wait/commit/26810110a4831170fa839725dad571cc04b56fd9))
+
 ## [0.5.0](https://github.com/samuelwilk/mind-the-wait/compare/v0.4.2...v0.5.0) (2025-10-15)
 
 
