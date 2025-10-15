@@ -25,8 +25,8 @@ services:
       context: ..
       dockerfile: docker/dev/Dockerfile
     environment:
-      APP_ENV: ${APP_ENV}
       COMPOSER_HOME: /tmp
+      # No APP_ENV - Symfony will load from .env files in mounted volume
     volumes:
       - ../:/var/www/app:cached
     depends_on:
@@ -81,11 +81,7 @@ services:
     command: bash -lc "php bin/console messenger:consume async -vv --time-limit=3600 --memory-limit=256M --sleep=1"
     volumes:
       - ../:/var/www/app:cached
-    environment:
-      APP_ENV: ${APP_ENV}
-      # This is optional because Symfony loads .env.local inside the container,
-      # but it doesn't hurt to be explicit for the worker:
-      MESSENGER_TRANSPORT_DSN: ${MESSENGER_TRANSPORT_DSN}
+    # No explicit environment vars - Symfony will load from .env files in mounted volume
 
   scheduler:
     build:
@@ -96,11 +92,10 @@ services:
       - redis
       - database
     working_dir: /var/www/app
-    command: php bin/console messenger:consume scheduler_score_tick scheduler_weather_collection scheduler_performance_aggregation scheduler_insight_cache_warming scheduler_bunching_detection -vv
+    command: php bin/console messenger:consume scheduler_score_tick scheduler_weather_collection scheduler_performance_aggregation scheduler_insight_cache_warming scheduler_bunching_detection scheduler_arrival_logging -vv
     volumes:
       - ../:/var/www/app:cached
-    environment:
-      APP_ENV: ${APP_ENV}
+    # No explicit environment vars - Symfony will load from .env files in mounted volume
 
 volumes:
   ###> doctrine/doctrine-bundle ###
