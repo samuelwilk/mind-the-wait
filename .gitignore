@@ -83,3 +83,7 @@ CLAUDE.md
 IMPLEMENTATION_NOTES.md
 .claude/
 .codex/
+
+# IAM and infrastructure files with account-specific info
+IAM_MIGRATION_COMPLETE.md
+terraform-policy*.json
