@@ -8,7 +8,6 @@ use App\Dto\ArrivalPredictionDto;
 use App\Dto\VehicleDto;
 use App\Entity\ArrivalLog;
 use App\Repository\ArrivalLogRepository;
-use App\Repository\RouteRepository;
 use App\Repository\StopRepository;
 use App\Repository\TripRepository;
 use Psr\Log\LoggerInterface;
@@ -24,7 +23,6 @@ final readonly class ArrivalLogger
 {
     public function __construct(
         private ArrivalLogRepository $arrivalLogRepo,
-        private RouteRepository $routeRepo,
         private StopRepository $stopRepo,
         private TripRepository $tripRepo,
         private LoggerInterface $logger,

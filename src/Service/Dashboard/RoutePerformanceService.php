@@ -10,7 +10,6 @@ use App\Entity\Route;
 use App\Repository\RealtimeRepository;
 use App\Repository\RoutePerformanceDailyRepository;
 use App\Repository\RouteRepository;
-use App\Repository\WeatherObservationRepository;
 
 use function array_map;
 use function count;
@@ -24,7 +23,6 @@ final readonly class RoutePerformanceService
     public function __construct(
         private RouteRepository $routeRepo,
         private RoutePerformanceDailyRepository $performanceRepo,
-        private WeatherObservationRepository $weatherRepo,
         private RealtimeRepository $realtimeRepo,
     ) {
     }

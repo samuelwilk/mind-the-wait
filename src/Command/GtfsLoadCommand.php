@@ -36,8 +36,8 @@ use function sprintf;
 #[AsCommand(name: 'app:gtfs:load', description: 'Load static GTFS into DB (route, trip, stop, stop_time)')]
 final class GtfsLoadCommand extends Command
 {
-    private const ARCGIS_PAGE_SIZE = 1000;
-    private const ARCGIS_MAX_PAGES = 2000;
+    private const int ARCGIS_PAGE_SIZE = 1000;
+    private const int ARCGIS_MAX_PAGES = 2000;
 
     public function __construct(
         private readonly RouteRepository $routes,

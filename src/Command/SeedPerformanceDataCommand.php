@@ -6,7 +6,6 @@ namespace App\Command;
 
 use App\Entity\RoutePerformanceDaily;
 use App\Entity\WeatherObservation;
-use App\Repository\RoutePerformanceDailyRepository;
 use App\Repository\RouteRepository;
 use App\Repository\WeatherObservationRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -87,7 +86,6 @@ final class SeedPerformanceDataCommand extends Command
         private readonly EntityManagerInterface $em,
         private readonly RouteRepository $routeRepo,
         private readonly WeatherObservationRepository $weatherRepo,
-        private readonly RoutePerformanceDailyRepository $performanceRepo,
     ) {
         parent::__construct();
     }
