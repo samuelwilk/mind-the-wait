@@ -6,7 +6,7 @@ namespace App\Controller;
 
 use App\Entity\ArrivalLog;
 use App\Entity\BunchingIncident;
-use App\Entity\Route;
+use App\Entity\Route as RouteEntity;
 use App\Entity\RoutePerformanceDaily;
 use App\Entity\Stop;
 use App\Entity\Trip;
@@ -19,7 +19,19 @@ use Symfony\Component\Routing\Attribute\Route;
 /**
  * Debug endpoints for checking database state.
  *
- * ⚠️ TEMPORARY - Remove before final production release.
+ * ⚠️ SECURITY WARNING - TEMPORARY ENDPOINT ⚠️
+ *
+ * This endpoint is publicly accessible and exposes database statistics.
+ * While it does NOT expose sensitive data (credentials, tokens, full records),
+ * it should be REMOVED before final production release.
+ *
+ * Security measures in place:
+ * - Only exposes counts, not full records
+ * - Latest records show only safe, non-sensitive fields
+ * - No credentials or tokens exposed
+ * - Comprehensive security tests verify safe output
+ *
+ * @see DebugControllerTest for security validation
  */
 #[Route('/api/debug')]
 final class DebugController extends AbstractController
@@ -45,7 +57,7 @@ final class DebugController extends AbstractController
         // Get counts
         $stats = [
             'gtfs_static' => [
-                'routes' => $this->em->getRepository(Route::class)->count([]),
+                'routes' => $this->em->getRepository(RouteEntity::class)->count([]),
                 'stops'  => $this->em->getRepository(Stop::class)->count([]),
                 'trips'  => $this->em->getRepository(Trip::class)->count([]),
             ],
@@ -63,9 +75,9 @@ final class DebugController extends AbstractController
             if ($latestWeather !== null) {
                 $stats['latest_weather'] = [
                     'observed_at' => $latestWeather->getObservedAt()->format('Y-m-d H:i:s'),
-                    'temperature' => $latestWeather->getTemperature(),
-                    'condition'   => $latestWeather->getCondition()->value,
-                    'impact'      => $latestWeather->getImpact()->value,
+                    'temperature' => $latestWeather->getTemperatureCelsius(),
+                    'condition'   => $latestWeather->getWeatherCondition(),
+                    'impact'      => $latestWeather->getTransitImpact()->value,
                 ];
             }
         }

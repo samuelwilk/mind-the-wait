@@ -1,0 +1,222 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Controller;
+
+use App\Controller\DebugController;
+use App\Entity\Route;
+use App\Entity\RoutePerformanceDaily;
+use App\Entity\WeatherObservation;
+use App\Enum\RouteTypeEnum;
+use App\Enum\TransitImpact;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+
+final class DebugControllerTest extends KernelTestCase
+{
+    private EntityManagerInterface $em;
+    private DebugController $controller;
+
+    protected function setUp(): void
+    {
+        self::bootKernel(['environment' => 'test', 'debug' => true]);
+        $this->em         = self::getContainer()->get(EntityManagerInterface::class);
+        $this->controller = self::getContainer()->get(DebugController::class);
+    }
+
+    public function testDatabaseStatsReturnsCorrectStructure(): void
+    {
+        $response = $this->controller->databaseStats();
+        $data     = json_decode($response->getContent(), true);
+
+        $this->assertIsArray($data);
+        $this->assertArrayHasKey('gtfs_static', $data);
+        $this->assertArrayHasKey('historical_data', $data);
+        $this->assertArrayHasKey('_note', $data);
+
+        // Check structure
+        $this->assertArrayHasKey('routes', $data['gtfs_static']);
+        $this->assertArrayHasKey('stops', $data['gtfs_static']);
+        $this->assertArrayHasKey('trips', $data['gtfs_static']);
+
+        $this->assertArrayHasKey('arrival_logs', $data['historical_data']);
+        $this->assertArrayHasKey('route_performance_daily', $data['historical_data']);
+        $this->assertArrayHasKey('bunching_incidents', $data['historical_data']);
+        $this->assertArrayHasKey('weather_observations', $data['historical_data']);
+    }
+
+    public function testDatabaseStatsWithWeatherData(): void
+    {
+        // Create a weather observation
+        $weather = new WeatherObservation();
+        $weather->setObservedAt(new \DateTimeImmutable('2025-10-15 01:00:00'));
+        $weather->setTemperatureCelsius('3.8');
+        $weather->setFeelsLikeCelsius('2.5');
+        $weather->setWeatherCode(3); // Overcast
+        $weather->setWeatherCondition('Overcast');
+        $weather->setTransitImpact(TransitImpact::NONE);
+        $weather->setPrecipitationMm('0.0');
+        $weather->setSnowfallCm('0.0');
+        $weather->setSnowDepthCm(0);
+        $weather->setVisibilityKm('10.0');
+        $weather->setWindSpeedKmh('5.0');
+        $weather->setDataSource('test');
+
+        $this->em->persist($weather);
+        $this->em->flush();
+
+        $response = $this->controller->databaseStats();
+        $data     = json_decode($response->getContent(), true);
+
+        $this->assertGreaterThan(0, $data['historical_data']['weather_observations']);
+        $this->assertArrayHasKey('latest_weather', $data);
+        $this->assertEquals('2025-10-15 01:00:00', $data['latest_weather']['observed_at']);
+        $this->assertEquals('3.8', $data['latest_weather']['temperature']);
+        $this->assertEquals('Overcast', $data['latest_weather']['condition']);
+        $this->assertEquals('none', $data['latest_weather']['impact']);
+    }
+
+    public function testDatabaseStatsWithPerformanceData(): void
+    {
+        // Create a route
+        $route = new Route();
+        $route->setGtfsId('test-route-1');
+        $route->setShortName('1');
+        $route->setLongName('Test Route 1');
+        $route->setRouteType(RouteTypeEnum::Bus);
+        $route->setColour('FF0000');
+
+        $this->em->persist($route);
+        $this->em->flush();
+
+        // Create performance record
+        $performance = new RoutePerformanceDaily();
+        $performance->setRoute($route);
+        $performance->setDate(new \DateTimeImmutable('2025-10-14'));
+        $performance->setTotalPredictions(100);
+        $performance->setHighConfidenceCount(80);
+        $performance->setMediumConfidenceCount(15);
+        $performance->setLowConfidenceCount(5);
+        $performance->setAvgDelaySec(120);
+        $performance->setMedianDelaySec(90);
+        $performance->setOnTimePercentage('75.50');
+        $performance->setLatePercentage('20.00');
+        $performance->setEarlyPercentage('4.50');
+        $performance->setBunchingIncidents(0);
+
+        $this->em->persist($performance);
+        $this->em->flush();
+
+        $response = $this->controller->databaseStats();
+        $data     = json_decode($response->getContent(), true);
+
+        $this->assertGreaterThan(0, $data['gtfs_static']['routes']);
+        $this->assertGreaterThan(0, $data['historical_data']['route_performance_daily']);
+        $this->assertArrayHasKey('latest_performance', $data);
+        $this->assertEquals('2025-10-14', $data['latest_performance']['date']);
+        $this->assertEquals('1', $data['latest_performance']['route_short_name']);
+        $this->assertEquals(100, $data['latest_performance']['total_predictions']);
+        $this->assertEquals(75.5, $data['latest_performance']['on_time_percentage']);
+    }
+
+    public function testResponseIsJson(): void
+    {
+        $response = $this->controller->databaseStats();
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertEquals('application/json', $response->headers->get('Content-Type'));
+
+        // Verify it's valid JSON
+        $data = json_decode($response->getContent(), true);
+        $this->assertIsArray($data);
+    }
+
+    public function testDoesNotExposeSensitiveData(): void
+    {
+        $response = $this->controller->databaseStats();
+        $content  = $response->getContent();
+
+        // Verify no database credentials are exposed
+        $this->assertStringNotContainsString('password', strtolower($content));
+        $this->assertStringNotContainsString('secret', strtolower($content));
+        $this->assertStringNotContainsString('token', strtolower($content));
+        $this->assertStringNotContainsString('api_key', strtolower($content));
+        $this->assertStringNotContainsString('DATABASE_URL', $content);
+        $this->assertStringNotContainsString('REDIS_URL', $content);
+
+        // Verify no actual record data is exposed (only counts and latest)
+        $data = json_decode($content, true);
+        $this->assertArrayNotHasKey('users', $data);
+        $this->assertArrayNotHasKey('credentials', $data);
+        $this->assertArrayNotHasKey('sessions', $data);
+    }
+
+    public function testOnlyExposesCountsNotRecords(): void
+    {
+        $response = $this->controller->databaseStats();
+        $data     = json_decode($response->getContent(), true);
+
+        // Verify all values under gtfs_static are integers (counts)
+        foreach ($data['gtfs_static'] as $key => $value) {
+            $this->assertIsInt($value, "gtfs_static.$key should be an integer count");
+        }
+
+        // Verify all values under historical_data are integers (counts)
+        foreach ($data['historical_data'] as $key => $value) {
+            $this->assertIsInt($value, "historical_data.$key should be an integer count");
+        }
+
+        // If latest_weather exists, it should only have specific safe fields
+        if (isset($data['latest_weather'])) {
+            $allowedWeatherFields = ['observed_at', 'temperature', 'condition', 'impact'];
+            foreach (array_keys($data['latest_weather']) as $field) {
+                $this->assertContains($field, $allowedWeatherFields, "Unexpected field in latest_weather: $field");
+            }
+        }
+
+        // If latest_performance exists, it should only have specific safe fields
+        if (isset($data['latest_performance'])) {
+            $allowedPerformanceFields = ['date', 'route_short_name', 'total_predictions', 'on_time_percentage'];
+            foreach (array_keys($data['latest_performance']) as $field) {
+                $this->assertContains($field, $allowedPerformanceFields, "Unexpected field in latest_performance: $field");
+            }
+        }
+    }
+
+    public function testIncludesSecurityWarningNote(): void
+    {
+        $response = $this->controller->databaseStats();
+        $data     = json_decode($response->getContent(), true);
+
+        // Verify the warning note is present
+        $this->assertArrayHasKey('_note', $data);
+        $this->assertStringContainsString('temporary', strtolower($data['_note']));
+        $this->assertStringContainsString('debug', strtolower($data['_note']));
+    }
+
+    public function testDoesNotExposeFullDatabaseRecords(): void
+    {
+        // Create test data
+        $route = new Route();
+        $route->setGtfsId('sensitive-route-id');
+        $route->setShortName('999');
+        $route->setLongName('Sensitive Route Name');
+        $route->setRouteType(RouteTypeEnum::Bus);
+
+        $this->em->persist($route);
+        $this->em->flush();
+
+        $response = $this->controller->databaseStats();
+        $content  = $response->getContent();
+
+        // Verify specific route details are NOT exposed
+        $this->assertStringNotContainsString('sensitive-route-id', $content);
+        $this->assertStringNotContainsString('Sensitive Route Name', $content);
+
+        // Only counts and latest record summary should be present
+        $data = json_decode($content, true);
+        $this->assertIsInt($data['gtfs_static']['routes']);
+        $this->assertGreaterThan(0, $data['gtfs_static']['routes']);
+    }
+}
