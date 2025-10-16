@@ -152,7 +152,8 @@ final readonly class RoutePerformanceService
             'title' => [
                 'text'      => '30-Day Performance Trend',
                 'left'      => 'center',
-                'textStyle' => ['fontSize' => 16, 'fontWeight' => 'bold'],
+                'top'       => '5',
+                'textStyle' => ['fontSize' => 12, 'fontWeight' => 'bold'],
             ],
             'tooltip' => [
                 'trigger'   => 'axis',
@@ -164,10 +165,13 @@ final readonly class RoutePerformanceService
                 'axisLabel' => ['rotate' => 45],
             ],
             'yAxis' => [
-                'type' => 'value',
-                'name' => 'On-Time %',
-                'min'  => 0,
-                'max'  => 100,
+                'type'          => 'value',
+                'name'          => 'On-Time %',
+                'nameLocation'  => 'middle',
+                'nameGap'       => 40,
+                'nameTextStyle' => ['fontSize' => 11],
+                'min'           => 0,
+                'max'           => 100,
             ],
             'series' => [
                 [
@@ -181,8 +185,9 @@ final readonly class RoutePerformanceService
                 ],
             ],
             'grid' => [
-                'left'         => '3%',
+                'left'         => '30',
                 'right'        => '4%',
+                'top'          => '40',
                 'bottom'       => '15%',
                 'containLabel' => true,
             ],
@@ -237,7 +242,8 @@ final readonly class RoutePerformanceService
             'title' => [
                 'text'      => 'Performance by Weather Condition',
                 'left'      => 'center',
-                'textStyle' => ['fontSize' => 16, 'fontWeight' => 'bold'],
+                'top'       => '5',
+                'textStyle' => ['fontSize' => 12, 'fontWeight' => 'bold'],
             ],
             'tooltip' => [
                 'trigger'     => 'axis',
@@ -248,10 +254,13 @@ final readonly class RoutePerformanceService
                 'data' => $conditions,
             ],
             'yAxis' => [
-                'type' => 'value',
-                'name' => 'On-Time %',
-                'min'  => 0,
-                'max'  => 100,
+                'type'          => 'value',
+                'name'          => 'On-Time %',
+                'nameLocation'  => 'middle',
+                'nameGap'       => 40,
+                'nameTextStyle' => ['fontSize' => 11],
+                'min'           => 0,
+                'max'           => 100,
             ],
             'series' => [
                 [
@@ -268,8 +277,9 @@ final readonly class RoutePerformanceService
                 ],
             ],
             'grid' => [
-                'left'         => '3%',
+                'left'         => '30',
                 'right'        => '4%',
+                'top'          => '40',
                 'bottom'       => '3%',
                 'containLabel' => true,
             ],
@@ -350,7 +360,8 @@ final readonly class RoutePerformanceService
             'title' => [
                 'text'      => 'Performance by Day & Time',
                 'left'      => 'center',
-                'textStyle' => ['fontSize' => 16, 'fontWeight' => 'bold'],
+                'top'       => '5',
+                'textStyle' => ['fontSize' => 12, 'fontWeight' => 'bold'],
             ],
             'tooltip' => [
                 'position'  => 'top',
@@ -391,7 +402,7 @@ final readonly class RoutePerformanceService
             ],
             'grid' => [
                 'height' => '60%',
-                'top'    => '10%',
+                'top'    => '12%',
             ],
         ];
     }

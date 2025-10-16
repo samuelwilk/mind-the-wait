@@ -25,8 +25,8 @@
             fallbackBg: badgeFallbackBg|default('bg-gray-100'),
             fallbackText: badgeFallbackText|default('text-gray-800')
         } %}
-        <div>
-            <p class="font-medium text-gray-900 {{ badgeSize|default('md') == 'sm' ? 'text-sm' : '' }}">{{ route.longName }}</p>
+        <div class="min-w-0 flex-1">
+            <p class="font-medium text-gray-900 text-sm sm:text-base line-clamp-2 sm:truncate">{{ route.longName }}</p>
             {% if metadata is defined and metadata %}
                 <p class="text-xs text-gray-500">{{ metadata|raw }}</p>
             {% endif %}
