@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1](https://github.com/samuelwilk/mind-the-wait/compare/v0.7.0...v0.7.1) (2025-10-16)
+
+
+### Bug Fixes
+
+* add missing PerformanceAggregationMessage messenger routing ([75a60c5](https://github.com/samuelwilk/mind-the-wait/commit/75a60c50460b5aae2b55aad75a022242115a5abd))
+* resolve weather collection duplicate key errors and routing issues ([7dd6e94](https://github.com/samuelwilk/mind-the-wait/commit/7dd6e94b9522ff300ccc4b39dd09eac606f9fe8c))
+* use timestamp comparison instead of object identity in test helper ([fc929f1](https://github.com/samuelwilk/mind-the-wait/commit/fc929f1277ad715616bebcf36754cd09478611e9))
+
 ## [0.7.0](https://github.com/samuelwilk/mind-the-wait/compare/v0.6.0...v0.7.0) (2025-10-15)
 
 
