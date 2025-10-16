@@ -48,10 +48,10 @@ Based on this real data about route performance in clear vs snow conditions:
 
 Write a brief 2-paragraph insight (max 150 words):
 1. State the key finding and explain why this route is vulnerable
-2. Provide 1 specific, actionable recommendation
+2. Describe what factors typically contribute to this performance drop
 
 Tone: Professional but accessible. Avoid jargon. Use HTML paragraph tags (<p>).
-Be concise and scannable.
+Be concise and scannable. Focus on data analysis, not recommendations.
 
 Do not use any emojis.
 PROMPT;
@@ -90,11 +90,11 @@ Based on this real data about transit performance at different temperatures:
 - Days observed below -20°C: {$stats['daysBelow']}
 
 Write a brief 2-paragraph insight (max 150 words):
-1. State the critical temperature threshold and main contributing factors
-2. Provide 1 specific operational recommendation
+1. State the critical temperature threshold and describe the performance impact
+2. Explain the main contributing factors that cause this temperature sensitivity
 
 Tone: Professional but accessible. Use HTML paragraph tags (<p>).
-Be concise.
+Be concise. Focus on data analysis, not recommendations.
 
 Do not use any emojis.
 PROMPT;
@@ -176,10 +176,11 @@ Note: Bunching detection is in development; these are representative samples.
 
 Write a brief 2-paragraph insight (max 140 words):
 1. Explain what bunching is and why weather increases it
-2. Suggest 1 operational strategy to prevent it
+2. Describe the observed patterns and their impact on riders
 
 Include a brief note that bunching detection is in development.
 Tone: Professional but accessible. Use HTML paragraph tags (<p>).
+Focus on data analysis, not recommendations.
 
 Do not use any emojis.
 PROMPT;
@@ -209,11 +210,12 @@ PROMPT;
 You are a transit data analyst writing a summary for a public-facing transit dashboard's weather impact analysis page.
 
 Write a 2-3 sentence key takeaway that:
-1. Summarizes why weather impact analysis matters
-2. Emphasizes how data-driven insights help transit planning
-3. Encourages using these patterns for operational improvements
+1. Summarizes why weather impact analysis matters for riders and transit understanding
+2. Highlights the key patterns observed in the data
+3. Explains what these patterns reveal about transit system behavior
 
-Tone: Professional, forward-looking, empowering. Keep it concise and impactful.
+Tone: Professional, informative, focused on understanding. Keep it concise and impactful.
+Focus on data insights, not recommendations.
 
 Do not use any emojis.
 PROMPT;
