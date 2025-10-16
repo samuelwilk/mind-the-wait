@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2](https://github.com/samuelwilk/mind-the-wait/compare/v0.7.1...v0.7.2) (2025-10-16)
+
+
+### Bug Fixes
+
+* improve mobile responsive layout to prevent text cutoff and cramped display on route pages ([4b46ed5](https://github.com/samuelwilk/mind-the-wait/commit/4b46ed52917daa02d7e9e7d7c7051ce8a09f236a))
+
+
+### Code Refactoring
+
+* remove recommendations from AI-generated insights ([fe97eae](https://github.com/samuelwilk/mind-the-wait/commit/fe97eae6f9e7b0575cb0e6c04b49b518aa817a8c))
+
 ## [0.7.1](https://github.com/samuelwilk/mind-the-wait/compare/v0.7.0...v0.7.1) (2025-10-16)
 
 
