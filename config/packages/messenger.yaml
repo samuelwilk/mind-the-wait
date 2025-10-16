@@ -40,3 +40,4 @@ framework:
             App\Scheduler\InsightCacheWarmingMessage: async           # AI insights nightly at 2 AM
             App\Scheduler\ArrivalLoggingMessage: async                # arrival predictions every 2min
             App\Scheduler\BunchingDetectionMessage: async             # bunching detection
+            App\Scheduler\PerformanceAggregationMessage: async        # daily performance aggregation at 1 AM
