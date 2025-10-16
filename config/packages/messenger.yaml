@@ -33,3 +33,10 @@ framework:
             # If/when these become heavy, switch to "async" and run a worker.
             App\Message\ProcessSnapshot: sync                         # lightweight; safe to run inline
             # App\Message\PollGtfs: 'sync://' # only if still dispatched anywhere
+
+            # Scheduled messages (processed by scheduler service via Redis queue)
+            App\Scheduler\WeatherCollectionMessage: async             # hourly weather collection
+            App\Scheduler\ScoreTickMessage: async                     # headway scoring every 30s
+            App\Scheduler\InsightCacheWarmingMessage: async           # AI insights nightly at 2 AM
+            App\Scheduler\ArrivalLoggingMessage: async                # arrival predictions every 2min
+            App\Scheduler\BunchingDetectionMessage: async             # bunching detection

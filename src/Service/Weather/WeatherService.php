@@ -65,7 +65,7 @@ final readonly class WeatherService
                 windSpeedKmh: $weatherData->windSpeedKmh       ?? 0
             );
 
-            // Create and persist weather observation
+            // Create and persist weather observation (upsert to handle duplicate timestamps)
             $observation = new WeatherObservation();
             $observation->setObservedAt($weatherData->time);
             $observation->setTemperatureCelsius((string) $weatherData->temperatureCelsius);
@@ -80,7 +80,7 @@ final readonly class WeatherService
             $observation->setTransitImpact($impact);
             $observation->setDataSource('open_meteo');
 
-            $this->weatherRepo->save($observation, flush: true);
+            $observation = $this->weatherRepo->upsert($observation);
 
             $this->logger->info('Weather observation collected', [
                 'observed_at' => $observation->getObservedAt()->format('Y-m-d H:i'),
@@ -152,7 +152,25 @@ final readonly class WeatherService
                     $observation->setTransitImpact($impact);
                     $observation->setDataSource('open_meteo');
 
-                    $this->weatherRepo->save($observation, flush: false);
+                    // Use upsert for idempotency (but skip flush for performance)
+                    $existing = $this->weatherRepo->findByObservedAt($weatherData->time);
+                    if ($existing !== null) {
+                        // Update existing
+                        $existing->setTemperatureCelsius((string) $weatherData->temperatureCelsius);
+                        $existing->setFeelsLikeCelsius($weatherData->apparentTemperatureCelsius !== null ? (string) $weatherData->apparentTemperatureCelsius : null);
+                        $existing->setPrecipitationMm($weatherData->precipitationMm !== null ? (string) $weatherData->precipitationMm : null);
+                        $existing->setSnowfallCm($weatherData->snowfallCm !== null ? (string) $weatherData->snowfallCm : null);
+                        $existing->setSnowDepthCm($weatherData->snowDepthCm);
+                        $existing->setWeatherCode($weatherData->weatherCode);
+                        $existing->setWeatherCondition($condition);
+                        $existing->setVisibilityKm($weatherData->visibilityM !== null ? (string) ($weatherData->visibilityM / 1000) : null);
+                        $existing->setWindSpeedKmh($weatherData->windSpeedKmh !== null ? (string) $weatherData->windSpeedKmh : null);
+                        $existing->setTransitImpact($impact);
+                        $existing->setDataSource('open_meteo');
+                    } else {
+                        // Insert new
+                        $this->weatherRepo->save($observation, flush: false);
+                    }
                     ++$success;
                 } catch (\Exception $e) {
                     ++$failed;

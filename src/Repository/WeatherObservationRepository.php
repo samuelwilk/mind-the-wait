@@ -134,6 +134,52 @@ final class WeatherObservationRepository extends BaseRepository
     }
 
     /**
+     * Find existing observation for a given timestamp (for idempotent upserts).
+     */
+    public function findByObservedAt(\DateTimeImmutable $observedAt): ?WeatherObservation
+    {
+        return $this->createQueryBuilder('w')
+            ->where('w.observedAt = :observedAt')
+            ->setParameter('observedAt', $observedAt)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
+     * Save or update weather observation (idempotent upsert).
+     *
+     * If observation with same observed_at exists, update it. Otherwise insert new.
+     */
+    public function upsert(WeatherObservation $observation): WeatherObservation
+    {
+        $existing = $this->findByObservedAt($observation->getObservedAt());
+
+        if ($existing !== null) {
+            // Update existing observation
+            $existing->setTemperatureCelsius($observation->getTemperatureCelsius());
+            $existing->setFeelsLikeCelsius($observation->getFeelsLikeCelsius());
+            $existing->setPrecipitationMm($observation->getPrecipitationMm());
+            $existing->setSnowfallCm($observation->getSnowfallCm());
+            $existing->setSnowDepthCm($observation->getSnowDepthCm());
+            $existing->setWeatherCode($observation->getWeatherCode());
+            $existing->setWeatherCondition($observation->getWeatherCondition());
+            $existing->setVisibilityKm($observation->getVisibilityKm());
+            $existing->setWindSpeedKmh($observation->getWindSpeedKmh());
+            $existing->setTransitImpact($observation->getTransitImpact());
+            $existing->setDataSource($observation->getDataSource());
+
+            $this->save($existing, flush: true);
+
+            return $existing;
+        }
+
+        // Insert new observation
+        $this->save($observation, flush: true);
+
+        return $observation;
+    }
+
+    /**
      * Delete weather observations older than specified number of days.
      *
      * @return int Number of deleted rows
