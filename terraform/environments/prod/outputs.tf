@@ -39,9 +39,10 @@ output "ecs_cluster_name" {
 output "ecs_services" {
   description = "ECS service names"
   value = {
-    php       = module.ecs_service_php.service_name
-    pyparser  = module.ecs_service_pyparser.service_name
-    scheduler = module.ecs_service_scheduler.service_name
+    php                  = module.ecs_service_php.service_name
+    pyparser             = module.ecs_service_pyparser.service_name
+    scheduler_high_freq  = module.ecs_service_scheduler_high_freq.service_name
+    scheduler_low_freq   = module.ecs_service_scheduler_low_freq.service_name
   }
 }
 
@@ -75,7 +76,8 @@ output "next_steps" {
   4. Force ECS deployment:
      aws ecs update-service --cluster ${module.ecs_cluster.cluster_name} --service ${module.ecs_service_php.service_name} --force-new-deployment --profile mind-the-wait
      aws ecs update-service --cluster ${module.ecs_cluster.cluster_name} --service ${module.ecs_service_pyparser.service_name} --force-new-deployment --profile mind-the-wait
-     aws ecs update-service --cluster ${module.ecs_cluster.cluster_name} --service ${module.ecs_service_scheduler.service_name} --force-new-deployment --profile mind-the-wait
+     aws ecs update-service --cluster ${module.ecs_cluster.cluster_name} --service ${module.ecs_service_scheduler_high_freq.service_name} --force-new-deployment --profile mind-the-wait
+     aws ecs update-service --cluster ${module.ecs_cluster.cluster_name} --service ${module.ecs_service_scheduler_low_freq.service_name} --force-new-deployment --profile mind-the-wait
 
   5. Run database migrations:
      # Get task ARN

@@ -215,13 +215,13 @@ module "ecs_service_pyparser" {
   tags = local.common_tags
 }
 
-# ECS Service: Scheduler (Cron Jobs)
-module "ecs_service_scheduler" {
+# ECS Service: High-Frequency Scheduler (score_tick, arrival_logging)
+module "ecs_service_scheduler_high_freq" {
   source = "../../modules/ecs-service"
 
   project_name             = local.project_name
   environment              = local.environment
-  service_name             = "scheduler"
+  service_name             = "scheduler-high-freq"
   cluster_id               = module.ecs_cluster.cluster_id
   cluster_name             = module.ecs_cluster.cluster_name
   task_execution_role_arn  = module.ecs_cluster.task_execution_role_arn
@@ -233,11 +233,61 @@ module "ecs_service_scheduler" {
   desired_count            = 1
 
   container_definitions = jsonencode([{
-    name      = "scheduler"
+    name      = "scheduler-high-freq"
     image     = "${module.ecr.repository_urls["php"]}:latest"
     essential = true
 
-    command = ["php", "bin/console", "messenger:consume", "scheduler_score_tick", "scheduler_weather_collection", "scheduler_performance_aggregation", "scheduler_insight_cache_warming", "scheduler_bunching_detection", "scheduler_arrival_logging", "-vv"]
+    command = ["php", "bin/console", "messenger:consume", "scheduler_score_tick", "scheduler_arrival_logging", "-vv"]
+
+    environment = [
+      { name = "APP_ENV", value = "prod" },
+      { name = "APP_SECRET", value = var.app_secret },
+      { name = "DATABASE_URL", value = local.database_url },
+      { name = "REDIS_URL", value = local.redis_url },
+      { name = "MESSENGER_TRANSPORT_DSN", value = local.messenger_transport_dsn },
+      { name = "MTW_GTFS_STATIC_URL", value = var.gtfs_static_url },
+      { name = "MTW_ARCGIS_ROUTE", value = var.arcgis_routes_url },
+      { name = "MTW_ARCGIS_STOP", value = var.arcgis_stops_url },
+      { name = "MTW_ARCGIS_TRIP", value = var.arcgis_trips_url },
+      { name = "MTW_ARCGIS_STOP_TIME", value = var.arcgis_stop_times_url }
+    ]
+
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = module.ecs_cluster.log_group_name
+        "awslogs-region"        = var.aws_region
+        "awslogs-stream-prefix" = "scheduler-high-freq"
+      }
+    }
+  }])
+
+  tags = local.common_tags
+}
+
+# ECS Service: Low-Frequency Scheduler (weather, aggregation, insights, bunching)
+module "ecs_service_scheduler_low_freq" {
+  source = "../../modules/ecs-service"
+
+  project_name             = local.project_name
+  environment              = local.environment
+  service_name             = "scheduler-low-freq"
+  cluster_id               = module.ecs_cluster.cluster_id
+  cluster_name             = module.ecs_cluster.cluster_name
+  task_execution_role_arn  = module.ecs_cluster.task_execution_role_arn
+  task_role_arn            = module.ecs_cluster.task_role_arn
+  task_security_group_id   = module.networking.ecs_tasks_security_group_id
+  subnet_ids               = module.networking.public_subnet_ids
+  cpu                      = 256  # Lower CPU for low-frequency tasks
+  memory                   = 512  # Lower memory for low-frequency tasks
+  desired_count            = 1
+
+  container_definitions = jsonencode([{
+    name      = "scheduler-low-freq"
+    image     = "${module.ecr.repository_urls["php"]}:latest"
+    essential = true
+
+    command = ["php", "bin/console", "messenger:consume", "scheduler_weather_collection", "scheduler_performance_aggregation", "scheduler_insight_cache_warming", "scheduler_bunching_detection", "-vv"]
 
     environment = [
       { name = "APP_ENV", value = "prod" },
@@ -258,7 +308,7 @@ module "ecs_service_scheduler" {
       options = {
         "awslogs-group"         = module.ecs_cluster.log_group_name
         "awslogs-region"        = var.aws_region
-        "awslogs-stream-prefix" = "scheduler"
+        "awslogs-stream-prefix" = "scheduler-low-freq"
       }
     }
   }])

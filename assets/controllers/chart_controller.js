@@ -29,9 +29,10 @@ export default class extends Controller {
         // Initialize with full bundle and custom theme
         this.chart = echarts.init(this.element, this.themeValue);
 
-        // Fix heatmap formatter (can't be passed from PHP as a string)
+        // Fix heatmap and scatter formatter (can't be passed from PHP as a string)
         const options = this.optionsValue;
-        if (options.series && options.series[0]?.type === 'heatmap') {
+
+        if (options.series && (options.series[0]?.type === 'heatmap')) {
             options.series[0].label.formatter = function(params) {
                 return params.value[2] + '%';
             };
@@ -41,6 +42,24 @@ export default class extends Controller {
                 const time = params.value[1];
                 const performance = params.value[2];
                 return `<strong>${day}</strong><br/>Time: ${options.yAxis.data[time]}<br/>Performance: ${performance}%`;
+            };
+        }
+
+        // Fix scatter chart tooltip (Temperature Threshold Analysis)
+        // Check if any series is a scatter type (chart may have multiple series)
+        const hasScatter = options.series?.some(s => s.type === 'scatter');
+        if (hasScatter) {
+            options.tooltip.formatter = function(params) {
+                // Handle both array params (multiple series) and single params
+                const param = Array.isArray(params) ? params[0] : params;
+
+                if (param && param.value && Array.isArray(param.value)) {
+                    // Parse and format values explicitly to avoid locale issues
+                    const temperature = Math.round(parseFloat(param.value[0]));
+                    const performance = Math.round(parseFloat(param.value[1]) * 10) / 10;
+                    return `Temperature: ${temperature}°C<br/>Performance: ${performance}%`;
+                }
+                return '';
             };
         }
 

@@ -83,7 +83,8 @@ services:
       - ../:/var/www/app:cached
     # No explicit environment vars - Symfony will load from .env files in mounted volume
 
-  scheduler:
+  # High-frequency scheduler: handles score_tick (every 30s) and arrival_logging (every 2min)
+  scheduler-high-freq:
     build:
       context: ..
       dockerfile: docker/dev/Dockerfile
@@ -92,7 +93,22 @@ services:
       - redis
       - database
     working_dir: /var/www/app
-    command: php bin/console messenger:consume scheduler_score_tick scheduler_weather_collection scheduler_performance_aggregation scheduler_insight_cache_warming scheduler_bunching_detection scheduler_arrival_logging -vv
+    command: php bin/console messenger:consume scheduler_score_tick scheduler_arrival_logging -vv
+    volumes:
+      - ../:/var/www/app:cached
+    # No explicit environment vars - Symfony will load from .env files in mounted volume
+
+  # Low-frequency scheduler: handles weather (hourly), aggregation (daily), insights (daily), bunching (daily)
+  scheduler-low-freq:
+    build:
+      context: ..
+      dockerfile: docker/dev/Dockerfile
+    depends_on:
+      - php
+      - redis
+      - database
+    working_dir: /var/www/app
+    command: php bin/console messenger:consume scheduler_weather_collection scheduler_performance_aggregation scheduler_insight_cache_warming scheduler_bunching_detection -vv
     volumes:
       - ../:/var/www/app:cached
     # No explicit environment vars - Symfony will load from .env files in mounted volume

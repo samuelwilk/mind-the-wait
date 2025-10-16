@@ -167,10 +167,13 @@ final readonly class WeatherAnalysisService
                 'axisLabel' => ['rotate' => 45, 'interval' => 0],
             ],
             'yAxis' => [
-                'type' => 'value',
-                'name' => 'On-Time %',
-                'min'  => 0,
-                'max'  => 100,
+                'type'          => 'value',
+                'name'          => 'On-Time %',
+                'nameLocation'  => 'middle',
+                'nameGap'       => 40,
+                'nameTextStyle' => ['fontSize' => 11],
+                'min'           => 0,
+                'max'           => 100,
             ],
             'series' => [
                 [
@@ -199,7 +202,7 @@ final readonly class WeatherAnalysisService
                 ],
             ],
             'grid' => [
-                'left'         => '3%',
+                'left'         => '30',
                 'right'        => '4%',
                 'bottom'       => '15%',
                 'containLabel' => true,
@@ -294,20 +297,27 @@ final readonly class WeatherAnalysisService
                 'textStyle' => ['fontSize' => 18, 'fontWeight' => 'bold'],
             ],
             'tooltip' => [
-                'trigger'   => 'item',
-                'formatter' => 'Temperature: {c0}°C<br/>Performance: {c1}%',
+                'trigger' => 'item',
+                // Note: formatter will be set by JavaScript in the chart controller
+                // to use: params => `Temperature: ${params.value[0]}°C<br/>Performance: ${params.value[1]}%`
             ],
             'xAxis' => [
-                'type' => 'value',
-                'name' => 'Temperature (°C)',
-                'min'  => -35,
-                'max'  => 35,
+                'type'          => 'value',
+                'name'          => 'Temperature (°C)',
+                'nameLocation'  => 'middle',
+                'nameGap'       => 40,
+                'nameTextStyle' => ['fontSize' => 11],
+                'min'           => -35,
+                'max'           => 35,
             ],
             'yAxis' => [
-                'type' => 'value',
-                'name' => 'On-Time %',
-                'min'  => 40,
-                'max'  => 100,
+                'type'          => 'value',
+                'name'          => 'On-Time %',
+                'nameLocation'  => 'middle',
+                'nameGap'       => 40,
+                'nameTextStyle' => ['fontSize' => 11],
+                'min'           => 40,
+                'max'           => 100,
             ],
             'series' => [
                 [
@@ -326,7 +336,7 @@ final readonly class WeatherAnalysisService
                 ],
             ],
             'grid' => [
-                'left'         => '3%',
+                'left'         => '30',
                 'right'        => '4%',
                 'bottom'       => '10%',
                 'containLabel' => true,
@@ -582,9 +592,12 @@ final readonly class WeatherAnalysisService
                 'data' => $conditions,
             ],
             'yAxis' => [
-                'type' => 'value',
-                'name' => 'Incidents',
-                'min'  => 0,
+                'type'          => 'value',
+                'name'          => 'Incidents',
+                'nameLocation'  => 'middle',
+                'nameGap'       => 40,
+                'nameTextStyle' => ['fontSize' => 11],
+                'min'           => 0,
             ],
             'series' => [
                 [
@@ -613,7 +626,7 @@ final readonly class WeatherAnalysisService
                 ],
             ],
             'grid' => [
-                'left'         => '3%',
+                'left'         => '30',
                 'right'        => '4%',
                 'bottom'       => '10%',
                 'containLabel' => true,
