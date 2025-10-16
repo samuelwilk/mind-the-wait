@@ -78,10 +78,10 @@ database-migrations-generate: ## Generates a new set of migrations
 ##@ Linting
 
 cs-dry-run: ## Dry run of the PHP Code Standards checker
-	@docker compose -f docker/compose.yaml exec php php-cs-fixer --config=.php-cs-fixer.php fix -v --diff --dry-run
+	@docker compose -f docker/compose.yaml exec php vendor/bin/php-cs-fixer --config=.php-cs-fixer.dist.php fix -v --diff --dry-run
 
 cs-fix: ## Automatically apply fixes from php-cs-fixer
-	@docker compose -f docker/compose.yaml exec php php-cs-fixer --config=.php-cs-fixer.php fix -v --diff
+	@docker compose -f docker/compose.yaml exec php vendor/bin/php-cs-fixer --config=.php-cs-fixer.dist.php fix -v --diff
 
 ##@ Tests
 
