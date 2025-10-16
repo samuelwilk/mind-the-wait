@@ -530,7 +530,7 @@ final class WeatherObservationRepositoryTest extends TestCase
     private function findByObservedAt(array $observations, \DateTimeImmutable $observedAt): ?WeatherObservation
     {
         foreach ($observations as $observation) {
-            if ($observation->getObservedAt() === $observedAt) {
+            if ($observation->getObservedAt()->getTimestamp() === $observedAt->getTimestamp()) {
                 return $observation;
             }
         }
