@@ -247,8 +247,10 @@ final class ChartBuilder
      */
     public function build(): Chart
     {
-        $config           = $this->config;
-        $config['series'] = $this->series;
+        $config = $this->config;
+        if ($this->series !== []) {
+            $config['series'] = $this->series;
+        }
 
         return new Chart($config);
     }

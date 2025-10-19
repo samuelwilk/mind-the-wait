@@ -23,7 +23,20 @@ resource "aws_ecs_service" "this" {
   cluster         = var.cluster_id
   task_definition = aws_ecs_task_definition.this.arn
   desired_count   = var.desired_count
-  launch_type     = "FARGATE"
+
+  # Use capacity provider strategy if Spot is enabled, otherwise use launch_type
+  launch_type = var.use_spot ? null : "FARGATE"
+
+  # Fargate Spot: 70% cost savings with ~5% interruption rate
+  dynamic "capacity_provider_strategy" {
+    for_each = var.use_spot ? [1] : []
+
+    content {
+      capacity_provider = "FARGATE_SPOT"
+      weight            = 100
+      base              = 0
+    }
+  }
 
   network_configuration {
     subnets          = var.subnet_ids

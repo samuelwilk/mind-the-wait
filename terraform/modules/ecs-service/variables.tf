@@ -106,3 +106,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "use_spot" {
+  description = "Use Fargate Spot for 70% cost savings (recommended for dev/staging)"
+  type        = bool
+  default     = false
+}

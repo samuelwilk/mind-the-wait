@@ -135,6 +135,8 @@ module "ecs_service_php" {
   max_capacity             = var.php_max_capacity
   cpu_target               = var.php_cpu_target
 
+  use_spot = true  # Fargate Spot: 70% cost savings
+
   container_definitions = jsonencode([{
     name      = "php"
     image     = "${module.ecr.repository_urls["php"]}:latest"
@@ -189,6 +191,8 @@ module "ecs_service_pyparser" {
   memory                   = var.pyparser_memory
   desired_count            = 1
 
+  use_spot = true  # Fargate Spot: 70% cost savings
+
   container_definitions = jsonencode([{
     name      = "pyparser"
     image     = "${module.ecr.repository_urls["pyparser"]}:latest"
@@ -231,6 +235,8 @@ module "ecs_service_scheduler_high_freq" {
   cpu                      = var.scheduler_cpu
   memory                   = var.scheduler_memory
   desired_count            = 1
+
+  use_spot = true  # Fargate Spot: 70% cost savings
 
   container_definitions = jsonencode([{
     name      = "scheduler-high-freq"
@@ -281,6 +287,8 @@ module "ecs_service_scheduler_low_freq" {
   cpu                      = 256  # Lower CPU for low-frequency tasks
   memory                   = 512  # Lower memory for low-frequency tasks
   desired_count            = 1
+
+  use_spot = true  # Fargate Spot: 70% cost savings
 
   container_definitions = jsonencode([{
     name      = "scheduler-low-freq"
