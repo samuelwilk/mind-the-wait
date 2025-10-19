@@ -136,11 +136,19 @@ jobs:
             --force-new-deployment \
             --region ${{ env.AWS_REGION }}
 
-      - name: Update Scheduler service
+      - name: Update High-Frequency Scheduler service
         run: |
           aws ecs update-service \
             --cluster ${{ env.ECS_CLUSTER }} \
-            --service ${{ secrets.ECS_SERVICE_SCHEDULER }} \
+            --service ${{ secrets.ECS_SERVICE_SCHEDULER_HIGH_FREQ }} \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Update Low-Frequency Scheduler service
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ secrets.ECS_SERVICE_SCHEDULER_LOW_FREQ }} \
             --force-new-deployment \
             --region ${{ env.AWS_REGION }}
 
@@ -158,11 +166,18 @@ jobs:
             --services ${{ secrets.ECS_SERVICE_PYPARSER }} \
             --region ${{ env.AWS_REGION }}
 
-      - name: Wait for Scheduler service to stabilize
+      - name: Wait for High-Frequency Scheduler service to stabilize
         run: |
           aws ecs wait services-stable \
             --cluster ${{ env.ECS_CLUSTER }} \
-            --services ${{ secrets.ECS_SERVICE_SCHEDULER }} \
+            --services ${{ secrets.ECS_SERVICE_SCHEDULER_HIGH_FREQ }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Wait for Low-Frequency Scheduler service to stabilize
+        run: |
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ secrets.ECS_SERVICE_SCHEDULER_LOW_FREQ }} \
             --region ${{ env.AWS_REGION }}
 
       - name: Deployment summary
@@ -175,4 +190,5 @@ jobs:
           echo "Services updated:"
           echo "  - ${{ secrets.ECS_SERVICE_PHP }}"
           echo "  - ${{ secrets.ECS_SERVICE_PYPARSER }}"
-          echo "  - ${{ secrets.ECS_SERVICE_SCHEDULER }}"
+          echo "  - ${{ secrets.ECS_SERVICE_SCHEDULER_HIGH_FREQ }}"
+          echo "  - ${{ secrets.ECS_SERVICE_SCHEDULER_LOW_FREQ }}"
