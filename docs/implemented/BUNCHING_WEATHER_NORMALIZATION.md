@@ -1,5 +1,14 @@
 # Bunching Incidents by Weather: Normalization Implementation
 
+> **✅ STATUS: IMPLEMENTED** | This feature has been fully implemented and deployed.
+>
+> **Implementation Date:** October 2025
+> **Files Modified:**
+> - `src/Repository/BunchingIncidentRepository.php` - Added `countByWeatherConditionNormalized()`
+> - `src/Service/Dashboard/WeatherAnalysisService.php` - Updated to use normalized rates
+> - `assets/controllers/chart_controller.js` - Enhanced tooltip with exposure hours
+> - `tests/Repository/BunchingIncidentRepositoryTest.php` - Unit tests added
+
 ## Problem Statement
 
 The current "Bunching by Weather Conditions" chart shows **raw incident counts** for each weather condition over the last 30 days:

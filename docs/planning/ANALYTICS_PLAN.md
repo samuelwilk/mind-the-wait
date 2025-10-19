@@ -1,5 +1,11 @@
 # Analytics Implementation Plan
 
+> **📋 STATUS: PLANNING** | This document describes a feature that has NOT been implemented yet.
+>
+> **Implementation Status:** Not started
+> **Priority:** Medium
+> **Last Updated:** 2025-10-19
+
 ## Overview
 
 This document outlines three options for implementing visitor tracking and analytics for mind-the-wait. The goal is to understand:

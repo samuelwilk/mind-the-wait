@@ -1,5 +1,12 @@
 # Enhanced Route Analytics Features
 
+> **📋 STATUS: PLANNING** | This document describes 7 analytics features that have NOT been implemented yet.
+>
+> **Implementation Status:** Not started (documentation updated with coding standards on 2025-10-19)
+> **Priority:** Medium (nice-to-have diagnostic tools)
+> **Estimated Effort:** 3 weeks total (7 features × ~2-3 days each)
+> **Last Updated:** 2025-10-19
+
 ## Overview
 
 This document outlines the implementation plan for seven new route analytics features that transform mind-the-wait from basic headway monitoring into a comprehensive transit performance diagnostic tool.

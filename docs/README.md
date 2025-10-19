@@ -11,6 +11,10 @@ Welcome to the mind-the-wait documentation! This transit headway monitoring syst
 - [Development Guide](development/setup.md) - Detailed development environment setup
 - [📝 Changelog](../CHANGELOG.md) - Recent changes and version history
 
+### Feature Planning
+- **[📋 Planning Documents](planning/README.md)** - Features in development or planned for future
+- **[✅ Implemented Features](implemented/README.md)** - Historical documentation of completed features
+
 ### API Documentation
 - [REST API Reference](api/endpoints.md) - Complete API endpoint documentation
 - [Arrival Predictions](api/arrival-predictions.md) - ⭐ Realtime countdown timers with confidence levels

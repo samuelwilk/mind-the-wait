@@ -1,5 +1,12 @@
 # Directional Performance Tracking
 
+> **📋 STATUS: PLANNING** | This document describes a feature that has NOT been implemented yet.
+>
+> **Implementation Status:** Not started
+> **Priority:** High (reveals important transit patterns)
+> **Estimated Effort:** 2 weeks (1 week backend, 1 week frontend)
+> **Last Updated:** 2025-10-19
+
 ## Executive Summary
 
 **Problem:** Current performance metrics aggregate both directions of a route together, hiding directional performance differences. Route 16 "Eastview / City Centre" shows 13.9% on-time overall, but we cannot tell if both directions are equally poor or if one direction is dragging down the average.
