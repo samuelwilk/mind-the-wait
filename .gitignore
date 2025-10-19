@@ -76,6 +76,9 @@ crash.*.log
 # Exclude local dev certificates (not critical but good practice)
 docker/certs/*.key
 docker/certs/*.crt
+docker/dev/certs/*.key
+docker/dev/certs/*.crt
+docker/dev/certs/*.pem
 ###< aws/secrets ###
 
 # IDE and AI assistant files

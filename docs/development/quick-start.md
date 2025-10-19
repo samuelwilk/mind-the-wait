@@ -8,6 +8,7 @@ Get mind-the-wait running locally in 5 minutes.
 - GNU Make
 - 4GB RAM minimum
 - 5GB disk space
+- **mkcert** (optional, for HTTPS/TLS) - [TLS Setup Guide](tls-setup.md)
 
 ## One-Command Setup
 
@@ -29,6 +30,18 @@ That's it! The `make setup` command will:
 **Total Time:** ~3-7 minutes on first run
 
 Once complete, access the application at **https://localhost**
+
+> **Note:** You may see a browser security warning on first access. This is expected since the local TLS certificate isn't trusted yet.
+>
+> To fix: Install [mkcert](https://github.com/FiloSottile/mkcert) and run:
+> ```bash
+> brew install mkcert
+> mkcert -install
+> make update-cert
+> docker compose -f docker/compose.yaml --env-file .env.local restart nginx
+> ```
+>
+> See [TLS Setup Guide](tls-setup.md) for complete instructions, including iOS simulator setup.
 
 ## What's Running?
 
