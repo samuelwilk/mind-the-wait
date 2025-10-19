@@ -1,0 +1,22 @@
+nelmio_cors:
+    defaults:
+        origin_regex: true
+        allow_origin: ['*'] # In production: restrict to app bundle ID or specific domains
+        allow_methods: ['GET', 'POST', 'OPTIONS']
+        allow_headers: ['Content-Type', 'Authorization']
+        expose_headers: ['Link']
+        max_age: 3600
+    paths:
+        # Mobile API endpoints (v1)
+        '^/api/v1/':
+            allow_origin: ['*']
+            allow_methods: ['GET', 'OPTIONS']
+            allow_headers: ['Content-Type', 'Authorization']
+            max_age: 3600
+
+        # Web API endpoints (unversioned)
+        '^/api/':
+            allow_origin: ['*']
+            allow_methods: ['GET', 'POST', 'OPTIONS']
+            allow_headers: ['Content-Type', 'Authorization']
+            max_age: 3600

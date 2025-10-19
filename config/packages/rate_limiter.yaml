@@ -1,0 +1,9 @@
+framework:
+    rate_limiter:
+        # Mobile API rate limiter
+        # Limits: 120 requests per 60 seconds per IP address
+        # Used by iOS app API endpoints to prevent abuse
+        mobile_api:
+            policy: 'sliding_window'
+            limit: 120
+            interval: '60 seconds'
