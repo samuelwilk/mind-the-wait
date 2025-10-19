@@ -121,10 +121,14 @@ final class InsightGeneratorServiceTest extends TestCase
     public function testGenerateBunchingByWeatherInsightReturnsCachedContent(): void
     {
         $stats = [
-            'snowIncidents'  => 87,
-            'rainIncidents'  => 32,
-            'clearIncidents' => 24,
-            'multiplier'     => 3.6,
+            'snow_rate'   => 5.35,
+            'rain_rate'   => 3.21,
+            'clear_rate'  => 1.48,
+            'snow_hours'  => 72.0,
+            'rain_hours'  => 48.0,
+            'clear_hours' => 600.0,
+            'multiplier'  => 3.6,
+            'hasData'     => true,
         ];
 
         $cachedContent = '<p>Bunching insight</p>';

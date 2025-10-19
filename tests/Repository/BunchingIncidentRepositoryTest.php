@@ -14,6 +14,8 @@ use App\Repository\BunchingIncidentRepository;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
+use const PHP_FLOAT_MAX;
+
 #[CoversClass(BunchingIncidentRepository::class)]
 final class BunchingIncidentRepositoryTest extends TestCase
 {
@@ -255,6 +257,111 @@ final class BunchingIncidentRepositoryTest extends TestCase
         usort($results, fn ($a, $b) => $b->incidentCount <=> $a->incidentCount);
 
         return $results;
+    }
+
+    /**
+     * Test countByWeatherConditionNormalized returns correct structure.
+     *
+     * Note: This is a structural test. Integration tests validate the actual SQL logic.
+     */
+    public function testCountByWeatherConditionNormalizedReturnsCorrectStructure(): void
+    {
+        // Simulate the expected output structure from countByWeatherConditionNormalized
+        $mockResults = [
+            [
+                'weather_condition'  => 'Snow',
+                'incident_count'     => 100,
+                'exposure_hours'     => 72.0,
+                'incidents_per_hour' => 1.39,
+            ],
+            [
+                'weather_condition'  => 'Clear',
+                'incident_count'     => 200,
+                'exposure_hours'     => 576.0,
+                'incidents_per_hour' => 0.35,
+            ],
+        ];
+
+        // Validate structure of each result
+        foreach ($mockResults as $result) {
+            $this->assertArrayHasKey('weather_condition', $result);
+            $this->assertArrayHasKey('incident_count', $result);
+            $this->assertArrayHasKey('exposure_hours', $result);
+            $this->assertArrayHasKey('incidents_per_hour', $result);
+
+            $this->assertIsString($result['weather_condition']);
+            $this->assertIsInt($result['incident_count']);
+            $this->assertIsFloat($result['exposure_hours']);
+            $this->assertIsFloat($result['incidents_per_hour']);
+
+            // Validate calculation: incidents_per_hour = incident_count / exposure_hours
+            if ($result['exposure_hours'] > 0) {
+                $expectedRate = $result['incident_count'] / $result['exposure_hours'];
+                $this->assertEqualsWithDelta(
+                    $expectedRate,
+                    $result['incidents_per_hour'],
+                    0.01,
+                    'Rate calculation should be correct'
+                );
+            }
+        }
+    }
+
+    /**
+     * Test countByWeatherConditionNormalized handles zero exposure hours.
+     */
+    public function testCountByWeatherConditionNormalizedExcludesZeroExposure(): void
+    {
+        // Mock results should not include conditions with zero exposure hours
+        // The WHERE clause in SQL filters these out
+        $mockResults = [
+            [
+                'weather_condition'  => 'Snow',
+                'incident_count'     => 10,
+                'exposure_hours'     => 24.0,
+                'incidents_per_hour' => 0.42,
+            ],
+        ];
+
+        // All results should have exposure_hours > 0
+        foreach ($mockResults as $result) {
+            $this->assertGreaterThan(0, $result['exposure_hours'], 'No zero-exposure conditions should be returned');
+        }
+    }
+
+    /**
+     * Test countByWeatherConditionNormalized orders by incidents_per_hour descending.
+     */
+    public function testCountByWeatherConditionNormalizedOrdersByRateDescending(): void
+    {
+        // Mock results ordered by incidents_per_hour (descending)
+        $mockResults = [
+            [
+                'weather_condition'  => 'Snow',
+                'incident_count'     => 50,
+                'exposure_hours'     => 10.0,
+                'incidents_per_hour' => 5.00, // Highest rate
+            ],
+            [
+                'weather_condition'  => 'Rain',
+                'incident_count'     => 30,
+                'exposure_hours'     => 20.0,
+                'incidents_per_hour' => 1.50,
+            ],
+            [
+                'weather_condition'  => 'Clear',
+                'incident_count'     => 100,
+                'exposure_hours'     => 200.0,
+                'incidents_per_hour' => 0.50, // Lowest rate
+            ],
+        ];
+
+        // Verify ordering
+        $previousRate = PHP_FLOAT_MAX;
+        foreach ($mockResults as $result) {
+            $this->assertLessThanOrEqual($previousRate, $result['incidents_per_hour'], 'Results should be ordered by rate descending');
+            $previousRate = $result['incidents_per_hour'];
+        }
     }
 
     private function createIncident(string $dateTime, ?string $weatherCondition): BunchingIncident

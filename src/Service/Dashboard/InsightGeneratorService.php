@@ -156,6 +156,10 @@ PROMPT;
      */
     public function generateBunchingByWeatherInsight(array $stats): string
     {
+        if (!$stats['hasData']) {
+            return '<p>No bunching data available yet. Run the bunching detection command to analyze arrival patterns.</p>';
+        }
+
         $cacheKey = 'insight_bunching_'.md5(serialize($stats));
         $item     = $this->cache->getItem($cacheKey);
 
@@ -166,21 +170,23 @@ PROMPT;
         $prompt = <<<PROMPT
 You are a transit data analyst writing insights for a public-facing transit dashboard.
 
-Based on this data about vehicle bunching in different weather conditions:
-- Snow incidents: {$stats['snowIncidents']}
-- Rain incidents: {$stats['rainIncidents']}
-- Clear weather incidents: {$stats['clearIncidents']}
-- Multiplier (snow vs clear): {$stats['multiplier']}x
+Based on 30 days of transit data for Saskatoon Transit:
 
-Note: Bunching detection is in development; these are representative samples.
+Bunching rates by weather condition (incidents per hour):
+- Snow: {$stats['snow_rate']} incidents/hour ({$stats['snow_hours']} hours exposure)
+- Rain: {$stats['rain_rate']} incidents/hour ({$stats['rain_hours']} hours exposure)
+- Clear: {$stats['clear_rate']} incidents/hour ({$stats['clear_hours']} hours exposure)
+
+Snow weather has a {$stats['multiplier']}× higher bunching rate than clear weather.
 
 Write a brief 2-paragraph insight (max 140 words):
 1. Explain what bunching is and why weather increases it
-2. Describe the observed patterns and their impact on riders
+2. Which weather condition has the highest bunching rate and why this might occur (operational challenges, driver behavior, traffic)
+3. One actionable recommendation for transit operators
 
 Include a brief note that bunching detection is in development.
 Tone: Professional but accessible. Use HTML paragraph tags (<p>).
-Focus on data analysis, not recommendations.
+Use plain language. No jargon. Be specific to Saskatoon's winter climate.
 
 Do not use any emojis.
 PROMPT;
@@ -283,13 +289,13 @@ PROMPT;
         $prompt = <<<PROMPT
 You are writing a brief insight card for a transit dashboard homepage.
 
-Based on data showing performance drops sharply below {$stats['threshold']}°C, with delays increasing by {$stats['delayIncrease']} minutes on average.
+Based on data showing on-time performance drops sharply below {$stats['threshold']}°C, declining from {$stats['aboveThreshold']}% on-time (above threshold) to {$stats['belowThreshold']}% (below threshold) - a drop of {$stats['performanceDrop']} percentage points.
 
 Write 1-2 sentences that:
 1. State the temperature threshold and impact
 2. Make it compelling enough to click "View Full Analysis"
 
-Tone: Punchy, informative. Use HTML paragraph tags (<p>). Use <strong> for temperature and time.
+Tone: Punchy, informative. Use HTML paragraph tags (<p>). Use <strong> for temperature and percentage drop.
 
 Do not use any emojis.
 PROMPT;

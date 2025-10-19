@@ -141,3 +141,12 @@ gtfs-load: ## Load GTFS static data (uses ArcGIS by default, or set MTW_GTFS_STA
 
 weather-collect: ## Collect current weather data
 	@docker compose -f docker/compose.yaml exec php bin/console app:collect:weather
+
+##@ Certificates
+update-cert: ## Generate mind-the-wait.local TLS cert and fullchain (requires mkcert)
+	mkdir -p docker/dev/certs
+	mkcert -key-file docker/dev/certs/mind-the-wait.local.key \
+		-cert-file docker/dev/certs/mind-the-wait.local.crt \
+		mind-the-wait.local mind-the-wait.test localhost 127.0.0.1 ::1
+	cat docker/dev/certs/mind-the-wait.local.crt "$$(mkcert -CAROOT)/rootCA.pem" \
+		> docker/dev/certs/mind-the-wait.local.fullchain.crt

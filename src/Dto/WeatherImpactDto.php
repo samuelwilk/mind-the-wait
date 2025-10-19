@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Dto;
 
+use App\ValueObject\Chart\Chart;
+
 /**
  * Weather impact insights data transfer object.
  *
@@ -12,31 +14,31 @@ namespace App\Dto;
 final readonly class WeatherImpactDto
 {
     /**
-     * @param array<string, mixed> $winterOperationsChart         ECharts config for clear vs snow comparison
+     * @param Chart                $winterOperationsChart         Chart for clear vs snow comparison
      * @param array<string, mixed> $winterOperationsStats         Statistics for story card
      * @param string               $winterOperationsNarrative     AI-generated insight text (HTML)
-     * @param array<string, mixed> $temperatureThresholdChart     ECharts config for temperature analysis
+     * @param Chart                $temperatureThresholdChart     Chart for temperature analysis
      * @param array<string, mixed> $temperatureThresholdStats     Statistics for story card
      * @param string               $temperatureThresholdNarrative AI-generated insight text (HTML)
-     * @param array<string, mixed> $weatherImpactMatrix           ECharts config for route×weather heatmap
+     * @param Chart                $weatherImpactMatrix           Chart for route×weather heatmap
      * @param array<string, mixed> $weatherImpactStats            Statistics for story card
      * @param string               $weatherImpactNarrative        AI-generated insight text (HTML)
-     * @param array<string, mixed> $bunchingByWeatherChart        ECharts config for bunching analysis
+     * @param Chart                $bunchingByWeatherChart        Chart for bunching analysis
      * @param array<string, mixed> $bunchingByWeatherStats        Statistics for story card
      * @param string               $bunchingByWeatherNarrative    AI-generated insight text (HTML)
      * @param string               $keyTakeaway                   AI-generated key takeaway (HTML)
      */
     public function __construct(
-        public array $winterOperationsChart,
+        public Chart $winterOperationsChart,
         public array $winterOperationsStats,
         public string $winterOperationsNarrative,
-        public array $temperatureThresholdChart,
+        public Chart $temperatureThresholdChart,
         public array $temperatureThresholdStats,
         public string $temperatureThresholdNarrative,
-        public array $weatherImpactMatrix,
+        public Chart $weatherImpactMatrix,
         public array $weatherImpactStats,
         public string $weatherImpactNarrative,
-        public array $bunchingByWeatherChart,
+        public Chart $bunchingByWeatherChart,
         public array $bunchingByWeatherStats,
         public string $bunchingByWeatherNarrative,
         public string $keyTakeaway,

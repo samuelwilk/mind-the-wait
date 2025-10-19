@@ -10,8 +10,9 @@ use App\Entity\Route;
 use App\Repository\RealtimeRepository;
 use App\Repository\RoutePerformanceDailyRepository;
 use App\Repository\RouteRepository;
+use App\ValueObject\Chart\Chart;
+use App\ValueObject\Chart\RoutePerformanceChartPreset;
 
-use function array_map;
 use function count;
 use function usort;
 
@@ -122,176 +123,50 @@ final readonly class RoutePerformanceService
 
     /**
      * Build 30-day performance trend chart with weather overlay.
-     *
-     * @return array<string, mixed>
      */
-    private function buildPerformanceTrendChart(Route $route, \DateTimeImmutable $startDate, \DateTimeImmutable $endDate): array
+    private function buildPerformanceTrendChart(Route $route, \DateTimeImmutable $startDate, \DateTimeImmutable $endDate): Chart
     {
         // Query performance data
         $performances = $this->performanceRepo->findByRouteAndDateRange($route->getId(), $startDate, $endDate);
 
         // Build data arrays
-        $dates   = [];
-        $values  = [];
-        $weather = [];
+        $dates  = [];
+        $values = [];
 
         foreach ($performances as $perf) {
-            // Format date as "Sep 14" instead of "2025-09-14"
-            $date     = $perf->getDate()->format('M j');
-            $dates[]  = $date;
+            $dates[]  = $perf->getDate()->format('M j');
             $onTime   = $perf->getOnTimePercentage();
             $values[] = $onTime !== null ? (float) $onTime : null;
-
-            // Get weather for this date
-            $weatherObs = $perf->getWeatherObservation();
-            $weather[]  = $weatherObs?->getWeatherCondition() ?? 'unknown';
         }
 
-        // ECharts configuration
-        return [
-            'title' => [
-                'text'      => '30-Day Performance Trend',
-                'left'      => 'center',
-                'top'       => '5',
-                'textStyle' => ['fontSize' => 12, 'fontWeight' => 'bold'],
-            ],
-            'tooltip' => [
-                'trigger'   => 'axis',
-                'formatter' => '{b}<br/>On-Time: {c}%<br/>Weather: {a}',
-            ],
-            'xAxis' => [
-                'type'      => 'category',
-                'data'      => $dates,
-                'axisLabel' => ['rotate' => 45],
-            ],
-            'yAxis' => [
-                'type'          => 'value',
-                'name'          => 'On-Time %',
-                'nameLocation'  => 'middle',
-                'nameGap'       => 40,
-                'nameTextStyle' => ['fontSize' => 11],
-                'min'           => 0,
-                'max'           => 100,
-            ],
-            'series' => [
-                [
-                    'name'      => 'On-Time Performance',
-                    'type'      => 'line',
-                    'data'      => $values,
-                    'smooth'    => true,
-                    'lineStyle' => ['width' => 3],
-                    'itemStyle' => ['color' => '#0284c7'],
-                    'areaStyle' => ['color' => 'rgba(2, 132, 199, 0.1)'],
-                ],
-            ],
-            'grid' => [
-                'left'         => '30',
-                'right'        => '4%',
-                'top'          => '40',
-                'bottom'       => '15%',
-                'containLabel' => true,
-            ],
-        ];
+        return RoutePerformanceChartPreset::performanceTrend($dates, $values);
     }
 
     /**
      * Build weather impact comparison chart.
-     *
-     * @return array<string, mixed>
      */
-    private function buildWeatherImpactChart(Route $route, \DateTimeImmutable $startDate, \DateTimeImmutable $endDate): array
+    private function buildWeatherImpactChart(Route $route, \DateTimeImmutable $startDate, \DateTimeImmutable $endDate): Chart
     {
-        // Query performance by weather condition
-        $qb = $this->performanceRepo->createQueryBuilder('p');
-        $qb->select('w.weatherCondition', 'AVG(p.onTimePercentage) as avgPerformance', 'COUNT(p.id) as days')
-            ->leftJoin('p.weatherObservation', 'w')
-            ->where('p.route = :route')
-            ->andWhere('p.date >= :start')
-            ->andWhere('p.date < :end')
-            ->andWhere('w.weatherCondition IS NOT NULL')
-            ->andWhere('p.onTimePercentage IS NOT NULL')
-            ->setParameter('route', $route)
-            ->setParameter('start', $startDate)
-            ->setParameter('end', $endDate)
-            ->groupBy('w.weatherCondition')
-            ->orderBy('avgPerformance', 'DESC');
-
-        $results = $qb->getQuery()->getResult();
+        // Query performance by weather condition from repository
+        $results = $this->performanceRepo->findWeatherImpactByRoute($route->getId(), $startDate, $endDate);
 
         $conditions = [];
         $values     = [];
         $colors     = [];
 
-        $colorMap = [
-            'clear'         => '#fef3c7',
-            'partly_cloudy' => '#e5e7eb',
-            'cloudy'        => '#cbd5e1',
-            'rain'          => '#dbeafe',
-            'snow'          => '#ede9fe',
-            'storm'         => '#1e293b',
-        ];
-
-        foreach ($results as $row) {
-            $condition    = $row['weatherCondition'] ?? 'unknown';
-            $conditions[] = ucfirst($condition);
-            $values[]     = round((float) $row['avgPerformance'], 1);
-            $colors[]     = $colorMap[$condition] ?? '#e5e7eb';
+        foreach ($results as $dto) {
+            $conditions[] = $dto->weatherCondition->label();
+            $values[]     = $dto->avgPerformance;
+            $colors[]     = $dto->weatherCondition->chartColor();
         }
 
-        return [
-            'title' => [
-                'text'      => 'Performance by Weather Condition',
-                'left'      => 'center',
-                'top'       => '5',
-                'textStyle' => ['fontSize' => 12, 'fontWeight' => 'bold'],
-            ],
-            'tooltip' => [
-                'trigger'     => 'axis',
-                'axisPointer' => ['type' => 'shadow'],
-            ],
-            'xAxis' => [
-                'type' => 'category',
-                'data' => $conditions,
-            ],
-            'yAxis' => [
-                'type'          => 'value',
-                'name'          => 'On-Time %',
-                'nameLocation'  => 'middle',
-                'nameGap'       => 40,
-                'nameTextStyle' => ['fontSize' => 11],
-                'min'           => 0,
-                'max'           => 100,
-            ],
-            'series' => [
-                [
-                    'name' => 'On-Time Performance',
-                    'type' => 'bar',
-                    'data' => array_map(function ($value, $color) {
-                        return ['value' => $value, 'itemStyle' => ['color' => $color]];
-                    }, $values, $colors),
-                    'label' => [
-                        'show'      => true,
-                        'position'  => 'top',
-                        'formatter' => '{c}%',
-                    ],
-                ],
-            ],
-            'grid' => [
-                'left'         => '30',
-                'right'        => '4%',
-                'top'          => '40',
-                'bottom'       => '3%',
-                'containLabel' => true,
-            ],
-        ];
+        return RoutePerformanceChartPreset::weatherImpact($conditions, $values, $colors);
     }
 
     /**
      * Build time-of-day heatmap showing performance by day of week and time.
-     *
-     * @return array<string, mixed>
      */
-    private function buildTimeOfDayHeatmap(Route $route, \DateTimeImmutable $startDate, \DateTimeImmutable $endDate): array
+    private function buildTimeOfDayHeatmap(Route $route, \DateTimeImmutable $startDate, \DateTimeImmutable $endDate): Chart
     {
         $days  = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         $hours = ['0-6', '6-9', '9-12', '12-15', '15-18', '18-21', '21-24'];
@@ -356,55 +231,7 @@ final readonly class RoutePerformanceService
             }
         }
 
-        return [
-            'title' => [
-                'text'      => 'Performance by Day & Time',
-                'left'      => 'center',
-                'top'       => '5',
-                'textStyle' => ['fontSize' => 12, 'fontWeight' => 'bold'],
-            ],
-            'tooltip' => [
-                'position'  => 'top',
-                'formatter' => 'Day: {b}<br/>Time: {c0}<br/>Performance: {c2}%',
-            ],
-            'xAxis' => [
-                'type'      => 'category',
-                'data'      => $days,
-                'splitArea' => ['show' => true],
-            ],
-            'yAxis' => [
-                'type'      => 'category',
-                'data'      => $hours,
-                'splitArea' => ['show' => true],
-            ],
-            'visualMap' => [
-                'min'        => 40,
-                'max'        => 100,
-                'calculable' => true,
-                'orient'     => 'horizontal',
-                'left'       => 'center',
-                'bottom'     => '0%',
-                'inRange'    => [
-                    'color' => ['#dc2626', '#f97316', '#fbbf24', '#84cc16', '#10b981'],
-                ],
-            ],
-            'series' => [
-                [
-                    'name'  => 'Performance',
-                    'type'  => 'heatmap',
-                    'data'  => $data,
-                    'label' => [
-                        'show'     => true,
-                        'fontSize' => 10,
-                        // Formatter will be added by JS controller
-                    ],
-                ],
-            ],
-            'grid' => [
-                'height' => '60%',
-                'top'    => '12%',
-            ],
-        ];
+        return RoutePerformanceChartPreset::timeOfDayHeatmap($days, $hours, $data);
     }
 
     /**

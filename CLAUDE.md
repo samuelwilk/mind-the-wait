@@ -146,6 +146,59 @@ curl -X POST https://localhost/api/vehicle-feedback \
 - Realtime vehicle feeds don't always include direction
 - `TripRepository::directionMapByGtfsId()` preloads `trip_id → direction` for O(1) lookup
 
+### Code Quality Patterns
+
+**Repository Pattern:**
+- All database queries live in repositories, never in services or controllers
+- Repository methods return typed DTOs instead of raw arrays
+- Example: `RoutePerformanceDailyRepository::findWinterPerformanceComparison()` returns `list<RoutePerformanceSummaryDto>`
+
+**Data Transfer Objects (DTOs):**
+- All repository methods return strongly-typed DTOs
+- DTOs are readonly classes with public properties
+- No array access with magic strings - use typed properties instead
+- Location: `src/Dto/`
+- Examples:
+  - `RoutePerformanceSummaryDto`: Winter performance comparison data
+  - `TemperatureBucketDto`: Performance by temperature range
+  - `HistoricalPerformerDto`: Top/worst performers over time period
+  - `BunchingRateDto`: Normalized bunching incidents per hour
+
+**Enums for Type Safety:**
+- `WeatherCondition` enum replaces magic strings ('snow', 'rain', 'clear')
+- Provides helper methods: `label()`, `chartColor()`, `icon()`, `fromString()`
+- Used in entity properties with Doctrine's `enumType` attribute
+- Example:
+  ```php
+  #[ORM\Column(type: 'string', enumType: WeatherCondition::class)]
+  private ?WeatherCondition $weatherCondition = null;
+  ```
+
+**Chart Builder Pattern:**
+- `ChartBuilder`: Fluent interface for building ECharts configurations
+- `Chart`: Immutable value object implementing JsonSerializable
+- `WeatherChartPreset`: Factory methods for common weather analysis charts
+- Replaces 100+ line array returns with concise builder calls
+- Example:
+  ```php
+  return ChartBuilder::bar()
+      ->title('Winter Operations')
+      ->categoryXAxis($routeNames)
+      ->valueYAxis('On-Time %', min: 0, max: 100)
+      ->addSeries('Clear Weather', $clearData)
+      ->addSeries('Snow', $snowData)
+      ->build();
+  ```
+
+**Service Layer Best Practices:**
+- Services orchestrate business logic, don't write queries
+- Call repository methods that return DTOs
+- Transform DTOs into UI-ready formats
+- Keep methods focused and under 30 lines
+- Example refactoring:
+  - Before: 150-line method with inline queries and array building
+  - After: 15-line method calling repository + preset chart builder
+
 ## Environment Variables
 
 Configure in `.env.local`:

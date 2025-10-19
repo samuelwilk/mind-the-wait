@@ -15,7 +15,6 @@ use App\Repository\WeatherObservationRepository;
 
 use function array_slice;
 use function count;
-use function sprintf;
 
 /**
  * Service for fetching system-wide overview metrics for the dashboard.
@@ -416,49 +415,22 @@ final readonly class OverviewService
      */
     private function getHistoricalTopPerformers(int $days = 30, int $limit = 5): array
     {
-        $endDate   = new \DateTimeImmutable('today');
-        $startDate = $endDate->modify(sprintf('-%d days', $days));
+        $performers = $this->performanceRepo->findHistoricalTopPerformers($days, minDays: 3, limit: $limit);
 
-        // Query average on-time percentage per route
-        $qb = $this->performanceRepo->createQueryBuilder('p');
-        $qb->select('IDENTITY(p.route) as route_id', 'AVG(p.onTimePercentage) as avg_on_time', 'COUNT(p.id) as days_count')
-            ->where('p.date >= :start')
-            ->andWhere('p.date < :end')
-            ->andWhere('p.onTimePercentage IS NOT NULL')
-            ->setParameter('start', $startDate)
-            ->setParameter('end', $endDate)
-            ->groupBy('p.route')
-            ->having('COUNT(p.id) >= :min_days')  // At least 3 days of data
-            ->setParameter('min_days', 3)
-            ->orderBy('avg_on_time', 'DESC')
-            ->setMaxResults($limit);
-
-        $results = $qb->getQuery()->getResult();
-
-        $performers = [];
-        foreach ($results as $row) {
-            $route = $this->routeRepo->find((int) $row['route_id']);
-            if ($route === null) {
-                continue;
-            }
-
-            $avgOnTime = (float) $row['avg_on_time'];
-            $grade     = $this->onTimePercentageToGrade($avgOnTime);
-
-            $performers[] = new RouteMetricDto(
-                routeId: $route->getGtfsId(),
-                shortName: $route->getShortName(),
-                longName: $route->getLongName(),
-                grade: $grade,
-                onTimePercentage: $avgOnTime,
-                colour: $route->getColour(),
+        return array_map(
+            fn ($dto) => new RouteMetricDto(
+                routeId: $dto->gtfsId,
+                shortName: $dto->shortName,
+                longName: $dto->longName,
+                grade: $dto->grade,
+                onTimePercentage: $dto->avgOnTimePercent,
+                colour: $dto->colour,
                 activeVehicles: null,
                 trend: null,
                 issue: null,
-            );
-        }
-
-        return $performers;
+            ),
+            $performers
+        );
     }
 
     /**
@@ -468,63 +440,22 @@ final readonly class OverviewService
      */
     private function getHistoricalWorstPerformers(int $days = 30, int $limit = 5): array
     {
-        $endDate   = new \DateTimeImmutable('today');
-        $startDate = $endDate->modify(sprintf('-%d days', $days));
+        $performers = $this->performanceRepo->findHistoricalWorstPerformers($days, minDays: 3, limit: $limit);
 
-        // Query average on-time percentage per route
-        $qb = $this->performanceRepo->createQueryBuilder('p');
-        $qb->select('IDENTITY(p.route) as route_id', 'AVG(p.onTimePercentage) as avg_on_time', 'COUNT(p.id) as days_count')
-            ->where('p.date >= :start')
-            ->andWhere('p.date < :end')
-            ->andWhere('p.onTimePercentage IS NOT NULL')
-            ->setParameter('start', $startDate)
-            ->setParameter('end', $endDate)
-            ->groupBy('p.route')
-            ->having('COUNT(p.id) >= :min_days')  // At least 3 days of data
-            ->setParameter('min_days', 3)
-            ->orderBy('avg_on_time', 'ASC')  // Worst first
-            ->setMaxResults($limit);
-
-        $results = $qb->getQuery()->getResult();
-
-        $performers = [];
-        foreach ($results as $row) {
-            $route = $this->routeRepo->find((int) $row['route_id']);
-            if ($route === null) {
-                continue;
-            }
-
-            $avgOnTime = (float) $row['avg_on_time'];
-            $grade     = $this->onTimePercentageToGrade($avgOnTime);
-
-            $performers[] = new RouteMetricDto(
-                routeId: $route->getGtfsId(),
-                shortName: $route->getShortName(),
-                longName: $route->getLongName(),
-                grade: $grade,
-                onTimePercentage: $avgOnTime,
-                colour: $route->getColour(),
+        return array_map(
+            fn ($dto) => new RouteMetricDto(
+                routeId: $dto->gtfsId,
+                shortName: $dto->shortName,
+                longName: $dto->longName,
+                grade: $dto->grade,
+                onTimePercentage: $dto->avgOnTimePercent,
+                colour: $dto->colour,
                 activeVehicles: null,
                 trend: null,
                 issue: null,
-            );
-        }
-
-        return $performers;
-    }
-
-    /**
-     * Convert on-time percentage to letter grade.
-     */
-    private function onTimePercentageToGrade(float $onTimePercentage): string
-    {
-        return match (true) {
-            $onTimePercentage >= 90 => 'A',
-            $onTimePercentage >= 80 => 'B',
-            $onTimePercentage >= 70 => 'C',
-            $onTimePercentage >= 60 => 'D',
-            default                 => 'F',
-        };
+            ),
+            $performers
+        );
     }
 
     /**
@@ -534,26 +465,19 @@ final readonly class OverviewService
      */
     private function calculateWinterImpactStats(): array
     {
-        // Quick calculation: average drop from clear to snow
-        $qb       = $this->performanceRepo->createQueryBuilder('p');
-        $clearAvg = $qb->select('AVG(p.onTimePercentage) as avg_perf')
-            ->leftJoin('p.weatherObservation', 'w')
-            ->where('w.weatherCondition = :clear')
-            ->andWhere('p.onTimePercentage IS NOT NULL')
-            ->setParameter('clear', 'clear')
-            ->getQuery()
-            ->getSingleScalarResult();
+        $results = $this->performanceRepo->findWinterPerformanceComparison(minDays: 1, limit: 100);
 
-        $qb2     = $this->performanceRepo->createQueryBuilder('p');
-        $snowAvg = $qb2->select('AVG(p.onTimePercentage) as avg_perf')
-            ->leftJoin('p.weatherObservation', 'w')
-            ->where('w.weatherCondition = :snow')
-            ->andWhere('p.onTimePercentage IS NOT NULL')
-            ->setParameter('snow', 'snow')
-            ->getQuery()
-            ->getSingleScalarResult();
+        if (count($results) === 0) {
+            return ['avgDrop' => 0.0];
+        }
 
-        $avgDrop = $clearAvg && $snowAvg ? round((float) $clearAvg - (float) $snowAvg, 1) : 33.0;
+        // Calculate average drop across all routes
+        $totalDrop = 0.0;
+        foreach ($results as $dto) {
+            $totalDrop += $dto->performanceDrop;
+        }
+
+        $avgDrop = round($totalDrop / count($results), 1);
 
         return [
             'avgDrop' => $avgDrop,
@@ -567,9 +491,15 @@ final readonly class OverviewService
      */
     private function calculateTemperatureThresholdStats(): array
     {
+        $result = $this->performanceRepo->findPerformanceByTemperatureThreshold(threshold: -20.0);
+
+        $performanceDrop = $result['above']->avgPerformance - $result['below']->avgPerformance;
+
         return [
-            'threshold'     => '-20',
-            'delayIncrease' => '5-7',
+            'threshold'       => '-20',
+            'performanceDrop' => round($performanceDrop, 1),
+            'aboveThreshold'  => $result['above']->avgPerformance,
+            'belowThreshold'  => $result['below']->avgPerformance,
         ];
     }
 }

@@ -63,6 +63,28 @@ export default class extends Controller {
             };
         }
 
+        // Fix bunching by weather tooltip
+        if (options.title?.text?.includes('Bunching Rate by Weather')) {
+            options.tooltip.formatter = function(params) {
+                const condition = params[0].name;
+                const rate = params[0].value;
+                const exposureHours = params[0].data.exposureHours || 0;
+
+                return `
+                    <strong>${condition}</strong><br/>
+                    Rate: ${rate.toFixed(2)} incidents/hour<br/>
+                    Exposure: ${Math.round(exposureHours)} hours
+                `;
+            };
+
+            // Update label formatter to show rate with decimals
+            if (options.series[0].label) {
+                options.series[0].label.formatter = function(params) {
+                    return params.value.toFixed(2);
+                };
+            }
+        }
+
         // Set the options from PHP
         this.chart.setOption(options);
 
