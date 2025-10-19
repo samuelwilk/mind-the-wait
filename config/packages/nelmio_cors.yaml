@@ -1,7 +1,7 @@
 nelmio_cors:
     defaults:
         origin_regex: true
-        allow_origin: ['*'] # In production: restrict to app bundle ID or specific domains
+        allow_origin: ['*'] # Development: allow all origins for easy testing
         allow_methods: ['GET', 'POST', 'OPTIONS']
         allow_headers: ['Content-Type', 'Authorization']
         expose_headers: ['Link']
@@ -20,3 +20,31 @@ nelmio_cors:
             allow_methods: ['GET', 'POST', 'OPTIONS']
             allow_headers: ['Content-Type', 'Authorization']
             max_age: 3600
+
+# Production: Restrict CORS to specific domains
+when@prod:
+    nelmio_cors:
+        defaults:
+            origin_regex: true
+            # Allow production domain + iOS app (if using WKWebView/Capacitor)
+            allow_origin: ['^https://mind-the-wait\.ca$', '^capacitor://localhost$', '^ionic://localhost$']
+            allow_methods: ['GET', 'POST', 'OPTIONS']
+            allow_headers: ['Content-Type', 'Authorization']
+            expose_headers: ['Link']
+            max_age: 3600
+        paths:
+            # Mobile API endpoints (v1) - stricter in production
+            '^/api/v1/':
+                origin_regex: true
+                allow_origin: ['^https://mind-the-wait\.ca$', '^capacitor://localhost$', '^ionic://localhost$']
+                allow_methods: ['GET', 'OPTIONS']
+                allow_headers: ['Content-Type', 'Authorization']
+                max_age: 3600
+
+            # Web API endpoints (unversioned)
+            '^/api/':
+                origin_regex: true
+                allow_origin: ['^https://mind-the-wait\.ca$', '^capacitor://localhost$', '^ionic://localhost$']
+                allow_methods: ['GET', 'POST', 'OPTIONS']
+                allow_headers: ['Content-Type', 'Authorization']
+                max_age: 3600
