@@ -54,4 +54,28 @@ class StopRepository extends BaseRepository
 
         return $stop;
     }
+
+    /**
+     * Find all stops served by a specific route.
+     *
+     * Queries stops through the stop_times → trips → route relationship.
+     * Returns distinct stops (no duplicates if stop is visited multiple times).
+     *
+     * @param string $routeGtfsId Route GTFS ID
+     *
+     * @return list<Stop>
+     */
+    public function findByRoute(string $routeGtfsId): array
+    {
+        return $this->createQueryBuilder('s')
+            ->join('s.stopTimes', 'st')
+            ->join('st.trip', 't')
+            ->join('t.route', 'r')
+            ->where('r.gtfsId = :routeId')
+            ->setParameter('routeId', $routeGtfsId)
+            ->distinct()
+            ->orderBy('s.name', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
 }

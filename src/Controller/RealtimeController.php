@@ -5,9 +5,12 @@ namespace App\Controller;
 use App\Service\Realtime\RealtimeSnapshotService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Annotation\Route;
 
+use function array_filter;
+use function array_values;
 use function function_exists;
 
 use const JSON_INVALID_UTF8_SUBSTITUTE;
@@ -19,11 +22,30 @@ final class RealtimeController extends AbstractController
     {
     }
 
+    /**
+     * Get realtime vehicle positions, optionally filtered by route.
+     *
+     * Query parameters:
+     * - route_id: Filter vehicles by route GTFS ID (optional)
+     *
+     * @param Request $request HTTP request
+     */
     #[Route('/api/realtime', name: 'api_realtime', methods: ['GET'])]
-    public function realtime(): JsonResponse
+    public function realtime(Request $request): JsonResponse
     {
+        $snapshot = $this->snapshotService->snapshot();
+        $routeId  = $request->query->get('route_id');
+
+        // Filter vehicles if route_id provided
+        if ($routeId !== null && isset($snapshot['vehicles'])) {
+            $snapshot['vehicles'] = array_values(array_filter(
+                $snapshot['vehicles'],
+                fn ($v) => ($v['route'] ?? null) === $routeId
+            ));
+        }
+
         return $this->json(
-            $this->snapshotService->snapshot(),
+            $snapshot,
             200,
             ['Content-Type'        => 'application/json'],
             ['json_encode_options' => JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE]
