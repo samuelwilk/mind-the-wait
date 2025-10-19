@@ -1,5 +1,16 @@
 # Infrastructure Documentation
 
+## 🚨 Cost Optimization Alert
+
+**Experiencing high AWS costs?** See **[AWS_COST_OPTIMIZATION.md](AWS_COST_OPTIMIZATION.md)** for aggressive cost-cutting strategies:
+- Reduce from $255/month → **$50-55/month** (78-80% savings)
+- Fargate Spot (70% discount)
+- Schedule-based scaling (run only during transit hours)
+- RDS instance scheduler
+- **Target:** <$30/month for development phase
+
+---
+
 ## Quick Start Guide
 
 ### Choose Your Configuration
@@ -8,10 +19,21 @@
 |--------|------|------------------|----------|
 | **Budget** | **$70/month** | 0-100 users/day | Initial deployment, learning AWS |
 | **Standard** | **$92/month** | 100-500 users/day | Production, better performance |
+| **🔥 Development** | **$50-55/month** | Dev/testing | Pre-launch, aggressive cost optimization |
 
-**Recommendation: Start with Budget, upgrade later if needed**
+**Recommendation:** Start with Development config for pre-launch, upgrade to Budget/Standard when ready
 
 ## Documentation Files
+
+### 0. 🔥 AWS Cost Optimization (`AWS_COST_OPTIMIZATION.md`) ⭐ **SAVE MONEY**
+Aggressive cost reduction strategies for development phase:
+- **Phase 1:** Quick wins (65% reduction) - 1 hour
+- **Phase 2:** Fargate Spot (70% discount) - 2 hours
+- **Phase 3:** Schedule-based scaling (transit hours only) - 3 hours
+- **Phase 4:** Aurora Serverless (true auto-pause) - 2-3 hours
+- Includes Lambda functions, EventBridge rules, audit scripts
+
+**Key Takeaway:** Reduce $255/month → $50-55/month (80% savings)
 
 ### 1. Cost Estimation (`aws-cost-estimation.md`)
 Comprehensive cost breakdown for AWS ECS deployment:
