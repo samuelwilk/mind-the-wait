@@ -12,6 +12,26 @@ This directory contains **planning documents for features that have NOT been ful
 
 ### High Priority
 
+#### [LIVE_ROUTE_VISUALIZATION.md](LIVE_ROUTE_VISUALIZATION.md)
+**Status:** 📋 PLANNING (Not started)
+
+Beautiful 3D visualization of favorite transit route with live vehicle positions and countdown timers. Mid-century modern aesthetic meets futuristic design.
+
+**Why Important:** Marquee feature that makes transit data delightful and instantly understandable. Widget provides at-a-glance countdown without opening app.
+
+**Key Features:**
+- 🚌 Live vehicle positions in isometric 3D view
+- ⏱️ Countdown timers to next arrival
+- 📱 Home screen widget (small/medium/large)
+- 🎨 Mid-century modern design language
+- 🔄 Tilt/rotate interaction with touch gestures
+
+**Dependencies:** Requires iOS app base implementation (IOS_IMPLEMENTATION_PLAN.md)
+
+**Estimated Effort:** 3-4 weeks
+
+---
+
 #### [IOS_IMPLEMENTATION_PLAN.md](IOS_IMPLEMENTATION_PLAN.md)
 **Status:** 📋 PARTIALLY IMPLEMENTED (Backend complete, iOS app not started)
 
