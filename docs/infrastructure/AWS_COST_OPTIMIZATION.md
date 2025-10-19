@@ -3,9 +3,10 @@
 > **📋 STATUS: IMPLEMENTATION READY** | Aggressive cost-cutting plan for development phase
 >
 > **Current Cost:** ~$255/month ($34 for 4 days)
-> **Target Cost:** <$30/month (88% reduction)
+> **Target Cost:** $82-103/month (60-68% reduction)
 > **Priority:** CRITICAL (unsustainable burn rate)
-> **Last Updated:** 2025-10-19
+> **Last Updated:** 2025-10-19 (Revised)
+> **Note:** Architecture-first approach - keeps schedulers separate to prevent data issues
 
 ## Executive Summary
 
@@ -14,15 +15,20 @@
 **Root Cause:** Infrastructure running 24/7 optimized for production load, not development.
 
 **Solution:** Aggressive multi-phase optimization:
-1. **Fargate Spot** → 70% savings on compute
-2. **Schedule-based scaling** → Run only during transit hours (25% time savings)
-3. **RDS instance scheduler** → Stop database during off-hours
-4. **Consolidate services** → Fewer tasks during development
-5. **Right-size instances** → Switch to Graviton (ARM) for 20% savings
+1. **Fargate Spot** → 70% savings on compute (Phase 2)
+2. **Schedule-based scaling** → Run only during transit hours (~25% time savings) (Phase 3)
+3. **RDS instance scheduler** → Stop database during off-hours (Phase 3)
+4. **Right-size instances** → Switch to Graviton (ARM) for 20% savings (Phase 1)
+5. **⚠️ Keep scheduler split** → Architectural decision, prevents data freshness bugs
 
 **Expected Outcome:**
-- **Phase 1 (Quick wins):** $255/month → $90/month (65% reduction)
-- **Phase 2 (Aggressive):** $90/month → $25-30/month (88-90% total reduction)
+- **Phase 2 (Fargate Spot):** $255/month → $150/month (41% reduction) - **START HERE**
+- **Phase 3 (Schedule-based):** $150/month → $110/month (57% total reduction)
+- **Phase 4 (Aurora Serverless):** $110/month → $82-103/month (60-68% total reduction)
+
+**Realistic Target:** **$82-103/month** (not $50-55 as originally estimated)
+
+**Why the change?** Original plan incorrectly proposed consolidating schedulers, which would break weather data collection reliability. Keeping the correct architecture reduces Phase 1 savings but is the right technical decision.
 
 **Safety:** All optimizations are reversible. No data loss. Performance maintained during transit hours.
 
@@ -84,71 +90,74 @@ Your actual bill: $255/month suggests:
 
 ---
 
-### 1.1 Consolidate Scheduler Services
+### 1.1 ~~Consolidate Scheduler Services~~ ❌ SKIP THIS
 
-**Problem:** Running 2 separate scheduler services (high-freq + low-freq) unnecessarily.
+**Problem:** Running 2 separate scheduler services (high-freq + low-freq) costs ~$9/month extra.
 
-**Solution:** Merge into single scheduler task for development.
+**Why NOT to consolidate:** ⚠️ **Architecture Decision**
 
-```diff
-# terraform/environments/prod/main.tf
+The schedulers were deliberately split in commit `8584870` to prevent high-frequency messages (score_tick runs every 30 seconds!) from drowning out critical low-frequency tasks:
+- Weather collection (hourly)
+- Performance aggregation (daily)
+- Insight cache warming (nightly at 2 AM)
+- Bunching detection (periodic)
 
--# ECS Service: High-Frequency Scheduler
--module "ecs_service_scheduler_high_freq" {
--  # ... 256 CPU, 512 MB memory
--}
--
--# ECS Service: Low-Frequency Scheduler
--module "ecs_service_scheduler_low_freq" {
--  # ... 256 CPU, 512 MB memory
--}
+**Previous Issue:** When consolidated, high-frequency `score_tick` messages would fill the Symfony Messenger queue, causing weather updates to be delayed or missed entirely. This led to stale weather data on the dashboard.
 
-+# ECS Service: Unified Scheduler (Development)
-+module "ecs_service_scheduler" {
-+  source = "../../modules/ecs-service"
-+
-+  project_name             = local.project_name
-+  environment              = local.environment
-+  service_name             = "scheduler"
-+  cluster_id               = module.ecs_cluster.cluster_id
-+  cluster_name             = module.ecs_cluster.cluster_name
-+  task_execution_role_arn  = module.ecs_cluster.task_execution_role_arn
-+  task_role_arn            = module.ecs_cluster.task_role_arn
-+  task_security_group_id   = module.networking.ecs_tasks_security_group_id
-+  subnet_ids               = module.networking.public_subnet_ids
-+  cpu                      = 256
-+  memory                   = 512
-+  desired_count            = 1
-+
-+  container_definitions = jsonencode([{
-+    name      = "scheduler"
-+    image     = "${module.ecr.repository_urls["php"]}:latest"
-+    essential = true
-+
-+    # Consume ALL scheduler transports in single task
-+    command = [
-+      "php", "bin/console", "messenger:consume",
-+      "scheduler_score_tick",
-+      "scheduler_arrival_logging",
-+      "scheduler_weather_collection",
-+      "scheduler_performance_aggregation",
-+      "scheduler_insight_cache_warming",
-+      "scheduler_bunching_detection",
-+      "-vv"
-+    ]
-+
-+    # ... environment and logs
-+  }])
-+}
-```
+**Decision:** ✅ **Keep schedulers separate** - This is correct architecture, not waste.
 
-**Savings:** 1 fewer Fargate task = ~$9/month
+**Alternative Optimization:** Skip this step. The scheduler split is working as designed and saves you from data freshness issues worth far more than $9/month in debugging time.
 
-**Safety:** ✅ Safe for development. Schedulers don't require high availability.
+**Savings:** $0/month (but prevents future bugs!)
 
 ---
 
-### 1.2 Reduce CloudWatch Log Retention
+### 1.2 Optimize Pyparser Task Size (New!)
+
+**Problem:** Python parser task may be over-provisioned for its workload.
+
+**Current Config:**
+```
+pyparser:
+  cpu: 256 (0.25 vCPU)
+  memory: 512 MB
+```
+
+**Analysis:** The Python parser:
+- Polls GTFS-RT feeds every 12 seconds
+- Parses protobuf → JSON
+- Writes to Redis
+- Very lightweight workload
+
+**Solution:** Reduce to minimum Fargate task size during development.
+
+```diff
+# terraform/environments/prod/terraform.tfvars
+
+-pyparser_cpu        = 256   # 0.25 vCPU
+-pyparser_memory     = 512   # 0.5 GB RAM
++pyparser_cpu        = 256   # 0.25 vCPU (minimum for Fargate)
++pyparser_memory     = 512   # 0.5 GB RAM (already minimum)
+
+# Note: 256 CPU + 512 MB is already the MINIMUM for Fargate
+# Cannot reduce further without moving to Lambda
+```
+
+**Result:** Already at minimum! No savings here.
+
+**Alternative:** Consider migrating pyparser to Lambda (future optimization):
+- Lambda: $0.20/million requests
+- Current: 5 requests/minute × 43,200 minutes/month = 216,000 requests/month
+- Lambda cost: $0.043/month (99% savings!)
+- But requires rewriting Python script to be event-driven
+
+**Decision:** Keep as-is for now. Add Lambda migration to future enhancements.
+
+**Savings:** $0/month now, ~$9/month potential with Lambda migration
+
+---
+
+### 1.3 Reduce CloudWatch Log Retention
 
 **Problem:** 7-day log retention is overkill for development.
 
@@ -170,7 +179,7 @@ module "ecs_cluster" {
 
 ---
 
-### 1.3 Switch to ARM-based Instances (Graviton)
+### 1.4 Switch to ARM-based Instances (Graviton)
 
 **Problem:** Using x86 instances (t3) instead of cheaper ARM instances (t4g).
 
@@ -192,7 +201,7 @@ module "ecs_cluster" {
 
 ---
 
-### 1.4 Remove Unused Resources
+### 1.5 Remove Unused Resources
 
 **Problem:** Resources that might be running but not visible in terraform.
 
@@ -219,11 +228,11 @@ aws ecs list-tasks --cluster mind-the-wait-prod --desired-status RUNNING --profi
 1. Verify only 1 ALB exists
 2. Verify only 1 RDS instance exists
 3. Verify only 1 ElastiCache cluster exists
-4. Verify task count matches terraform (4-5 tasks)
+4. Verify task count matches terraform (5 tasks: php, pyparser, scheduler-high-freq, scheduler-low-freq, total)
 
 ---
 
-### 1.5 Disable Detailed CloudWatch Monitoring
+### 1.6 Disable Detailed CloudWatch Monitoring
 
 **Problem:** Detailed monitoring ($0.30/metric/month) adds up fast.
 
@@ -245,18 +254,28 @@ resource "aws_db_instance" "this" {
 
 ### Phase 1 Summary
 
-**Total Savings:** $100/month (39% reduction)
+**Total Savings:** ~$10-13/month (4-5% reduction)
 
-**Time Required:** 1 hour (terraform apply + verification)
+**Revised Approach:** Phase 1 alone doesn't provide huge savings, but it's still worth doing for:
+- ✅ Free optimizations (Graviton, log retention)
+- ✅ Sets foundation for Phases 2-3 (the real cost savers)
+- ✅ Removes unnecessary monitoring overhead
+
+**Time Required:** 30 minutes (terraform apply + verification)
 
 **Risk:** ⚠️ Low - All changes reversible
 
-**Apply Now:**
+**Recommendation:** ⚡ **Skip directly to Phase 2 (Fargate Spot)** for 60% immediate savings instead of implementing Phase 1 first. Phase 2 includes all Phase 1 optimizations anyway.
+
+**If you still want Phase 1 only:**
 ```bash
 cd terraform/environments/prod
+# Edit terraform.tfvars to switch to t4g instances and reduce log retention
 terraform plan
 terraform apply
 ```
+
+**Reality Check:** The BIG savings come from Phase 2 (Fargate Spot) and Phase 3 (Schedule-based scaling), not Phase 1. Consider jumping straight to Phase 2.
 
 ---
 
@@ -264,7 +283,9 @@ terraform apply
 
 **Goal:** Migrate all Fargate tasks to Spot instances for 70% cost savings.
 
-**Estimated Savings:** $155/month → $95/month ($60/month saved)
+**Starting Point:** $255/month (or $242-245 if Phase 1 applied)
+
+**Estimated Savings:** $255/month → $152-155/month (~$100/month saved, 60% of compute costs)
 
 ---
 
@@ -404,9 +425,11 @@ aws ecs describe-tasks --cluster mind-the-wait-prod --tasks <task-arn> --profile
 
 ### Phase 2 Summary
 
-**Total Savings:** $60/month (38% additional reduction)
+**Total Savings:** ~$100/month (40% reduction)
 
-**Cumulative Savings:** $160/month (63% total reduction from $255)
+**Cumulative Savings:** ~$100-113/month (40-44% total reduction from $255)
+
+**New Monthly Cost:** ~$142-155/month
 
 **Time Required:** 2 hours (terraform + testing)
 
@@ -429,7 +452,9 @@ aws ecs describe-services --cluster mind-the-wait-prod --services mind-the-wait-
 
 **Goal:** Run infrastructure only during transit hours (5:30 AM - 11:30 PM CST).
 
-**Estimated Savings:** $95/month → $72/month ($23/month saved)
+**Starting Point:** ~$150/month (after Phase 2)
+
+**Estimated Savings:** $150/month → $112-115/month (~$35-38/month saved)
 
 **Concept:** Saskatoon Transit doesn't run 24/7, so why should your app?
 
@@ -841,15 +866,15 @@ aws ssm put-parameter \
 
 ### Phase 3 Summary
 
-**Total Savings:** $23/month (24% additional reduction)
+**Total Savings:** ~$35-38/month (23-25% additional reduction)
 
-**Cumulative Savings:** $183/month (72% total reduction from $255)
+**Cumulative Savings:** ~$135-151/month (53-59% total reduction from $255)
+
+**New Monthly Cost:** ~$104-120/month
 
 **Time Required:** 3 hours (Lambda + EventBridge + testing)
 
 **Risk:** ⚠️ Medium - Test thoroughly, ensure scale-up happens before transit starts
-
-**Current Cost:** ~$72/month
 
 ---
 
@@ -857,7 +882,9 @@ aws ssm put-parameter \
 
 **Goal:** Further optimize RDS and consider Aurora Serverless for true auto-pause.
 
-**Estimated Savings:** $72/month → $50-55/month ($17-22/month saved)
+**Starting Point:** ~$110/month (after Phase 3)
+
+**Estimated Savings:** $110/month → $88-93/month (~$17-22/month saved)
 
 ---
 
@@ -991,15 +1018,15 @@ resource "aws_db_instance" "this" {
 
 ### Phase 4 Summary
 
-**Total Savings:** $5-22/month (7-30% additional reduction)
+**Total Savings:** ~$17-22/month (15-20% additional reduction)
 
-**Cumulative Savings:** $188-205/month (74-80% total reduction)
+**Cumulative Savings:** ~$152-173/month (60-68% total reduction from $255)
+
+**New Monthly Cost:** ~$82-103/month
 
 **Time Required:** 1-3 hours (depending on Aurora migration)
 
 **Risk:** ⚠️ Low (storage optimization) to High (Aurora migration)
-
-**Current Cost:** ~$50-67/month
 
 ---
 
@@ -1205,66 +1232,79 @@ aws rds delete-db-cluster --db-cluster-identifier mind-the-wait-prod --skip-fina
 
 ## 9. Cost Optimization Summary
 
-### Final Cost Breakdown
+### Final Cost Breakdown (REVISED)
 
 | Optimization | Before | After | Savings | Risk |
 |--------------|--------|-------|---------|------|
 | **Baseline** | $255/month | - | - | - |
-| **Phase 1: Quick wins** | $255 | $155 | $100 (39%) | ✅ Low |
-| **Phase 2: Fargate Spot** | $155 | $95 | $60 (24%) | ⚠️ Medium |
-| **Phase 3: Schedulers** | $95 | $72 | $23 (9%) | ⚠️ Medium |
-| **Phase 4: Aurora Serverless** | $72 | $50-55 | $17-22 (7%) | ⚠️ High |
-| **Total Savings** | $255 | **$50-55** | **$200-205 (78-80%)** | - |
+| **Phase 1: Quick wins** | $255 | $242-245 | $10-13 (4-5%) | ✅ Low |
+| **Phase 2: Fargate Spot** | $255 | $150-155 | $100 (40%) | ⚠️ Medium |
+| **Phase 3: Schedulers** | $150 | $110-115 | $35-40 (23-25%) | ⚠️ Medium |
+| **Phase 4: Aurora Serverless** | $110 | $82-103 | $17-22 (15-20%) | ⚠️ High |
+| **Total Savings (All Phases)** | $255 | **$82-103** | **$152-173 (60-68%)** | - |
 
-**Target Achieved:** ✅ $50-55/month (<$60 target)
+**Revised Target:** **$82-103/month** (60-68% reduction)
+
+**Why Not $50?** Original estimate incorrectly proposed consolidating schedulers, which would break weather collection. Keeping proper architecture is worth the $9/month cost to avoid operational issues.
+
+**Best Bang for Buck:** Phase 2 (Fargate Spot) alone saves $100/month with minimal risk. Start there!
 
 ---
 
 ### Implementation Timeline
 
-**Week 1: Quick Wins (Low Risk)**
-- ✅ Day 1: Consolidate schedulers, reduce log retention
-- ✅ Day 2: Switch to Graviton instances (ARM)
-- ✅ Day 3: Audit and remove unused resources
-- **Cost after Week 1:** $155/month
-
-**Week 2: Fargate Spot (Medium Risk)**
-- ⚠️ Day 1: Update terraform for Spot support
+**Week 1: Fargate Spot (Medium Risk) - BIG WINS**
+- ⚠️ Day 1: Update terraform modules for Spot support
 - ⚠️ Day 2: Deploy and test Spot instances
 - ⚠️ Day 3: Monitor for interruptions (24-48 hours)
-- **Cost after Week 2:** $95/month
+- **Cost after Week 1:** ~$150/month (40% reduction!)
 
-**Week 3: Schedule-Based Scaling (Medium Risk)**
+**Week 2: Schedule-Based Scaling (Medium Risk)**
 - ⚠️ Day 1-2: Build Lambda functions and EventBridge rules
 - ⚠️ Day 3: Test scaling up/down manually
 - ⚠️ Day 4: Enable automatic scheduling
 - ⚠️ Day 5: Monitor first full cycle (24 hours)
-- **Cost after Week 3:** $72/month
+- **Cost after Week 2:** ~$110/month (57% total reduction)
 
-**Week 4: Database Optimization (Optional, High Risk)**
+**Week 3: Database Optimization (Optional, High Risk)**
 - ⚠️ Day 1-2: Snapshot RDS and plan migration
 - ⚠️ Day 3-4: Migrate to Aurora Serverless v2
 - ⚠️ Day 5: Test and verify data integrity
-- **Cost after Week 4:** $50-55/month
+- **Cost after Week 3:** ~$82-103/month (60-68% total reduction)
 
-**Total Timeline:** 3-4 weeks to full optimization
+**Week 4: Quick Wins (Low Risk, Low Impact)**
+- ✅ Day 1: Switch to Graviton instances (ARM)
+- ✅ Day 2: Reduce log retention, disable enhanced monitoring
+- ✅ Day 3: Audit and remove any leaked resources
+- **Additional Savings:** ~$10-13/month (marginal)
+
+**Total Timeline:** 2-4 weeks depending on how aggressive you want to be
+
+**Recommended:** Start with Week 1 (Fargate Spot) only for maximum impact with reasonable effort.
 
 ---
 
 ### Recommended Approach
 
-**Conservative (Recommended for First Month):**
-1. ✅ Implement Phase 1 (Quick Wins) → $155/month
-2. ✅ Implement Phase 2 (Fargate Spot) → $95/month
-3. ⏸️ Skip Phase 3 (Schedulers) initially - monitor for stability
+**Conservative (Recommended - Best ROI):**
+1. ✅ Implement Phase 2 (Fargate Spot) ONLY → ~$150/month
+2. ⏸️ Skip Phase 1 (minimal savings for effort)
+3. ⏸️ Skip Phase 3 (Schedulers) initially - monitor demand first
 4. ⏸️ Skip Phase 4 (Aurora) - too risky for first iteration
 
-**Total: $95/month (63% reduction) with minimal risk**
+**Total: ~$150/month (41% reduction) with 2 hours effort** ⭐ **BEST BANG FOR BUCK**
+
+**Moderate (Good Balance):**
+1. ✅ Implement Phase 2 (Fargate Spot) → ~$150/month
+2. ✅ Implement Phase 3 (Schedule-based scaling) → ~$110/month
+3. ⏸️ Skip Aurora migration for now
+
+**Total: ~$110/month (57% reduction) with 1 week effort**
 
 **Aggressive (Maximum Savings):**
 1. Implement all 4 phases
-2. **Total: $50-55/month (80% reduction)**
-3. Higher risk, requires careful testing
+2. **Total: $82-103/month (60-68% reduction)**
+3. Higher risk, requires 3-4 weeks effort and careful testing
 
 ---
 

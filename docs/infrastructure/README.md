@@ -3,11 +3,11 @@
 ## 🚨 Cost Optimization Alert
 
 **Experiencing high AWS costs?** See **[AWS_COST_OPTIMIZATION.md](AWS_COST_OPTIMIZATION.md)** for aggressive cost-cutting strategies:
-- Reduce from $255/month → **$50-55/month** (78-80% savings)
-- Fargate Spot (70% discount)
+- Reduce from $255/month → **$82-103/month** (60-68% savings)
+- **Quick win:** Fargate Spot alone → $150/month (40% savings in 2 hours!)
 - Schedule-based scaling (run only during transit hours)
-- RDS instance scheduler
-- **Target:** <$30/month for development phase
+- Aurora Serverless v2 (true auto-pause)
+- **Best approach:** Start with Fargate Spot for maximum ROI
 
 ---
 
@@ -19,21 +19,22 @@
 |--------|------|------------------|----------|
 | **Budget** | **$70/month** | 0-100 users/day | Initial deployment, learning AWS |
 | **Standard** | **$92/month** | 100-500 users/day | Production, better performance |
-| **🔥 Development** | **$50-55/month** | Dev/testing | Pre-launch, aggressive cost optimization |
+| **🔥 Spot (Quick Win)** | **~$150/month** | Dev/light prod | Fargate Spot only (2 hours setup) |
+| **🔥 Development** | **$82-103/month** | Dev/testing | Spot + scheduling + Aurora (full optimization) |
 
-**Recommendation:** Start with Development config for pre-launch, upgrade to Budget/Standard when ready
+**Recommendation:** Start with Spot config (easiest, 40% savings), add scheduling later if needed
 
 ## Documentation Files
 
 ### 0. 🔥 AWS Cost Optimization (`AWS_COST_OPTIMIZATION.md`) ⭐ **SAVE MONEY**
 Aggressive cost reduction strategies for development phase:
-- **Phase 1:** Quick wins (65% reduction) - 1 hour
-- **Phase 2:** Fargate Spot (70% discount) - 2 hours
-- **Phase 3:** Schedule-based scaling (transit hours only) - 3 hours
-- **Phase 4:** Aurora Serverless (true auto-pause) - 2-3 hours
+- **Phase 2 (RECOMMENDED):** Fargate Spot (40% discount) - 2 hours → $150/month
+- **Phase 3:** Schedule-based scaling (transit hours only) - 1 week → $110/month
+- **Phase 4:** Aurora Serverless (true auto-pause) - 2-3 hours → $82-103/month
 - Includes Lambda functions, EventBridge rules, audit scripts
+- **Note:** Phase 1 (scheduler consolidation) removed to preserve architecture
 
-**Key Takeaway:** Reduce $255/month → $50-55/month (80% savings)
+**Key Takeaway:** Reduce $255/month → $150/month in 2 hours (Fargate Spot), or $82-103/month with full optimization (60-68% savings)
 
 ### 1. Cost Estimation (`aws-cost-estimation.md`)
 Comprehensive cost breakdown for AWS ECS deployment:
