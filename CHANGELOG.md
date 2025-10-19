@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0](https://github.com/samuelwilk/mind-the-wait/compare/v0.7.2...v0.8.0) (2025-10-19)
+
+
+### Features
+
+* add comprehensive TLS/HTTPS setup for local development and iOS simulator ([a2ef060](https://github.com/samuelwilk/mind-the-wait/commit/a2ef060c742aab3d31fd67041d3ed7de0fc1748c))
+* add iOS API infrastructure configuration ([354899f](https://github.com/samuelwilk/mind-the-wait/commit/354899fc4eb80f7eeb5056ae44426398165a53a8))
+* add mobile-optimized v1 API endpoints for iOS app ([455a019](https://github.com/samuelwilk/mind-the-wait/commit/455a01928bf8414aa6ea670c066e1238eb2ea666))
+* split scheduler into high-frequency and low-frequency services ([0e77558](https://github.com/samuelwilk/mind-the-wait/commit/0e7755811f8d2f553c00410afc40272bfa403919))
+
+
+### Bug Fixes
+
+* correct production domain in CORS config to mind-the-wait.ca ([772479f](https://github.com/samuelwilk/mind-the-wait/commit/772479f4b7cb044d24a3fe03784feecb8ad7f66f))
+
+
+### Documentation
+
+* add comprehensive AWS cost optimization strategy to reduce bill by 78-80% ([9a3ab6d](https://github.com/samuelwilk/mind-the-wait/commit/9a3ab6d49b8d22ba59732ef5a135a67ae06b4f38))
+* add iOS infrastructure deployment timeline ([191b414](https://github.com/samuelwilk/mind-the-wait/commit/191b414e6fa04b9e89bed87af7a51f39c2d83ce1))
+* add Live Route Visualization iOS feature planning document ([3ecb9f2](https://github.com/samuelwilk/mind-the-wait/commit/3ecb9f200a40bacfa2b1d9dacd05023cad09b56b))
+* document scheduler split fix for weather collection reliability ([8f51bf4](https://github.com/samuelwilk/mind-the-wait/commit/8f51bf40974ee0e25236cc852f588304dc82e836))
+* reorganize documentation into planning/ and implemented/ directories ([d2853a9](https://github.com/samuelwilk/mind-the-wait/commit/d2853a9574936f99d38541ac5cf528b341fb797f))
+* revise AWS cost optimization plan to preserve scheduler architecture ([8474d93](https://github.com/samuelwilk/mind-the-wait/commit/8474d93ac5a9e8bf7ff55a9b482e73ec879fe8a6))
+* update ENHANCED_ANALYTICS_FEATURES with modern coding standards ([a660941](https://github.com/samuelwilk/mind-the-wait/commit/a660941a0edbed56b330573f9c00e7ccc0273db5))
+
+
+### Code Refactoring
+
+* complete Phase 4 code quality improvements and fix chart regressions ([ef90fa8](https://github.com/samuelwilk/mind-the-wait/commit/ef90fa81da1b1fb15594801a7c9b2265a18d1f90))
+
 ## [0.7.2](https://github.com/samuelwilk/mind-the-wait/compare/v0.7.1...v0.7.2) (2025-10-16)
 
 
