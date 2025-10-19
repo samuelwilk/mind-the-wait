@@ -10,6 +10,136 @@ This document outlines the implementation plan for seven new route analytics fea
 
 ---
 
+## Coding Standards (Updated 2025-10-19)
+
+All implementations must follow these established patterns:
+
+### 1. Use DTOs (Data Transfer Objects)
+```php
+// ✅ GOOD: Readonly DTO with typed properties
+final readonly class StopReliabilityDataDto
+{
+    public function __construct(
+        public string $stopName,
+        public int $stopSequence,
+        public float $avgDelay,
+        public float $delayVariance,
+        public int $sampleSize,
+    ) {}
+}
+
+// ❌ BAD: Raw associative arrays
+$data = ['stop_name' => 'foo', 'avg_delay' => 120];
+```
+
+### 2. Use Enums Instead of String Literals
+```php
+// ✅ GOOD: Type-safe enum
+enum ScheduleRealismGrade: string
+{
+    case SEVERELY_UNDER_SCHEDULED = 'Severely Under-scheduled';
+    case UNDER_SCHEDULED = 'Under-scheduled';
+    case REALISTIC = 'Realistic';
+    case OVER_SCHEDULED = 'Over-scheduled';
+    case SEVERELY_OVER_SCHEDULED = 'Severely Over-scheduled (excessive padding)';
+    case UNKNOWN = 'Unknown';
+}
+
+// ❌ BAD: Magic strings
+return 'Severely Under-scheduled';
+```
+
+### 3. Repository Pattern (No Queries in Services)
+```php
+// ✅ GOOD: Query logic in repository
+class ArrivalLogRepository
+{
+    public function findStopReliabilityData(
+        int $routeId,
+        \DateTimeImmutable $startDate,
+        \DateTimeImmutable $endDate
+    ): array {
+        // SQL query here
+    }
+}
+
+class RoutePerformanceService
+{
+    public function buildChart(Route $route): Chart
+    {
+        $data = $this->arrivalLogRepo->findStopReliabilityData(...);
+        return $this->chartBuilder->build($data);
+    }
+}
+
+// ❌ BAD: SQL in service
+class RoutePerformanceService
+{
+    private function buildChart()
+    {
+        $conn = $this->em->getConnection();
+        $sql = "SELECT ..."; // Don't do this!
+    }
+}
+```
+
+### 4. Use ChartBuilder and Chart Value Objects
+```php
+// ✅ GOOD: Fluent ChartBuilder API
+return ChartBuilder::line()
+    ->title('Stop-Level Reliability')
+    ->categoryXAxis($stopNames)
+    ->valueYAxis('Delay (seconds)')
+    ->addSeries('Average Delay', $avgDelays)
+    ->build();
+
+// ❌ BAD: Raw ECharts arrays
+return [
+    'title' => ['text' => 'Stop-Level Reliability'],
+    'xAxis' => ['type' => 'category', 'data' => $stopNames],
+    // ... hundreds of lines of array configuration
+];
+```
+
+### 5. Readonly Properties
+```php
+// ✅ GOOD: Immutable DTOs
+final readonly class RouteDetailDto
+{
+    public function __construct(
+        public Chart $performanceTrendChart,
+        public Chart $stopReliabilityChart,
+        public array $stats,
+    ) {}
+}
+
+// ❌ BAD: Mutable properties
+class RouteDetailDto
+{
+    public array $charts; // Can be modified
+}
+```
+
+### 6. Typed Returns
+```php
+// ✅ GOOD: Explicit return types
+public function getScheduleRealismGrade(float $ratio): ScheduleRealismGrade
+{
+    return match (true) {
+        $ratio >= 1.15 => ScheduleRealismGrade::SEVERELY_UNDER_SCHEDULED,
+        // ...
+    };
+}
+
+// ❌ BAD: No type hints
+public function getGrade($ratio)
+{
+    return 'Under-scheduled';
+}
+```
+
+---
+
 ## Current State Assessment
 
 ### Existing Infrastructure
@@ -56,34 +186,53 @@ Show which stops along a route consistently cause delays or recoveries.
 
 ### Implementation
 
-#### Database Changes
-**Migration:**
+#### 1. Create DTO
+
+**File:** `src/Dto/StopReliabilityDataDto.php`
+
 ```php
-// New index for performance
-CREATE INDEX idx_arrival_log_route_stop
-ON arrival_log (route_id, stop_id, predicted_at);
+<?php
+
+declare(strict_types=1);
+
+namespace App\Dto;
+
+/**
+ * Stop-level reliability metrics for a single stop on a route.
+ */
+final readonly class StopReliabilityDataDto
+{
+    public function __construct(
+        public string $stopName,
+        public int $stopSequence,
+        public float $avgDelay,
+        public float $delayVariance,
+        public int $sampleSize,
+        public int $lateCount,
+        public int $onTimeCount,
+    ) {}
+}
 ```
 
-#### Backend Service (RoutePerformanceService.php)
+#### 2. Add Repository Method
 
-**New method:**
+**File:** `src/Repository/ArrivalLogRepository.php`
+
 ```php
 /**
- * Build stop-level reliability chart showing delay patterns by stop sequence.
+ * Find stop-level reliability metrics for a route.
  *
- * @return array<string, mixed> ECharts configuration
+ * @return list<StopReliabilityDataDto>
  */
-private function buildStopLevelReliabilityChart(
-    Route $route,
+public function findStopReliabilityData(
+    int $routeId,
     \DateTimeImmutable $startDate,
     \DateTimeImmutable $endDate
-): array
-{
-    $conn = $this->performanceRepo->getEntityManager()->getConnection();
+): array {
+    $conn = $this->getEntityManager()->getConnection();
 
     $sql = <<<'SQL'
         SELECT
-            st.stop_id,
             s.name as stop_name,
             st.stop_sequence,
             AVG(al.delay_sec) as avg_delay,
@@ -98,113 +247,173 @@ private function buildStopLevelReliabilityChart(
           AND al.predicted_at >= :start_date
           AND al.predicted_at < :end_date
           AND al.delay_sec IS NOT NULL
-        GROUP BY st.stop_id, s.name, st.stop_sequence
-        HAVING COUNT(*) >= 10  -- Require minimum sample size
+        GROUP BY s.name, st.stop_sequence
+        HAVING COUNT(*) >= 10
         ORDER BY st.stop_sequence ASC
     SQL;
 
     $results = $conn->executeQuery($sql, [
-        'route_id'   => $route->getId(),
+        'route_id'   => $routeId,
         'start_date' => $startDate->format('Y-m-d H:i:s'),
         'end_date'   => $endDate->format('Y-m-d H:i:s'),
     ])->fetchAllAssociative();
 
-    // Build data arrays
-    $stopNames = [];
-    $avgDelays = [];
-    $variances = [];
+    return array_map(
+        fn (array $row) => new StopReliabilityDataDto(
+            stopName: (string) $row['stop_name'],
+            stopSequence: (int) $row['stop_sequence'],
+            avgDelay: (float) $row['avg_delay'],
+            delayVariance: (float) ($row['delay_variance'] ?? 0),
+            sampleSize: (int) $row['sample_size'],
+            lateCount: (int) $row['late_count'],
+            onTimeCount: (int) $row['on_time_count'],
+        ),
+        $results
+    );
+}
+```
 
-    foreach ($results as $row) {
-        $stopNames[] = $row['stop_name'];
-        $avgDelays[] = round((float) $row['avg_delay'], 0);
-        $variances[] = round((float) ($row['delay_variance'] ?? 0), 0);
-    }
+#### 3. Create Chart Preset
 
-    return [
-        'title' => [
-            'text'      => 'Stop-Level Reliability',
-            'subtext'   => 'Average delay by stop (larger points = more variable)',
-            'left'      => 'center',
-            'top'       => '5',
-            'textStyle' => ['fontSize' => 12, 'fontWeight' => 'bold'],
-        ],
-        'tooltip' => [
-            'trigger'   => 'axis',
-            'formatter' => '{b}<br/>Avg Delay: {c} sec<br/>Variance: {a}',
-        ],
-        'xAxis' => [
-            'type'      => 'category',
-            'data'      => $stopNames,
-            'axisLabel' => [
-                'rotate'   => 45,
-                'interval' => 0, // Show all labels
-            ],
-        ],
-        'yAxis' => [
-            'type'          => 'value',
-            'name'          => 'Delay (seconds)',
-            'nameLocation'  => 'middle',
-            'nameGap'       => 40,
-            'nameTextStyle' => ['fontSize' => 11],
-            'axisLine'      => ['show' => true],
-            'splitLine'     => ['lineStyle' => ['type' => 'dashed']],
-        ],
-        'series' => [
-            [
-                'name'      => 'Average Delay',
-                'type'      => 'line',
-                'data'      => $avgDelays,
+**File:** `src/ValueObject/Chart/StopReliabilityChartPreset.php`
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\ValueObject\Chart;
+
+use App\Dto\StopReliabilityDataDto;
+
+/**
+ * Chart presets for stop-level reliability visualization.
+ */
+final class StopReliabilityChartPreset
+{
+    /**
+     * Create stop reliability chart showing delay by stop sequence.
+     *
+     * @param list<StopReliabilityDataDto> $data
+     */
+    public static function create(array $data): Chart
+    {
+        $stopNames = [];
+        $avgDelays = [];
+        $variances = [];
+
+        foreach ($data as $stop) {
+            $stopNames[] = $stop->stopName;
+            $avgDelays[] = round($stop->avgDelay, 0);
+            $variances[] = round($stop->delayVariance, 0);
+        }
+
+        return ChartBuilder::line()
+            ->title('Stop-Level Reliability', 'Average delay by stop (larger points = more variable)')
+            ->categoryXAxis($stopNames, ['rotate' => 45, 'interval' => 0])
+            ->valueYAxis('Delay (seconds)', min: null, max: null)
+            ->addSeries('Average Delay', $avgDelays, [
                 'smooth'    => false,
                 'lineStyle' => ['width' => 2],
                 'itemStyle' => ['color' => '#0284c7'],
-                'symbolSize' => function ($value, $params) use ($variances) {
-                    // Size points by variance (clamped to 5-20)
-                    $variance = $variances[$params['dataIndex']] ?? 0;
-                    return min(20, max(5, $variance / 10));
-                },
-            ],
-        ],
-        'grid' => [
-            'left'         => '40',
-            'right'        => '4%',
-            'top'          => '80',
-            'bottom'       => '20%',
-            'containLabel' => true,
-        ],
-    ];
+                // Size points by variance (clamped to 5-20)
+                'symbolSize' => 'function (value, params) {
+                    var variances = ' . json_encode($variances) . ';
+                    var variance = variances[params.dataIndex] || 0;
+                    return Math.min(20, Math.max(5, variance / 10));
+                }',
+            ])
+            ->grid(['left' => '40', 'right' => '4%', 'top' => '80', 'bottom' => '20%'])
+            ->build();
+    }
 }
 ```
 
-#### Update RouteDetailDto
+#### 4. Update Service
+
+**File:** `src/Service/Dashboard/RoutePerformanceService.php`
 
 ```php
-public function __construct(
-    public array $performanceTrendChart,
-    public array $weatherImpactChart,
-    public array $timeOfDayHeatmap,
-    public array $stopLevelReliabilityChart,  // NEW
-    public array $stats,
-) {
+public function getRouteDetail(Route $route): RouteDetailDto
+{
+    $endDate   = new \DateTimeImmutable('today');
+    $startDate = $endDate->modify('-30 days');
+
+    // Build charts using presets and repository data
+    $performanceTrend = $this->buildPerformanceTrendChart($route, $startDate, $endDate);
+    $weatherImpact    = $this->buildWeatherImpactChart($route, $startDate, $endDate);
+    $timeOfDay        = $this->buildTimeOfDayHeatmap($route, $startDate, $endDate);
+
+    // NEW: Stop-level reliability
+    $stopReliabilityData = $this->arrivalLogRepo->findStopReliabilityData(
+        $route->getId(),
+        $startDate,
+        $endDate
+    );
+    $stopReliability = StopReliabilityChartPreset::create($stopReliabilityData);
+
+    $stats = $this->buildStats($route, $startDate, $endDate);
+
+    return new RouteDetailDto(
+        performanceTrendChart: $performanceTrend,
+        weatherImpactChart: $weatherImpact,
+        timeOfDayHeatmap: $timeOfDay,
+        stopReliabilityChart: $stopReliability, // NEW
+        stats: $stats,
+    );
 }
 ```
 
-#### Update Template (route_detail.html.twig)
+#### 5. Update RouteDetailDto
+
+**File:** `src/Dto/RouteDetailDto.php`
+
+```php
+final readonly class RouteDetailDto
+{
+    public function __construct(
+        public Chart $performanceTrendChart,
+        public Chart $weatherImpactChart,
+        public Chart $timeOfDayHeatmap,
+        public Chart $stopReliabilityChart,  // NEW
+        public array $stats,
+    ) {}
+}
+```
+
+#### 6. Update Template
+
+**File:** `templates/route/detail.html.twig`
 
 ```twig
 {# Add after existing charts #}
 <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-6 mb-8">
     <div
         data-controller="chart"
-        data-chart-options-value="{{ routeDetail.stopLevelReliabilityChart|json_encode|e('html_attr') }}"
+        data-chart-options-value="{{ routeDetail.stopReliabilityChart.toJson()|e('html_attr') }}"
         style="width: 100%; height: 350px; min-height: 350px; position: relative; z-index: 1;">
     </div>
 </div>
 ```
 
-### Expected Output
-- Line chart with stop names on X-axis, delay in seconds on Y-axis
-- Point size indicates variance (bigger = more unstable)
-- Identifies problem stops (e.g., "Stop #5: Idylwyld Dr & 22nd St consistently +120 sec late")
+#### 7. Database Migration
+
+**File:** `migrations/VersionXXX_AddStopReliabilityIndexes.php`
+
+```php
+public function up(Schema $schema): void
+{
+    $this->addSql('
+        CREATE INDEX idx_arrival_log_route_stop
+        ON arrival_log (route_id, stop_id, predicted_at)
+    ');
+}
+
+public function down(Schema $schema): void
+{
+    $this->addSql('DROP INDEX IF EXISTS idx_arrival_log_route_stop');
+}
+```
 
 ---
 
@@ -213,30 +422,50 @@ public function __construct(
 ### Objective
 Show how delays compound or self-correct along the route over the course of trips.
 
-### Business Value
-- Reveals whether delays are systemic (additive) or self-correcting
-- Shows if schedule padding is working
-- Identifies which time periods have runaway delay propagation
-
 ### Implementation
 
-#### Backend Service Method
+#### 1. Create DTO
+
+**File:** `src/Dto/DelayPropagationDataDto.php`
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Dto;
+
+/**
+ * Delay propagation metric for a specific stop sequence and hour combination.
+ */
+final readonly class DelayPropagationDataDto
+{
+    public function __construct(
+        public int $stopSequence,
+        public int $hour,
+        public float $avgDelayDelta,
+        public int $sampleSize,
+    ) {}
+}
+```
+
+#### 2. Add Repository Method
+
+**File:** `src/Repository/ArrivalLogRepository.php`
 
 ```php
 /**
- * Build delay propagation heatmap showing how delays change between consecutive stops.
+ * Find delay propagation data (change in delay between consecutive stops).
  *
- * @return array<string, mixed> ECharts heatmap configuration
+ * @return list<DelayPropagationDataDto>
  */
-private function buildDelayPropagationHeatmap(
-    Route $route,
+public function findDelayPropagationData(
+    int $routeId,
     \DateTimeImmutable $startDate,
     \DateTimeImmutable $endDate
-): array
-{
-    $conn = $this->performanceRepo->getEntityManager()->getConnection();
+): array {
+    $conn = $this->getEntityManager()->getConnection();
 
-    // Calculate delay delta (change in delay) between consecutive stops
     $sql = <<<'SQL'
         WITH trip_delays AS (
             SELECT
@@ -263,102 +492,91 @@ private function buildDelayPropagationHeatmap(
         FROM trip_delays
         WHERE prev_delay IS NOT NULL
         GROUP BY stop_sequence, hour
-        HAVING COUNT(*) >= 5  -- Minimum sample size
+        HAVING COUNT(*) >= 5
         ORDER BY hour, stop_sequence
     SQL;
 
     $results = $conn->executeQuery($sql, [
-        'route_id'   => $route->getId(),
+        'route_id'   => $routeId,
         'start_date' => $startDate->format('Y-m-d H:i:s'),
         'end_date'   => $endDate->format('Y-m-d H:i:s'),
     ])->fetchAllAssociative();
 
-    // Build heatmap data
-    $data      = [];
-    $resultMap = [];
-
-    // Index results by [hour][stop_sequence]
-    foreach ($results as $row) {
-        $hour         = (int) $row['hour'];
-        $stopSequence = (int) $row['stop_sequence'];
-        $delta        = round((float) $row['avg_delay_delta'], 0);
-
-        $resultMap[$hour][$stopSequence] = $delta;
-    }
-
-    // Fill heatmap data (24 hours × max stop sequence)
-    $maxStopSeq = count($resultMap) > 0 ? max(array_map('max', array_map('array_keys', $resultMap))) : 20;
-
-    for ($h = 0; $h < 24; ++$h) {
-        for ($s = 1; $s <= $maxStopSeq; ++$s) {
-            $value  = $resultMap[$h][$s] ?? null;
-            $data[] = [$s - 1, $h, $value]; // X=stop, Y=hour, Value=delta
-        }
-    }
-
-    return [
-        'title' => [
-            'text'      => 'Delay Propagation Pattern',
-            'subtext'   => 'How delays change between stops (red = delays growing, green = recovering)',
-            'left'      => 'center',
-            'top'       => '5',
-            'textStyle' => ['fontSize' => 12, 'fontWeight' => 'bold'],
-        ],
-        'tooltip' => [
-            'position'  => 'top',
-            'formatter' => 'Stop {c0}<br/>Hour {c1}:00<br/>Delay Change: {c2}s',
-        ],
-        'xAxis' => [
-            'type'      => 'category',
-            'data'      => range(1, $maxStopSeq),
-            'name'      => 'Stop Sequence',
-            'splitArea' => ['show' => true],
-        ],
-        'yAxis' => [
-            'type'      => 'category',
-            'data'      => range(0, 23),
-            'name'      => 'Hour of Day',
-            'splitArea' => ['show' => true],
-        ],
-        'visualMap' => [
-            'min'        => -60,  // Recovering by 1 min
-            'max'        => 60,   // Degrading by 1 min
-            'calculable' => true,
-            'orient'     => 'horizontal',
-            'left'       => 'center',
-            'bottom'     => '0%',
-            'inRange'    => [
-                'color' => ['#10b981', '#fbbf24', '#f97316', '#dc2626'], // green → red
-            ],
-        ],
-        'series' => [
-            [
-                'name'  => 'Delay Delta',
-                'type'  => 'heatmap',
-                'data'  => $data,
-                'label' => [
-                    'show'     => false, // Too cluttered for small cells
-                    'fontSize' => 9,
-                ],
-            ],
-        ],
-        'grid' => [
-            'height' => '60%',
-            'top'    => '80',
-        ],
-    ];
+    return array_map(
+        fn (array $row) => new DelayPropagationDataDto(
+            stopSequence: (int) $row['stop_sequence'],
+            hour: (int) $row['hour'],
+            avgDelayDelta: (float) $row['avg_delay_delta'],
+            sampleSize: (int) $row['sample_size'],
+        ),
+        $results
+    );
 }
 ```
 
-#### Add to RouteDetailDto
-```php
-public array $delayPropagationHeatmap,  // NEW
-```
+#### 3. Create Chart Preset
 
-### Expected Output
-- Heatmap: X-axis = stop sequence, Y-axis = hour of day
-- Color: Green (delays recovering), Yellow (stable), Red (delays growing)
-- **Insight Example:** "Stop #8 at 5 PM consistently shows +45 sec delay growth → traffic bottleneck"
+**File:** `src/ValueObject/Chart/DelayPropagationChartPreset.php`
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\ValueObject\Chart;
+
+use App\Dto\DelayPropagationDataDto;
+
+final class DelayPropagationChartPreset
+{
+    /**
+     * Create heatmap showing delay propagation (change in delay between stops).
+     *
+     * @param list<DelayPropagationDataDto> $data
+     */
+    public static function create(array $data): Chart
+    {
+        // Build result map indexed by [hour][stopSequence]
+        $resultMap = [];
+        foreach ($data as $row) {
+            $resultMap[$row->hour][$row->stopSequence] = round($row->avgDelayDelta, 0);
+        }
+
+        // Determine max stop sequence
+        $maxStopSeq = count($resultMap) > 0
+            ? max(array_map('max', array_map('array_keys', $resultMap)))
+            : 20;
+
+        // Fill heatmap data (24 hours × max stop sequence)
+        $heatmapData = [];
+        for ($h = 0; $h < 24; ++$h) {
+            for ($s = 1; $s <= $maxStopSeq; ++$s) {
+                $value = $resultMap[$h][$s] ?? null;
+                $heatmapData[] = [$s - 1, $h, $value]; // X=stop, Y=hour, Value=delta
+            }
+        }
+
+        return ChartBuilder::heatmap()
+            ->title('Delay Propagation Pattern', 'How delays change between stops (red = delays growing, green = recovering)')
+            ->categoryXAxis(range(1, $maxStopSeq), ['splitArea' => ['show' => true]])
+            ->categoryYAxis(range(0, 23), ['splitArea' => ['show' => true]])
+            ->addSeries('Delay Delta', $heatmapData)
+            ->visualMap([
+                'min'        => -60,
+                'max'        => 60,
+                'calculable' => true,
+                'orient'     => 'horizontal',
+                'left'       => 'center',
+                'bottom'     => '0%',
+                'inRange'    => [
+                    'color' => ['#10b981', '#fbbf24', '#f97316', '#dc2626'],
+                ],
+            ])
+            ->grid(['height' => '60%', 'top' => '80'])
+            ->build();
+    }
+}
+```
 
 ---
 
@@ -367,63 +585,107 @@ public array $delayPropagationHeatmap,  // NEW
 ### Objective
 Identify routes with chronic under-scheduling or over-scheduling (excessive padding).
 
-### Business Value
-- Provides evidence for schedule adjustments
-- Shows if operators are sitting idle (over-scheduled) or chronically behind (under-scheduled)
-- Helps optimize scheduling for efficiency and rider satisfaction
-
 ### Implementation
 
-#### Database Changes
+#### 1. Create Enum
 
-**Migration:**
+**File:** `src/Enum/ScheduleRealismGrade.php`
+
 ```php
-public function up(Schema $schema): void
-{
-    $this->addSql('
-        ALTER TABLE route_performance_daily
-        ADD COLUMN schedule_realism_ratio NUMERIC(5, 3) DEFAULT NULL
-    ');
+<?php
 
-    $this->addSql("
-        COMMENT ON COLUMN route_performance_daily.schedule_realism_ratio
-        IS 'Ratio of actual mean travel time to scheduled travel time (1.0 = perfect)'
-    ");
+declare(strict_types=1);
+
+namespace App\Enum;
+
+/**
+ * Schedule realism grades based on actual vs scheduled travel time ratio.
+ */
+enum ScheduleRealismGrade: string
+{
+    case SEVERELY_UNDER_SCHEDULED = 'Severely Under-scheduled';
+    case UNDER_SCHEDULED = 'Under-scheduled';
+    case REALISTIC = 'Realistic';
+    case OVER_SCHEDULED = 'Over-scheduled';
+    case SEVERELY_OVER_SCHEDULED = 'Severely Over-scheduled (excessive padding)';
+    case UNKNOWN = 'Unknown';
+
+    /**
+     * Get grade from ratio of actual to scheduled time.
+     */
+    public static function fromRatio(?float $ratio): self
+    {
+        if ($ratio === null) {
+            return self::UNKNOWN;
+        }
+
+        return match (true) {
+            $ratio >= 1.15 => self::SEVERELY_UNDER_SCHEDULED,
+            $ratio >= 1.10 => self::UNDER_SCHEDULED,
+            $ratio >= 0.95 => self::REALISTIC,
+            $ratio >= 0.85 => self::OVER_SCHEDULED,
+            default        => self::SEVERELY_OVER_SCHEDULED,
+        };
+    }
+
+    /**
+     * Get color class for Tailwind CSS.
+     */
+    public function getColorClass(): string
+    {
+        return match ($this) {
+            self::REALISTIC => 'text-success-600',
+            self::UNDER_SCHEDULED, self::SEVERELY_UNDER_SCHEDULED => 'text-danger-600',
+            self::OVER_SCHEDULED, self::SEVERELY_OVER_SCHEDULED => 'text-warning-600',
+            self::UNKNOWN => 'text-gray-400',
+        };
+    }
 }
 ```
 
-#### Update PerformanceAggregator Service
+#### 2. Add Entity Property
+
+**File:** `src/Entity/RoutePerformanceDaily.php`
 
 ```php
-// In src/Service/History/PerformanceAggregator.php
+#[ORM\Column(type: Types::DECIMAL, precision: 5, scale: 3, nullable: true)]
+private ?string $scheduleRealismRatio = null;
 
-public function aggregateDate(\DateTimeImmutable $date): array
+public function getScheduleRealismRatio(): ?float
 {
-    // ... existing code ...
-
-    // NEW: Calculate schedule realism ratio
-    $realismRatio = $this->calculateScheduleRealismRatio($route, $date);
-    $performance->setScheduleRealismRatio($realismRatio !== null ? (string) $realismRatio : null);
-
-    // ... rest of existing code ...
+    return $this->scheduleRealismRatio !== null
+        ? (float) $this->scheduleRealismRatio
+        : null;
 }
 
-/**
- * Calculate ratio of actual travel time to scheduled travel time.
- *
- * @return float|null Ratio (1.0 = perfect, >1.1 = under-scheduled, <0.9 = over-scheduled)
- */
-private function calculateScheduleRealismRatio(Route $route, \DateTimeImmutable $date): ?float
+public function setScheduleRealismRatio(?float $ratio): self
 {
-    $conn = $this->em->getConnection();
+    $this->scheduleRealismRatio = $ratio !== null
+        ? (string) $ratio
+        : null;
 
-    // Get actual vs scheduled trip durations
+    return $this;
+}
+```
+
+#### 3. Add Repository Method
+
+**File:** `src/Repository/ArrivalLogRepository.php`
+
+```php
+/**
+ * Calculate schedule realism ratio (actual vs scheduled travel time).
+ */
+public function calculateScheduleRealismRatio(
+    int $routeId,
+    \DateTimeImmutable $date
+): ?float {
+    $conn = $this->getEntityManager()->getConnection();
+
     $sql = <<<'SQL'
         WITH trip_times AS (
             SELECT
                 al.trip_id,
-                MIN(st.stop_sequence) as first_stop,
-                MAX(st.stop_sequence) as last_stop,
                 MAX(al.predicted_arrival_at) - MIN(al.predicted_arrival_at) as actual_duration,
                 MAX(al.scheduled_arrival_at) - MIN(al.scheduled_arrival_at) as scheduled_duration
             FROM arrival_log al
@@ -433,7 +695,7 @@ private function calculateScheduleRealismRatio(Route $route, \DateTimeImmutable 
               AND al.predicted_at < :end
               AND al.scheduled_arrival_at IS NOT NULL
             GROUP BY al.trip_id
-            HAVING COUNT(*) >= 5  -- Need multiple stops per trip
+            HAVING COUNT(*) >= 5
         )
         SELECT
             AVG(EXTRACT(EPOCH FROM actual_duration)) as avg_actual_sec,
@@ -446,7 +708,7 @@ private function calculateScheduleRealismRatio(Route $route, \DateTimeImmutable 
     $end   = $date->setTime(23, 59, 59);
 
     $result = $conn->executeQuery($sql, [
-        'route_id' => $route->getId(),
+        'route_id' => $routeId,
         'start'    => $start->format('Y-m-d H:i:s'),
         'end'      => $end->format('Y-m-d H:i:s'),
     ])->fetchAssociative();
@@ -462,245 +724,141 @@ private function calculateScheduleRealismRatio(Route $route, \DateTimeImmutable 
 }
 ```
 
-#### Update RoutePerformanceService Stats
+#### 4. Update Stats Building
+
+**File:** `src/Service/Dashboard/RoutePerformanceService.php`
 
 ```php
-private function buildStats(Route $route, \DateTimeImmutable $startDate, \DateTimeImmutable $endDate): array
-{
-    $performances = $this->performanceRepo->findByRouteAndDateRange($route->getId(), $startDate, $endDate);
+private function buildStats(
+    Route $route,
+    \DateTimeImmutable $startDate,
+    \DateTimeImmutable $endDate
+): array {
+    $performances = $this->performanceRepo->findByRouteAndDateRange(
+        $route->getId(),
+        $startDate,
+        $endDate
+    );
 
     // ... existing stats calculation ...
 
-    // NEW: Calculate average schedule realism ratio
+    // Calculate average schedule realism ratio
     $totalRatio = 0.0;
     $ratioCount = 0;
 
     foreach ($performances as $perf) {
         $ratio = $perf->getScheduleRealismRatio();
         if ($ratio !== null) {
-            $totalRatio += (float) $ratio;
+            $totalRatio += $ratio;
             ++$ratioCount;
         }
     }
 
     $avgRatio = $ratioCount > 0 ? $totalRatio / $ratioCount : null;
+    $realismGrade = ScheduleRealismGrade::fromRatio($avgRatio);
 
     return [
         // ... existing stats ...
         'scheduleRealism' => $avgRatio !== null ? round($avgRatio, 2) : null,
-        'scheduleRealismGrade' => $this->getScheduleRealismGrade($avgRatio),
+        'scheduleRealismGrade' => $realismGrade,
     ];
-}
-
-private function getScheduleRealismGrade(?float $ratio): string
-{
-    if ($ratio === null) {
-        return 'Unknown';
-    }
-
-    return match (true) {
-        $ratio >= 1.15 => 'Severely Under-scheduled',
-        $ratio >= 1.10 => 'Under-scheduled',
-        $ratio >= 0.95 => 'Realistic',
-        $ratio >= 0.85 => 'Over-scheduled',
-        default        => 'Severely Over-scheduled (excessive padding)',
-    };
 }
 ```
 
-#### Update Template
+#### 5. Update Template
+
+**File:** `templates/route/detail.html.twig`
 
 ```twig
 {# Add to summary statistics grid #}
 <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
     <div class="text-xs sm:text-sm font-medium text-gray-600 mb-2">Schedule Realism</div>
     {% if routeDetail.stats.scheduleRealism %}
-        <div class="text-2xl sm:text-3xl font-bold
-            {% if routeDetail.stats.scheduleRealismGrade == 'Realistic' %}text-success-600
-            {% elseif routeDetail.stats.scheduleRealismGrade starts with 'Under' %}text-danger-600
-            {% else %}text-warning-600{% endif %}">
+        <div class="text-2xl sm:text-3xl font-bold {{ routeDetail.stats.scheduleRealismGrade.getColorClass() }}">
             {{ (routeDetail.stats.scheduleRealism * 100)|round(0) }}%
         </div>
-        <div class="text-xs text-gray-500 mt-1">{{ routeDetail.stats.scheduleRealismGrade }}</div>
+        <div class="text-xs text-gray-500 mt-1">
+            {{ routeDetail.stats.scheduleRealismGrade.value }}
+        </div>
     {% else %}
         <div class="text-xl text-gray-400">Insufficient data</div>
     {% endif %}
 </div>
 ```
 
-### Expected Output
-- Metric card showing ratio (e.g., "115%")
-- Color-coded interpretation (Red: Under-scheduled, Green: Realistic, Yellow: Over-scheduled)
-- **Example:** "Route 27 runs 15% over schedule on average → need more time in schedule"
+#### 6. Database Migration
+
+```php
+public function up(Schema $schema): void
+{
+    $this->addSql('
+        ALTER TABLE route_performance_daily
+        ADD COLUMN schedule_realism_ratio NUMERIC(5, 3) DEFAULT NULL
+    ');
+
+    $this->addSql("
+        COMMENT ON COLUMN route_performance_daily.schedule_realism_ratio
+        IS 'Actual/scheduled travel time ratio (1.0 = perfect, >1.1 = under-scheduled)'
+    ");
+}
+```
 
 ---
 
 ## Feature 4: Temporal Delay Curve
 
-### Objective
-Show when during the day delays are systematically worst or best.
+### Implementation (Following Same Pattern)
 
-### Business Value
-- Quickly communicates rush-hour stress points
-- Shows midday recovery periods
-- One day's pattern is often repeatable (Saskatoon traffic cycles are stable)
-
-### Implementation
-
-#### Backend Service Method
-
-```php
-/**
- * Build temporal delay curve showing average delay by hour of day.
- *
- * @return array<string, mixed> ECharts line chart configuration
- */
-private function buildTemporalDelayCurve(
-    Route $route,
-    \DateTimeImmutable $startDate,
-    \DateTimeImmutable $endDate
-): array
-{
-    $conn = $this->performanceRepo->getEntityManager()->getConnection();
-
-    $sql = <<<'SQL'
-        SELECT
-            EXTRACT(HOUR FROM predicted_at) as hour,
-            AVG(delay_sec) as avg_delay,
-            STDDEV(delay_sec) as delay_stddev,
-            COUNT(*) as sample_size
-        FROM arrival_log
-        WHERE route_id = :route_id
-          AND predicted_at >= :start_date
-          AND predicted_at < :end_date
-          AND delay_sec IS NOT NULL
-        GROUP BY EXTRACT(HOUR FROM predicted_at)
-        HAVING COUNT(*) >= 10
-        ORDER BY hour
-    SQL;
-
-    $results = $conn->executeQuery($sql, [
-        'route_id'   => $route->getId(),
-        'start_date' => $startDate->format('Y-m-d H:i:s'),
-        'end_date'   => $endDate->format('Y-m-d H:i:s'),
-    ])->fetchAllAssociative();
-
-    $hours      = [];
-    $avgDelays  = [];
-    $upperBound = [];
-    $lowerBound = [];
-
-    foreach ($results as $row) {
-        $hour    = (int) $row['hour'];
-        $avg     = (float) $row['avg_delay'];
-        $stddev  = (float) ($row['delay_stddev'] ?? 0);
-
-        $hours[]      = $hour . ':00';
-        $avgDelays[]  = round($avg, 0);
-        $upperBound[] = round($avg + $stddev, 0);
-        $lowerBound[] = round($avg - $stddev, 0);
-    }
-
-    return [
-        'title' => [
-            'text'      => 'Delay Pattern by Hour',
-            'subtext'   => 'Average delay throughout the day (shaded area = variance)',
-            'left'      => 'center',
-            'top'       => '5',
-            'textStyle' => ['fontSize' => 12, 'fontWeight' => 'bold'],
-        ],
-        'tooltip' => [
-            'trigger' => 'axis',
-        ],
-        'xAxis' => [
-            'type'      => 'category',
-            'data'      => $hours,
-            'boundaryGap' => false,
-        ],
-        'yAxis' => [
-            'type'          => 'value',
-            'name'          => 'Delay (seconds)',
-            'nameLocation'  => 'middle',
-            'nameGap'       => 40,
-            'nameTextStyle' => ['fontSize' => 11],
-        ],
-        'series' => [
-            [
-                'name'      => 'Average Delay',
-                'type'      => 'line',
-                'data'      => $avgDelays,
-                'smooth'    => true,
-                'lineStyle' => ['width' => 3],
-                'itemStyle' => ['color' => '#0284c7'],
-                'areaStyle' => ['color' => 'rgba(2, 132, 199, 0.1)'],
-            ],
-            // Upper bound (avg + stddev)
-            [
-                'name'      => 'Upper Bound',
-                'type'      => 'line',
-                'data'      => $upperBound,
-                'lineStyle' => ['opacity' => 0],
-                'stack'     => 'confidence',
-                'symbol'    => 'none',
-            ],
-            // Lower bound (avg - stddev)
-            [
-                'name'      => 'Lower Bound',
-                'type'      => 'line',
-                'data'      => $lowerBound,
-                'lineStyle' => ['opacity' => 0},
-                'areaStyle' => ['color' => 'rgba(2, 132, 199, 0.2)'],
-                'stack'     => 'confidence',
-                'symbol'    => 'none',
-            ],
-        ],
-        'grid' => [
-            'left'         => '40',
-            'right'        => '4%',
-            'top'          => '80',
-            'bottom'       => '10%',
-            'containLabel' => true,
-        ],
-    ];
-}
-```
-
-#### Add to RouteDetailDto
-```php
-public array $temporalDelayCurve,  // NEW
-```
-
-### Expected Output
-- Smooth line chart: X-axis = hour (0-23), Y-axis = avg delay
-- Shaded area shows ±1 standard deviation (consistency indicator)
-- **Insight Example:** "Peak delays at 5-6 PM (+180 sec), recovers by 8 PM"
+1. **DTO**: `TemporalDelayDataDto` (hour, avgDelay, stddev, sampleSize)
+2. **Repository Method**: `ArrivalLogRepository::findTemporalDelayData()`
+3. **Chart Preset**: `TemporalDelayChartPreset::create()`
+4. **Service**: Call repository, use preset
+5. **Template**: Display chart
 
 ---
 
 ## Feature 5: Reliability Context Panel
 
-### Objective
-Show how this route compares to system-wide performance.
-
-### Business Value
-- Normalizes performance — users see if a route's issue is local or system-wide
-- Provides context: "Route 27 is #4 of 22 — better than 82% of routes"
-- Helps prioritize which routes need intervention
-
 ### Implementation
 
-#### New Service Method (OverviewService.php)
+#### 1. Create DTO
+
+**File:** `src/Dto/SystemComparisonDto.php`
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Dto;
+
+/**
+ * System-wide performance comparison metrics.
+ */
+final readonly class SystemComparisonDto
+{
+    public function __construct(
+        public float $systemMedianOnTime,
+        public int $routeRank,
+        public int $totalRoutes,
+        public int $percentile,
+    ) {}
+}
+```
+
+#### 2. Add Repository Method
+
+**File:** `src/Repository/RoutePerformanceDailyRepository.php`
 
 ```php
 /**
- * Get system-wide median performance for a date range.
+ * Calculate system-wide median on-time percentage.
  */
 public function getSystemMedianPerformance(
     \DateTimeImmutable $startDate,
     \DateTimeImmutable $endDate
-): float
-{
-    $qb = $this->performanceRepo->createQueryBuilder('p');
+): float {
+    $qb = $this->createQueryBuilder('p');
 
     $results = $qb
         ->select('p.onTimePercentage')
@@ -710,13 +868,13 @@ public function getSystemMedianPerformance(
         ->setParameter('start', $startDate)
         ->setParameter('end', $endDate)
         ->getQuery()
-        ->getResult();
+        ->getScalarResult();
 
     if (count($results) === 0) {
         return 0.0;
     }
 
-    $values = array_map(fn($r) => (float) $r['onTimePercentage'], $results);
+    $values = array_map(fn (array $r) => (float) $r['onTimePercentage'], $results);
     sort($values);
 
     $count = count($values);
@@ -726,294 +884,179 @@ public function getSystemMedianPerformance(
         ? ($values[$mid - 1] + $values[$mid]) / 2
         : $values[$mid];
 }
-```
 
-#### Update RoutePerformanceService
+/**
+ * Get route performance ranking.
+ *
+ * @return array<int, float> Route ID => average on-time percentage
+ */
+public function getRoutePerformanceRanking(
+    \DateTimeImmutable $startDate,
+    \DateTimeImmutable $endDate
+): array {
+    $qb = $this->createQueryBuilder('p');
 
-```php
-private function buildStats(Route $route, \DateTimeImmutable $startDate, \DateTimeImmutable $endDate): array
-{
-    // ... existing stats ...
+    $results = $qb
+        ->select('IDENTITY(p.route) as route_id, AVG(p.onTimePercentage) as avg_on_time')
+        ->where('p.date >= :start')
+        ->andWhere('p.date < :end')
+        ->andWhere('p.onTimePercentage IS NOT NULL')
+        ->setParameter('start', $startDate)
+        ->setParameter('end', $endDate)
+        ->groupBy('p.route')
+        ->getQuery()
+        ->getArrayResult();
 
-    // NEW: Calculate system comparison
-    $systemMedian = $this->overviewService->getSystemMedianPerformance($startDate, $endDate);
-
-    // Get all routes ranked by performance
-    $allRoutes = $this->routeRepo->findAll();
-    $routePerfs = [];
-
-    foreach ($allRoutes as $r) {
-        $perf = $this->performanceRepo->findByRouteAndDateRange($r->getId(), $startDate, $endDate);
-        $avgOnTime = 0.0;
-        $count = 0;
-
-        foreach ($perf as $p) {
-            if ($p->getOnTimePercentage() !== null) {
-                $avgOnTime += (float) $p->getOnTimePercentage();
-                ++$count;
-            }
-        }
-
-        if ($count > 0) {
-            $routePerfs[$r->getId()] = $avgOnTime / $count;
-        }
+    $ranking = [];
+    foreach ($results as $row) {
+        $ranking[(int) $row['route_id']] = (float) $row['avg_on_time'];
     }
 
-    // Sort routes by performance (descending)
-    arsort($routePerfs);
+    arsort($ranking); // Sort descending by performance
+
+    return $ranking;
+}
+```
+
+#### 3. Update Service
+
+**File:** `src/Service/Dashboard/RoutePerformanceService.php`
+
+```php
+private function buildSystemComparison(
+    Route $route,
+    \DateTimeImmutable $startDate,
+    \DateTimeImmutable $endDate
+): SystemComparisonDto {
+    $systemMedian = $this->performanceRepo->getSystemMedianPerformance($startDate, $endDate);
+    $ranking = $this->performanceRepo->getRoutePerformanceRanking($startDate, $endDate);
 
     // Find rank of current route
     $rank = 1;
-    foreach (array_keys($routePerfs) as $routeId) {
+    foreach (array_keys($ranking) as $routeId) {
         if ($routeId === $route->getId()) {
             break;
         }
         ++$rank;
     }
 
-    $totalRoutes = count($routePerfs);
-    $percentile = $totalRoutes > 0 ? round((($totalRoutes - $rank) / $totalRoutes) * 100, 0) : 0;
+    $totalRoutes = count($ranking);
+    $percentile = $totalRoutes > 0
+        ? (int) round((($totalRoutes - $rank) / $totalRoutes) * 100)
+        : 0;
+
+    return new SystemComparisonDto(
+        systemMedianOnTime: round($systemMedian, 1),
+        routeRank: $rank,
+        totalRoutes: $totalRoutes,
+        percentile: $percentile,
+    );
+}
+
+private function buildStats(...): array
+{
+    // ... existing code ...
+
+    $systemComparison = $this->buildSystemComparison($route, $startDate, $endDate);
 
     return [
         // ... existing stats ...
-        'systemComparison' => [
-            'systemMedianOnTime' => round($systemMedian, 1),
-            'routeRank'          => $rank,
-            'totalRoutes'        => $totalRoutes,
-            'percentile'         => $percentile,
-        ],
+        'systemComparison' => $systemComparison,
     ];
 }
 ```
-
-#### Update Template
-
-```twig
-{# Add after insights section #}
-<div class="bg-blue-50 border border-blue-200 rounded-lg p-4 sm:p-6 mb-8">
-    <div class="flex items-start">
-        <div class="flex-shrink-0">
-            <svg class="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-            </svg>
-        </div>
-        <div class="ml-3 sm:ml-4 flex-1">
-            <h3 class="text-base sm:text-lg font-semibold text-blue-900">System Context</h3>
-            <div class="mt-2 text-xs sm:text-sm text-blue-800">
-                <p class="mb-2">
-                    This route ranks <strong>#{{ routeDetail.stats.systemComparison.routeRank }}</strong>
-                    out of {{ routeDetail.stats.systemComparison.totalRoutes }} routes in Saskatoon Transit.
-                </p>
-                <div class="grid grid-cols-2 gap-4 mt-3">
-                    <div>
-                        <div class="text-xs text-blue-600 mb-1">System Median</div>
-                        <div class="text-lg font-bold text-blue-900">{{ routeDetail.stats.systemComparison.systemMedianOnTime }}%</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-blue-600 mb-1">Percentile</div>
-                        <div class="text-lg font-bold text-blue-900">{{ routeDetail.stats.systemComparison.percentile }}th</div>
-                    </div>
-                </div>
-                <p class="mt-3 text-xs">
-                    This route performs better than {{ routeDetail.stats.systemComparison.percentile }}% of routes in the system.
-                </p>
-            </div>
-        </div>
-    </div>
-</div>
-```
-
-### Expected Output
-- Card showing: "Route ranks #4 of 22"
-- System median comparison: "System median: 82.5%, This route: 87.3%"
-- Percentile: "Better than 82% of routes"
 
 ---
 
 ## Feature 6: Live Route Health Gauge
 
-### Objective
-Real-time % of vehicles within ±2 min of schedule — instant visual feedback.
-
-### Business Value
-- Makes mind-the-wait feel alive and responsive
-- Helps casual riders at a glance
-- No historical data needed — uses current realtime feed
-
 ### Implementation
 
-#### New API Endpoint (RouteController.php)
+#### 1. Create Enum
+
+**File:** `src/Enum/RouteHealthGrade.php`
 
 ```php
-/**
- * Get live health status for a route (% of vehicles on-time).
- */
-#[Route('/routes/{gtfsId}/health', name: 'health', methods: ['GET'])]
-public function health(string $gtfsId, RealtimeRepository $realtimeRepo): JsonResponse
+<?php
+
+declare(strict_types=1);
+
+namespace App\Enum;
+
+enum RouteHealthGrade: string
 {
-    $route = $this->routeRepo->findOneBy(['gtfsId' => $gtfsId]);
+    case EXCELLENT = 'excellent';
+    case GOOD = 'good';
+    case FAIR = 'fair';
+    case POOR = 'poor';
 
-    if ($route === null) {
-        return $this->json(['error' => 'Route not found'], 404);
-    }
-
-    // Get current vehicles from Redis
-    $snapshot = $realtimeRepo->snapshot();
-    $vehicles = array_filter($snapshot['vehicles'], fn($v) => ($v['route'] ?? null) === $gtfsId);
-
-    $onTimeCount = 0;
-    $lateCount   = 0;
-    $earlyCount  = 0;
-    $totalCount  = count($vehicles);
-
-    foreach ($vehicles as $vehicle) {
-        $delay = $vehicle['delay_sec'] ?? null;
-
-        if ($delay === null) {
-            continue; // Skip vehicles without delay data
-        }
-
-        if ($delay > 120) {
-            ++$lateCount;
-        } elseif ($delay < -120) {
-            ++$earlyCount;
-        } else {
-            ++$onTimeCount;
-        }
-    }
-
-    $healthPercent = $totalCount > 0 ? round(($onTimeCount / $totalCount) * 100, 1) : 0;
-    $healthGrade = match (true) {
-        $healthPercent >= 90 => 'excellent',
-        $healthPercent >= 70 => 'good',
-        $healthPercent >= 50 => 'fair',
-        default              => 'poor',
-    };
-
-    return $this->json([
-        'route_id'         => $gtfsId,
-        'health_percent'   => $healthPercent,
-        'health_grade'     => $healthGrade,
-        'active_vehicles'  => $totalCount,
-        'on_time_vehicles' => $onTimeCount,
-        'late_vehicles'    => $lateCount,
-        'early_vehicles'   => $earlyCount,
-        'timestamp'        => $snapshot['timestamp'] ?? time(),
-    ]);
-}
-```
-
-#### Frontend Stimulus Controller
-
-```javascript
-// assets/controllers/route_health_controller.js
-import { Controller } from '@hotwired/stimulus';
-
-export default class extends Controller {
-    static values = {
-        routeId: String,
-        pollInterval: { type: Number, default: 30000 }  // Poll every 30 seconds
-    }
-
-    static targets = ['gauge', 'activeVehicles', 'healthText']
-
-    connect() {
-        this.poll();
-        this.pollTimer = setInterval(() => this.poll(), this.pollIntervalValue);
-    }
-
-    disconnect() {
-        if (this.pollTimer) {
-            clearInterval(this.pollTimer);
-        }
-    }
-
-    async poll() {
-        try {
-            const response = await fetch(`/routes/${this.routeIdValue}/health`);
-            const data = await response.json();
-            this.updateGauge(data);
-        } catch (error) {
-            console.error('Failed to fetch route health:', error);
-        }
-    }
-
-    updateGauge(data) {
-        // Update text
-        this.activeVehiclesTarget.textContent = data.active_vehicles;
-        this.healthTextTarget.textContent = `${data.health_percent}% on-time`;
-
-        // Update gauge color
-        const color = this.getColorForGrade(data.health_grade);
-        this.gaugeTarget.style.background = `conic-gradient(
-            ${color} 0deg,
-            ${color} ${data.health_percent * 3.6}deg,
-            #e5e7eb ${data.health_percent * 3.6}deg
-        )`;
-    }
-
-    getColorForGrade(grade) {
-        const colors = {
-            'excellent': '#10b981',  // green
-            'good': '#84cc16',       // lime
-            'fair': '#fbbf24',       // yellow
-            'poor': '#dc2626',       // red
+    public static function fromPercentage(float $percent): self
+    {
+        return match (true) {
+            $percent >= 90 => self::EXCELLENT,
+            $percent >= 70 => self::GOOD,
+            $percent >= 50 => self::FAIR,
+            default        => self::POOR,
         };
-        return colors[grade] || '#9ca3af';
+    }
+
+    public function getColor(): string
+    {
+        return match ($this) {
+            self::EXCELLENT => '#10b981',
+            self::GOOD      => '#84cc16',
+            self::FAIR      => '#fbbf24',
+            self::POOR      => '#dc2626',
+        };
     }
 }
 ```
 
-#### Template Component
+#### 2. Create DTO
 
-```twig
-{# Add at top of route detail page, before summary stats #}
-<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 mb-6"
-     data-controller="route-health"
-     data-route-health-route-id-value="{{ route.gtfsId }}">
-    <div class="flex items-center justify-between">
-        <div>
-            <h3 class="text-sm font-medium text-gray-600 mb-1">Live Route Health</h3>
-            <div class="text-2xl font-bold text-gray-900" data-route-health-target="healthText">
-                Loading...
-            </div>
-            <p class="text-xs text-gray-500 mt-1">
-                <span data-route-health-target="activeVehicles">-</span> active vehicles
-            </p>
-        </div>
-        <div class="w-20 h-20 rounded-full border-4 border-gray-200 flex items-center justify-center"
-             data-route-health-target="gauge"
-             style="background: conic-gradient(#e5e7eb 0deg, #e5e7eb 360deg);">
-            <div class="w-14 h-14 bg-white rounded-full"></div>
-        </div>
-    </div>
-    <div class="mt-3 text-xs text-gray-500">
-        Updates every 30 seconds from realtime feed
-    </div>
-</div>
+**File:** `src/Dto/RouteHealthDto.php`
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Dto;
+
+use App\Enum\RouteHealthGrade;
+
+final readonly class RouteHealthDto
+{
+    public function __construct(
+        public string $routeId,
+        public float $healthPercent,
+        public RouteHealthGrade $healthGrade,
+        public int $activeVehicles,
+        public int $onTimeVehicles,
+        public int $lateVehicles,
+        public int $earlyVehicles,
+        public int $timestamp,
+    ) {}
+
+    public function toArray(): array
+    {
+        return [
+            'route_id'         => $this->routeId,
+            'health_percent'   => $this->healthPercent,
+            'health_grade'     => $this->healthGrade->value,
+            'active_vehicles'  => $this->activeVehicles,
+            'on_time_vehicles' => $this->onTimeVehicles,
+            'late_vehicles'    => $this->lateVehicles,
+            'early_vehicles'   => $this->earlyVehicles,
+            'timestamp'        => $this->timestamp,
+        ];
+    }
+}
 ```
 
-### Expected Output
-- Circular gauge showing % on-time (green → red)
-- Text: "87% on-time" with "5 active vehicles"
-- Auto-refreshes every 30 seconds
-- Color-coded: Green (>90%), Yellow (70-90%), Red (<70%)
+#### 3. Create Service
 
----
-
-## Feature 7: Data Integrity / Coverage Diagnostics
-
-### Objective
-Build user trust by transparently showing data quality and coverage.
-
-### Business Value
-- Establishes credibility
-- Explains why patterns might be weak ("limited data coverage today")
-- Helps debug feed issues
-
-### Implementation
-
-#### New Service (DataIntegrityService.php)
+**File:** `src/Service/Dashboard/RouteHealthService.php`
 
 ```php
 <?php
@@ -1022,95 +1065,165 @@ declare(strict_types=1);
 
 namespace App\Service\Dashboard;
 
-use App\Repository\ArrivalLogRepository;
+use App\Dto\RouteHealthDto;
+use App\Enum\RouteHealthGrade;
 use App\Repository\RealtimeRepository;
-use App\Repository\RouteRepository;
-use App\Repository\StopRepository;
-use App\Repository\TripRepository;
 
-final readonly class DataIntegrityService
+final readonly class RouteHealthService
 {
     public function __construct(
-        private ArrivalLogRepository $arrivalLogRepo,
-        private TripRepository $tripRepo,
-        private StopRepository $stopRepo,
-        private RouteRepository $routeRepo,
         private RealtimeRepository $realtimeRepo,
-    ) {
-    }
+    ) {}
 
-    /**
-     * Get data quality metrics for today.
-     *
-     * @return array<string, mixed>
-     */
-    public function getDataQualityMetrics(): array
+    public function getRouteHealth(string $gtfsId): RouteHealthDto
     {
-        $today = new \DateTimeImmutable('today');
+        $snapshot = $this->realtimeRepo->snapshot();
+        $vehicles = array_filter(
+            $snapshot['vehicles'],
+            fn (array $v) => ($v['route'] ?? null) === $gtfsId
+        );
 
-        // 1. Trip coverage: % of scheduled trips with realtime data
-        $scheduledTrips = $this->tripRepo->count([]);
-        $trackedTrips   = $this->arrivalLogRepo->countUniqueTrips($today);
-        $tripCoverage   = $scheduledTrips > 0 ? ($trackedTrips / $scheduledTrips) * 100 : 0;
+        $onTimeCount = 0;
+        $lateCount   = 0;
+        $earlyCount  = 0;
+        $totalCount  = count($vehicles);
 
-        // 2. Stop coverage: % of stops with arrival predictions today
-        $totalStops  = $this->stopRepo->count([]);
-        $activeStops = $this->arrivalLogRepo->countUniqueStops($today);
-        $stopCoverage = $totalStops > 0 ? ($activeStops / $totalStops) * 100 : 0;
+        foreach ($vehicles as $vehicle) {
+            $delay = $vehicle['delay_sec'] ?? null;
 
-        // 3. Feed latency: Age of latest realtime update
-        $snapshot     = $this->realtimeRepo->snapshot();
-        $latestUpdate = $snapshot['timestamp'] ?? time();
-        $latencySec   = time() - $latestUpdate;
+            if ($delay === null) {
+                continue;
+            }
 
-        // 4. Data freshness: Predictions from last hour
-        $recentLogs = $this->arrivalLogRepo->countSince(new \DateTimeImmutable('-1 hour'));
-
-        // 5. Active routes: Routes with vehicles right now
-        $activeRoutes = count(array_unique(array_map(
-            fn($v) => $v['route'] ?? null,
-            $snapshot['vehicles'] ?? []
-        )));
-        $totalRoutes = $this->routeRepo->count([]);
-
-        return [
-            'trip_coverage_pct'   => round($tripCoverage, 1),
-            'stop_coverage_pct'   => round($stopCoverage, 1),
-            'feed_latency_sec'    => $latencySec,
-            'recent_predictions'  => $recentLogs,
-            'active_routes'       => $activeRoutes,
-            'total_routes'        => $totalRoutes,
-            'data_quality_grade'  => $this->calculateQualityGrade($tripCoverage, $latencySec),
-        ];
-    }
-
-    /**
-     * Calculate overall data quality grade.
-     */
-    private function calculateQualityGrade(float $coverage, int $latency): string
-    {
-        if ($coverage >= 80 && $latency < 60) {
-            return 'Excellent';
+            if ($delay > 120) {
+                ++$lateCount;
+            } elseif ($delay < -120) {
+                ++$earlyCount;
+            } else {
+                ++$onTimeCount;
+            }
         }
 
-        if ($coverage >= 60 && $latency < 120) {
-            return 'Good';
-        }
+        $healthPercent = $totalCount > 0
+            ? round(($onTimeCount / $totalCount) * 100, 1)
+            : 0.0;
+        $healthGrade = RouteHealthGrade::fromPercentage($healthPercent);
 
-        if ($coverage >= 40 && $latency < 300) {
-            return 'Fair';
-        }
-
-        return 'Limited';
+        return new RouteHealthDto(
+            routeId: $gtfsId,
+            healthPercent: $healthPercent,
+            healthGrade: $healthGrade,
+            activeVehicles: $totalCount,
+            onTimeVehicles: $onTimeCount,
+            lateVehicles: $lateCount,
+            earlyVehicles: $earlyCount,
+            timestamp: $snapshot['timestamp'] ?? time(),
+        );
     }
 }
 ```
 
-#### Add Repository Methods
+#### 4. Create API Endpoint
+
+**File:** `src/Controller/RouteController.php`
 
 ```php
-// In ArrivalLogRepository.php
+#[Route('/routes/{gtfsId}/health', name: 'health', methods: ['GET'])]
+public function health(
+    string $gtfsId,
+    RouteRepository $routeRepo,
+    RouteHealthService $healthService
+): JsonResponse {
+    $route = $routeRepo->findOneBy(['gtfsId' => $gtfsId]);
 
+    if ($route === null) {
+        return $this->json(['error' => 'Route not found'], 404);
+    }
+
+    $health = $healthService->getRouteHealth($gtfsId);
+
+    return $this->json($health->toArray());
+}
+```
+
+---
+
+## Feature 7: Data Integrity / Coverage Diagnostics
+
+### Implementation
+
+#### 1. Create Enum
+
+**File:** `src/Enum/DataQualityGrade.php`
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Enum;
+
+enum DataQualityGrade: string
+{
+    case EXCELLENT = 'Excellent';
+    case GOOD = 'Good';
+    case FAIR = 'Fair';
+    case LIMITED = 'Limited';
+
+    public static function calculate(float $coverage, int $latency): self
+    {
+        return match (true) {
+            $coverage >= 80 && $latency < 60  => self::EXCELLENT,
+            $coverage >= 60 && $latency < 120 => self::GOOD,
+            $coverage >= 40 && $latency < 300 => self::FAIR,
+            default                            => self::LIMITED,
+        };
+    }
+
+    public function getBadgeClass(): string
+    {
+        return match ($this) {
+            self::EXCELLENT => 'bg-green-100 text-green-800',
+            self::GOOD      => 'bg-blue-100 text-blue-800',
+            self::FAIR      => 'bg-yellow-100 text-yellow-800',
+            self::LIMITED   => 'bg-red-100 text-red-800',
+        };
+    }
+}
+```
+
+#### 2. Create DTO
+
+**File:** `src/Dto/DataQualityMetricsDto.php`
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Dto;
+
+use App\Enum\DataQualityGrade;
+
+final readonly class DataQualityMetricsDto
+{
+    public function __construct(
+        public float $tripCoveragePct,
+        public float $stopCoveragePct,
+        public int $feedLatencySec,
+        public int $recentPredictions,
+        public int $activeRoutes,
+        public int $totalRoutes,
+        public DataQualityGrade $dataQualityGrade,
+    ) {}
+}
+```
+
+#### 3. Add Repository Methods
+
+**File:** `src/Repository/ArrivalLogRepository.php`
+
+```php
 /**
  * Count unique trips tracked on a specific date.
  */
@@ -1161,242 +1274,173 @@ public function countSince(\DateTimeInterface $since): int
 }
 ```
 
-#### Update Dashboard Template
+#### 4. Create Service
 
-```twig
-{# Add to dashboard footer (dashboard/index.html.twig) #}
-<div class="bg-gray-50 border border-gray-200 rounded-lg p-4 sm:p-6 mt-8">
-    <div class="flex items-center justify-between mb-4">
-        <h4 class="font-semibold text-gray-900">Data Quality</h4>
-        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
-            {% if dataQuality.data_quality_grade == 'Excellent' %}bg-green-100 text-green-800
-            {% elseif dataQuality.data_quality_grade == 'Good' %}bg-blue-100 text-blue-800
-            {% elseif dataQuality.data_quality_grade == 'Fair' %}bg-yellow-100 text-yellow-800
-            {% else %}bg-red-100 text-red-800{% endif %}">
-            {{ dataQuality.data_quality_grade }}
-        </span>
-    </div>
+**File:** `src/Service/Dashboard/DataIntegrityService.php`
 
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div>
-            <div class="text-xs sm:text-sm text-gray-600 mb-1">Trip Coverage</div>
-            <div class="text-xl sm:text-2xl font-bold text-gray-900">{{ dataQuality.trip_coverage_pct }}%</div>
-            <div class="text-xs text-gray-500">{{ dataQuality.active_routes }} of {{ dataQuality.total_routes }} routes active</div>
-        </div>
-
-        <div>
-            <div class="text-xs sm:text-sm text-gray-600 mb-1">Feed Latency</div>
-            <div class="text-xl sm:text-2xl font-bold
-                {% if dataQuality.feed_latency_sec < 60 %}text-green-600
-                {% elseif dataQuality.feed_latency_sec < 300 %}text-yellow-600
-                {% else %}text-red-600{% endif %}">
-                {{ dataQuality.feed_latency_sec }}s
-            </div>
-            <div class="text-xs text-gray-500">Last realtime update</div>
-        </div>
-
-        <div>
-            <div class="text-xs sm:text-sm text-gray-600 mb-1">Stop Coverage</div>
-            <div class="text-xl sm:text-2xl font-bold text-gray-900">{{ dataQuality.stop_coverage_pct }}%</div>
-            <div class="text-xs text-gray-500">Stops with predictions</div>
-        </div>
-
-        <div>
-            <div class="text-xs sm:text-sm text-gray-600 mb-1">Recent Activity</div>
-            <div class="text-xl sm:text-2xl font-bold text-gray-900">{{ dataQuality.recent_predictions }}</div>
-            <div class="text-xs text-gray-500">Predictions last hour</div>
-        </div>
-    </div>
-
-    <div class="mt-4 text-xs text-gray-600">
-        <p>Data quality metrics help you understand the reliability of insights.
-        <strong>Excellent</strong> = comprehensive coverage and fresh data.
-        <strong>Limited</strong> = partial coverage or stale feed.</p>
-    </div>
-</div>
-```
-
-### Expected Output
-- Footer panel showing 4 metrics:
-  - Trip Coverage: "78%" (with "18 of 22 routes active")
-  - Feed Latency: "45s" (color: green <60s, yellow <300s, red >300s)
-  - Stop Coverage: "82%"
-  - Recent Activity: "1,247 predictions last hour"
-- Overall grade badge: "Excellent" / "Good" / "Fair" / "Limited"
-
----
-
-## Database Migrations Summary
-
-### Migration 1: Add Schedule Realism Ratio
 ```php
-// migrations/VersionXXX_AddScheduleRealismRatio.php
-public function up(Schema $schema): void
+<?php
+
+declare(strict_types=1);
+
+namespace App\Service\Dashboard;
+
+use App\Dto\DataQualityMetricsDto;
+use App\Enum\DataQualityGrade;
+use App\Repository\ArrivalLogRepository;
+use App\Repository\RealtimeRepository;
+use App\Repository\RouteRepository;
+use App\Repository\StopRepository;
+use App\Repository\TripRepository;
+
+final readonly class DataIntegrityService
 {
-    $this->addSql('
-        ALTER TABLE route_performance_daily
-        ADD schedule_realism_ratio NUMERIC(5, 3) DEFAULT NULL
-    ');
+    public function __construct(
+        private ArrivalLogRepository $arrivalLogRepo,
+        private TripRepository $tripRepo,
+        private StopRepository $stopRepo,
+        private RouteRepository $routeRepo,
+        private RealtimeRepository $realtimeRepo,
+    ) {}
 
-    $this->addSql("
-        COMMENT ON COLUMN route_performance_daily.schedule_realism_ratio
-        IS 'Actual/scheduled travel time ratio (1.0 = perfect, >1.1 = under-scheduled)'
-    ");
-}
+    /**
+     * Get data quality metrics for today.
+     */
+    public function getDataQualityMetrics(): DataQualityMetricsDto
+    {
+        $today = new \DateTimeImmutable('today');
 
-public function down(Schema $schema): void
-{
-    $this->addSql('ALTER TABLE route_performance_daily DROP COLUMN schedule_realism_ratio');
-}
-```
+        // Trip coverage
+        $scheduledTrips = $this->tripRepo->count([]);
+        $trackedTrips   = $this->arrivalLogRepo->countUniqueTrips($today);
+        $tripCoverage   = $scheduledTrips > 0 ? ($trackedTrips / $scheduledTrips) * 100 : 0;
 
-### Migration 2: Add Performance Indexes
-```php
-// migrations/VersionXXX_AddAnalyticsIndexes.php
-public function up(Schema $schema): void
-{
-    // For stop-level reliability queries
-    $this->addSql('
-        CREATE INDEX idx_arrival_log_route_stop
-        ON arrival_log (route_id, stop_id, predicted_at)
-    ');
+        // Stop coverage
+        $totalStops  = $this->stopRepo->count([]);
+        $activeStops = $this->arrivalLogRepo->countUniqueStops($today);
+        $stopCoverage = $totalStops > 0 ? ($activeStops / $totalStops) * 100 : 0;
 
-    // For temporal delay curve queries (PostgreSQL functional index)
-    $this->addSql('
-        CREATE INDEX idx_arrival_log_route_hour
-        ON arrival_log (route_id, EXTRACT(HOUR FROM predicted_at))
-    ');
-}
+        // Feed latency
+        $snapshot     = $this->realtimeRepo->snapshot();
+        $latestUpdate = $snapshot['timestamp'] ?? time();
+        $latencySec   = time() - $latestUpdate;
 
-public function down(Schema $schema): void
-{
-    $this->addSql('DROP INDEX IF EXISTS idx_arrival_log_route_stop');
-    $this->addSql('DROP INDEX IF EXISTS idx_arrival_log_route_hour');
+        // Data freshness
+        $recentLogs = $this->arrivalLogRepo->countSince(new \DateTimeImmutable('-1 hour'));
+
+        // Active routes
+        $activeRoutes = count(array_unique(array_map(
+            fn (array $v) => $v['route'] ?? null,
+            $snapshot['vehicles'] ?? []
+        )));
+        $totalRoutes = $this->routeRepo->count([]);
+
+        $grade = DataQualityGrade::calculate($tripCoverage, $latencySec);
+
+        return new DataQualityMetricsDto(
+            tripCoveragePct: round($tripCoverage, 1),
+            stopCoveragePct: round($stopCoverage, 1),
+            feedLatencySec: $latencySec,
+            recentPredictions: $recentLogs,
+            activeRoutes: $activeRoutes,
+            totalRoutes: $totalRoutes,
+            dataQualityGrade: $grade,
+        );
+    }
 }
 ```
 
 ---
 
-## Implementation Roadmap (2-Week Timeline)
+## Implementation Roadmap
 
-### Week 1: Backend Foundation + Database
+### Week 1: Backend Foundation
 
-**Day 1-2: Database & Data Integrity**
-- ✅ Create migrations for schedule_realism_ratio column
-- ✅ Create migrations for new indexes
-- ✅ Implement DataIntegrityService
-- ✅ Add repository methods (countUniqueTrips, countUniqueStops, countSince)
-- ✅ Test data quality metrics on dashboard
+**Day 1-2: Core DTOs and Enums**
+- Create all DTOs (StopReliabilityDataDto, DelayPropagationDataDto, etc.)
+- Create all Enums (ScheduleRealismGrade, RouteHealthGrade, DataQualityGrade)
+- Run `make cs-fix`
 
-**Day 3-4: Chart Services (Part 1)**
-- ✅ Implement buildStopLevelReliabilityChart()
-- ✅ Implement buildDelayPropagationHeatmap()
-- ✅ Test with sample data
+**Day 3-4: Repository Methods**
+- Add all query methods to ArrivalLogRepository
+- Add ranking methods to RoutePerformanceDailyRepository
+- Test with EXPLAIN ANALYZE
 
-**Day 5: Chart Services (Part 2) + Performance Aggregation**
-- ✅ Implement buildTemporalDelayCurve()
-- ✅ Update PerformanceAggregator to calculate schedule realism ratio
-- ✅ Add system comparison calculations to RoutePerformanceService
-- ✅ Update buildStats() method with new metrics
+**Day 5: Database Migrations**
+- Create migration for schedule_realism_ratio column
+- Create migration for new indexes
+- Run migrations and verify
 
-### Week 2: Frontend + Polish
+### Week 2: Chart Presets and Services
 
-**Day 6-7: Route Detail Page Enhancement**
-- ✅ Update RouteDetailDto with new chart properties
-- ✅ Update RoutePerformanceService::getRouteDetail() to generate all new charts
-- ✅ Update route_detail.html.twig with new chart sections
-- ✅ Add metric cards for schedule realism and system rank
-- ✅ Add reliability context panel
+**Day 6-7: Chart Presets**
+- Create StopReliabilityChartPreset
+- Create DelayPropagationChartPreset
+- Create TemporalDelayChartPreset
+- Test chart rendering
 
-**Day 8-9: Live Features**
-- ✅ Create /routes/{id}/health API endpoint
-- ✅ Implement route_health Stimulus controller
-- ✅ Add live health gauge component to route detail page
-- ✅ Test real-time polling and auto-refresh
+**Day 8-9: Services**
+- Implement RouteHealthService
+- Implement DataIntegrityService
+- Update RoutePerformanceService with new chart methods
+- Create API endpoint for route health
 
-**Day 10: Data Quality Dashboard**
-- ✅ Add data integrity metrics to dashboard footer
-- ✅ Style and format quality indicators
-- ✅ Test with different data coverage scenarios
+**Day 10: Frontend**
+- Update RouteDetailDto with new Chart properties
+- Update templates with new charts
+- Create Stimulus controller for live health gauge
+- Test mobile responsiveness
 
-**Day 11-12: Testing, Optimization & Documentation**
-- ✅ Write PHPUnit tests for new service methods
-- ✅ Test with limited data scenarios (1 day, missing stops, partial coverage)
-- ✅ Add loading states and error handling for live features
-- ✅ Optimize query performance (verify index usage with EXPLAIN)
-- ✅ Run `make cs-fix` for code style
-- ✅ Update CLAUDE.md with new features
-- ✅ Create user-facing documentation
+### Week 3: Testing and Polish
+
+**Day 11-12: Testing**
+- Write PHPUnit tests for all new methods
+- Test with limited data scenarios
+- Verify query performance with EXPLAIN
+
+**Day 13-14: Documentation and Deployment**
+- Run `make cs-fix`
+- Update CLAUDE.md
+- Create user documentation
+- Deploy to staging
 
 ---
 
-## Testing Strategy
+## Testing Checklist
 
-### Unit Tests (PHPUnit)
+### Unit Tests Required
 
-**Test file:** `tests/Service/Dashboard/RoutePerformanceServiceTest.php`
+**Repository Tests:**
+- [ ] `ArrivalLogRepository::findStopReliabilityData()` returns valid DTOs
+- [ ] `ArrivalLogRepository::findDelayPropagationData()` calculates deltas correctly
+- [ ] `ArrivalLogRepository::calculateScheduleRealismRatio()` handles null data
+- [ ] `RoutePerformanceDailyRepository::getSystemMedianPerformance()` calculates median
 
-```php
-public function testStopLevelReliabilityChartGeneratesValidData(): void
-{
-    // Given: Route with arrival logs at multiple stops
-    // When: buildStopLevelReliabilityChart() is called
-    // Then: Chart config contains stop names, delays, and variances
-}
+**Service Tests:**
+- [ ] `RouteHealthService::getRouteHealth()` returns correct DTO
+- [ ] `DataIntegrityService::getDataQualityMetrics()` calculates coverage
 
-public function testDelayPropagationHeatmapCalculatesDelta(): void
-{
-    // Given: Trip with delays at consecutive stops
-    // When: buildDelayPropagationHeatmap() is called
-    // Then: Heatmap shows delay delta (change between stops)
-}
+**Enum Tests:**
+- [ ] `ScheduleRealismGrade::fromRatio()` assigns correct grades
+- [ ] `RouteHealthGrade::fromPercentage()` assigns correct grades
+- [ ] `DataQualityGrade::calculate()` uses correct thresholds
 
-public function testScheduleRealismRatioCalculation(): void
-{
-    // Given: Actual and scheduled trip durations
-    // When: calculateScheduleRealismRatio() is called
-    // Then: Returns correct ratio (actual/scheduled)
-}
-```
-
-**Test file:** `tests/Service/Dashboard/DataIntegrityServiceTest.php`
-
-```php
-public function testDataQualityMetricsWithFullCoverage(): void
-{
-    // Given: All trips tracked, fresh feed
-    // When: getDataQualityMetrics() is called
-    // Then: Returns "Excellent" grade
-}
-
-public function testDataQualityMetricsWithStaleFeed(): void
-{
-    // Given: Feed latency > 300 seconds
-    // When: getDataQualityMetrics() is called
-    // Then: Returns "Limited" grade
-}
-```
+**Chart Preset Tests:**
+- [ ] `StopReliabilityChartPreset::create()` builds valid Chart object
+- [ ] Chart presets handle empty data gracefully
 
 ### Integration Tests
 
-**Test scenarios:**
-1. Route detail page loads with all 7 new features
-2. Live health gauge updates via API endpoint
-3. Charts render correctly with 1 day vs 30 days of data
-4. Data quality panel shows accurate metrics
+- [ ] Route detail page loads all 7 charts without errors
+- [ ] Live health gauge API endpoint returns JSON
+- [ ] Charts render correctly with 1 day vs 30 days of data
 
-### Manual Testing Checklist
+### Manual Testing
 
-- [ ] Stop-level reliability chart identifies problem stops
-- [ ] Delay propagation heatmap shows delay growth patterns
-- [ ] Schedule realism index correctly flags over/under-scheduled routes
-- [ ] Temporal delay curve shows peak delay hours
-- [ ] System comparison ranks routes correctly
-- [ ] Live health gauge updates in real-time
-- [ ] Data quality metrics match actual database counts
 - [ ] All charts are mobile-responsive (test at 320px width)
-- [ ] Charts handle missing data gracefully ("Insufficient data" message)
-- [ ] Page load performance is acceptable (<2 seconds)
+- [ ] Charts show "Insufficient data" messages when appropriate
+- [ ] Enums display correct colors and labels
+- [ ] Page load performance <2 seconds
 
 ---
 
@@ -1404,214 +1448,45 @@ public function testDataQualityMetricsWithStaleFeed(): void
 
 ### Query Optimization
 
-**All new queries:**
-1. Use indexed columns (route_id, predicted_at, stop_id)
-2. Include `HAVING COUNT(*) >= N` to filter out low-sample-size data
-3. Use native SQL for complex aggregations (faster than Doctrine DQL)
+All queries use:
+1. ✅ Indexed columns (route_id, predicted_at, stop_id)
+2. ✅ Minimum sample size filters (`HAVING COUNT(*) >= N`)
+3. ✅ Native SQL for complex aggregations (faster than DQL)
 
-**Index verification:**
+Verify index usage:
 ```sql
 EXPLAIN ANALYZE
-SELECT /* your query here */;
+SELECT /* your query */;
+-- Should show "Index Scan" not "Seq Scan"
 ```
 
-Expected: "Index Scan" not "Seq Scan"
+### Expected Database Load
+
+- 7 new queries per route detail page load
+- Each query scans ~1K-10K rows (indexed)
+- Live health endpoint: 1 Redis read per request
 
 ### Caching Strategy
 
-**Chart data caching:**
-- RouteDetailDto is rendered once per page load (no need for additional caching)
-- Live health endpoint is polled every 30 seconds (acceptable load)
-
-**Optional: Add Redis caching for heavy queries:**
-```php
-$cacheKey = "route_detail_{$route->getId()}_{$startDate->format('Ymd')}";
-$cachedData = $this->cache->get($cacheKey, function () use ($route, $startDate, $endDate) {
-    return $this->buildStopLevelReliabilityChart($route, $startDate, $endDate);
-});
-```
-
-### Database Load
-
-**Estimated impact:**
-- 7 new queries per route detail page load
-- Each query scans ~1K-10K arrival_log rows (indexed, fast)
-- Live health API: 1 Redis read per request (minimal)
-
-**Mitigation if needed:**
-- Materialize chart data nightly (like RoutePerformanceDaily)
-- Add API rate limiting for live health endpoint
+- Chart data generated once per page load (no additional caching needed)
+- Live health polled every 30 seconds (acceptable load)
+- Consider Redis caching if page load exceeds 2 seconds
 
 ---
 
-## Data Scarcity Handling
+## Summary of Best Practices
 
-### Minimum Sample Size Requirements
-
-Each feature includes sample size checks:
-
-```php
-HAVING COUNT(*) >= 10  -- Minimum 10 observations
-```
-
-### Fallback UI for Insufficient Data
-
-**Template pattern:**
-```twig
-{% if chartData.sample_size >= 10 %}
-    {# Render chart #}
-{% else %}
-    <div class="text-center py-8 text-gray-500">
-        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-        </svg>
-        <p class="mt-2 text-sm">Insufficient data for this analysis</p>
-        <p class="text-xs">Need at least {{ chartData.min_sample_size }} observations</p>
-    </div>
-{% endif %}
-```
-
-### Confidence Indicators
-
-**Show sample size and confidence level:**
-```twig
-<div class="text-xs text-gray-500 mt-2">
-    Based on {{ chartData.sample_size }} observations
-    (Confidence: {% if chartData.sample_size > 100 %}High{% elseif chartData.sample_size > 50 %}Medium{% else %}Low{% endif %})
-</div>
-```
+1. ✅ **DTOs**: All data transfer uses readonly DTOs, not arrays
+2. ✅ **Enums**: All string constants replaced with type-safe enums
+3. ✅ **Repository Pattern**: Zero SQL in services, all queries in repositories
+4. ✅ **Value Objects**: Chart objects built with ChartBuilder, not raw arrays
+5. ✅ **Type Safety**: Explicit return types on all methods
+6. ✅ **Immutability**: Readonly properties on DTOs
+7. ✅ **Code Style**: Run `make cs-fix` before committing
 
 ---
 
-## Code Quality Checklist
-
-**Before committing:**
-- [ ] All new methods have complete PHPDoc comments
-- [ ] Use `readonly` properties where appropriate
-- [ ] Follow existing naming conventions:
-  - PascalCase for service classes
-  - camelCase for methods
-  - snake_case for database columns
-- [ ] SQL queries use named parameters (`:route_id` not `?`)
-- [ ] Handle null/missing data gracefully (null coalescing, early returns)
-- [ ] Run `make cs-fix` to auto-fix code style
-- [ ] No hardcoded values (use constants or config)
-- [ ] Add Twig comments explaining complex chart logic
-- [ ] Use ECharts for consistency with existing visualizations
-- [ ] Test mobile responsiveness (Chrome DevTools at 320px width)
-- [ ] No console.log() statements in production JS
-- [ ] API endpoints return proper HTTP status codes
-
----
-
-## Expected Outcomes
-
-### For Users (Casual Riders)
-- ✅ Live health gauge provides instant visual feedback
-- ✅ Temporal delay curve shows "avoid this route at 5 PM"
-- ✅ Data quality panel builds trust in insights
-
-### For City Planners & Operators
-- ✅ Stop-level reliability map identifies bottleneck intersections
-- ✅ Schedule realism index provides evidence for schedule changes
-- ✅ Delay propagation heatmap shows if padding is working
-- ✅ System comparison helps prioritize which routes need intervention
-
-### For Developers & Analysts
-- ✅ Extensible chart service architecture for future features
-- ✅ Reusable data quality metrics across application
-- ✅ Real-time health monitoring foundation for alerts
-- ✅ Pattern-making visible even with limited data
-
----
-
-## Future Enhancements (Post-Launch)
-
-### Phase 2 (Month 2-3)
-1. **Chart Export:** Add PNG download buttons (ECharts built-in feature)
-2. **Email Alerts:** Notify when route drops below health threshold
-3. **Historical Comparison:** "This week vs last week" overlays
-4. **Stop Detail Pages:** Deep-dive into individual stop performance
-
-### Phase 3 (Month 4-6)
-1. **Predictive ML Model:** Forecast delays based on patterns
-2. **Weather Integration:** Overlay precipitation/temperature on charts
-3. **Route Comparison Tool:** Side-by-side comparison of 2+ routes
-4. **API Documentation:** Public API for third-party developers
-
-### Advanced Analytics (Month 6+)
-1. **Bunching Detection:** Populate BunchingIncident table from realtime data
-2. **Passenger Load Estimation:** Correlate delays with ridership (if data available)
-3. **Network Effect Analysis:** How delays on one route impact connecting routes
-4. **Seasonal Patterns:** Year-over-year performance comparison
-
----
-
-## Appendix: Sample Data Queries
-
-### Generate Test Data (Development Only)
-
-```php
-// For testing with limited data, create sample arrival logs
-docker compose exec php bin/console app:seed:performance-data --clear
-```
-
-### Manual Testing Queries
-
-**Check stop-level reliability data:**
-```sql
-SELECT
-    s.name,
-    AVG(al.delay_sec) as avg_delay,
-    COUNT(*) as samples
-FROM arrival_log al
-JOIN stop s ON al.stop_id = s.id
-WHERE al.route_id = 123
-GROUP BY s.name
-ORDER BY avg_delay DESC;
-```
-
-**Check schedule realism:**
-```sql
-SELECT
-    AVG(EXTRACT(EPOCH FROM (predicted_arrival_at - scheduled_arrival_at))) as avg_diff
-FROM arrival_log
-WHERE route_id = 123
-  AND scheduled_arrival_at IS NOT NULL;
-```
-
-**Check data coverage:**
-```sql
-SELECT
-    COUNT(DISTINCT trip_id) as tracked_trips,
-    (SELECT COUNT(*) FROM trip) as total_trips,
-    ROUND(COUNT(DISTINCT trip_id)::numeric / (SELECT COUNT(*) FROM trip) * 100, 1) as coverage_pct
-FROM arrival_log
-WHERE predicted_at >= CURRENT_DATE;
-```
-
----
-
-## Questions & Answers
-
-**Q: What if we only have 1 day of data?**
-A: All features are designed to work with minimal data. Stop-level reliability and temporal curves provide value even from 1 day (geographic patterns are stable). Show confidence levels and sample sizes.
-
-**Q: How do we handle routes with no recent data?**
-A: Display "Insufficient data" messages with sample size requirements. Data quality panel explains coverage gaps.
-
-**Q: Will this slow down the route detail page?**
-A: No. All queries use indexes and return <10K rows. Total page render time should be <2 seconds. Monitor with Symfony profiler.
-
-**Q: Can we backfill historical data?**
-A: Yes. Run `CollectDailyPerformanceCommand` with `--date` option for each historical date. Schedule realism ratio will be calculated retroactively.
-
-**Q: How do we know if indexes are being used?**
-A: Run `EXPLAIN ANALYZE` on queries. Look for "Index Scan" in query plan.
-
----
-
-**Last Updated:** 2025-10-17
-**Status:** Implementation Plan
+**Last Updated:** 2025-10-19
+**Status:** Implementation Plan (Updated with Code Quality Standards)
 **Owner:** @samuelwilk
-**Estimated Effort:** 2 weeks (1 developer)
+**Estimated Effort:** 3 weeks (1 developer)
