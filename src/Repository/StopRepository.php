@@ -56,10 +56,11 @@ class StopRepository extends BaseRepository
     }
 
     /**
-     * Find all stops served by a specific route.
+     * Find all stops served by a specific route, ordered by sequence.
      *
-     * Queries stops through the stop_times → trips → route relationship.
-     * Returns distinct stops (no duplicates if stop is visited multiple times).
+     * Returns stops in the order they appear along the route path (for direction 0).
+     * Uses minimum stop_sequence across all trips to determine order.
+     * This provides a proper sequential path for route visualization.
      *
      * @param string $routeGtfsId Route GTFS ID
      *
@@ -67,15 +68,32 @@ class StopRepository extends BaseRepository
      */
     public function findByRoute(string $routeGtfsId): array
     {
-        return $this->createQueryBuilder('s')
-            ->join('s.stopTimes', 'st')
-            ->join('st.trip', 't')
-            ->join('t.route', 'r')
-            ->where('r.gtfsId = :routeId')
-            ->setParameter('routeId', $routeGtfsId)
-            ->distinct()
-            ->orderBy('s.name', 'ASC')
-            ->getQuery()
-            ->getResult();
+        // Get stops ordered by their sequence on the route (direction 0 only for clean path)
+        $conn = $this->getEntityManager()->getConnection();
+        $sql  = '
+            SELECT DISTINCT s.id, s.gtfs_id, s.name, s.lat, s.long,
+                   MIN(st.stop_sequence) as min_seq
+            FROM stop s
+            JOIN stop_time st ON st.stop_id = s.id
+            JOIN trip t ON t.id = st.trip_id
+            JOIN route r ON r.id = t.route_id
+            WHERE r.gtfs_id = :routeId
+              AND t.direction = 0
+            GROUP BY s.id, s.gtfs_id, s.name, s.lat, s.long
+            ORDER BY min_seq ASC
+        ';
+
+        $result = $conn->executeQuery($sql, ['routeId' => $routeGtfsId])->fetchAllAssociative();
+
+        // Map results to Stop entities
+        $stops = [];
+        foreach ($result as $row) {
+            $stop = $this->find($row['id']);
+            if ($stop) {
+                $stops[] = $stop;
+            }
+        }
+
+        return $stops;
     }
 }
