@@ -187,6 +187,12 @@ variable "log_retention_days" {
   default     = 7
 }
 
+variable "alert_email" {
+  description = "Email address for CloudWatch alarm notifications (Spot monitoring)"
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   description = "Additional tags"
   type        = map(string)

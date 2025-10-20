@@ -323,3 +323,113 @@ module "ecs_service_scheduler_low_freq" {
 
   tags = local.common_tags
 }
+
+# ============================================================================
+# MONITORING: CloudWatch Alarms for Spot Interruption Detection
+# ============================================================================
+
+# SNS Topic for ECS Service Alarms
+resource "aws_sns_topic" "ecs_alarms" {
+  name = "${local.project_name}-${local.environment}-ecs-alarms"
+
+  tags = merge(local.common_tags, {
+    Name = "${local.project_name}-${local.environment}-ecs-alarms"
+  })
+}
+
+# SNS Email Subscription (only if alert_email is provided)
+resource "aws_sns_topic_subscription" "ecs_alarms_email" {
+  count = var.alert_email != "" ? 1 : 0
+
+  topic_arn = aws_sns_topic.ecs_alarms.arn
+  protocol  = "email"
+  endpoint  = var.alert_email
+}
+
+# CloudWatch Alarm: PHP Service - Task Count = 0
+resource "aws_cloudwatch_metric_alarm" "php_no_tasks" {
+  alarm_name          = "${local.project_name}-${local.environment}-php-no-tasks"
+  comparison_operator = "LessThanOrEqualToThreshold"
+  evaluation_periods  = 2
+  metric_name         = "RunningTaskCount"
+  namespace           = "AWS/ECS"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 0
+  alarm_description   = "Alert when PHP service has no running tasks (possible Spot interruption without recovery)"
+  alarm_actions       = [aws_sns_topic.ecs_alarms.arn]
+  ok_actions          = [aws_sns_topic.ecs_alarms.arn]
+
+  dimensions = {
+    ServiceName = module.ecs_service_php.service_name
+    ClusterName = module.ecs_cluster.cluster_name
+  }
+
+  tags = local.common_tags
+}
+
+# CloudWatch Alarm: PyParser Service - Task Count = 0
+resource "aws_cloudwatch_metric_alarm" "pyparser_no_tasks" {
+  alarm_name          = "${local.project_name}-${local.environment}-pyparser-no-tasks"
+  comparison_operator = "LessThanOrEqualToThreshold"
+  evaluation_periods  = 2
+  metric_name         = "RunningTaskCount"
+  namespace           = "AWS/ECS"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 0
+  alarm_description   = "Alert when PyParser service has no running tasks (possible Spot interruption without recovery)"
+  alarm_actions       = [aws_sns_topic.ecs_alarms.arn]
+  ok_actions          = [aws_sns_topic.ecs_alarms.arn]
+
+  dimensions = {
+    ServiceName = module.ecs_service_pyparser.service_name
+    ClusterName = module.ecs_cluster.cluster_name
+  }
+
+  tags = local.common_tags
+}
+
+# CloudWatch Alarm: High-Freq Scheduler - Task Count = 0
+resource "aws_cloudwatch_metric_alarm" "scheduler_high_freq_no_tasks" {
+  alarm_name          = "${local.project_name}-${local.environment}-scheduler-high-freq-no-tasks"
+  comparison_operator = "LessThanOrEqualToThreshold"
+  evaluation_periods  = 2
+  metric_name         = "RunningTaskCount"
+  namespace           = "AWS/ECS"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 0
+  alarm_description   = "Alert when High-Freq Scheduler has no running tasks (possible Spot interruption without recovery)"
+  alarm_actions       = [aws_sns_topic.ecs_alarms.arn]
+  ok_actions          = [aws_sns_topic.ecs_alarms.arn]
+
+  dimensions = {
+    ServiceName = module.ecs_service_scheduler_high_freq.service_name
+    ClusterName = module.ecs_cluster.cluster_name
+  }
+
+  tags = local.common_tags
+}
+
+# CloudWatch Alarm: Low-Freq Scheduler - Task Count = 0
+resource "aws_cloudwatch_metric_alarm" "scheduler_low_freq_no_tasks" {
+  alarm_name          = "${local.project_name}-${local.environment}-scheduler-low-freq-no-tasks"
+  comparison_operator = "LessThanOrEqualToThreshold"
+  evaluation_periods  = 2
+  metric_name         = "RunningTaskCount"
+  namespace           = "AWS/ECS"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 0
+  alarm_description   = "Alert when Low-Freq Scheduler has no running tasks (possible Spot interruption without recovery)"
+  alarm_actions       = [aws_sns_topic.ecs_alarms.arn]
+  ok_actions          = [aws_sns_topic.ecs_alarms.arn]
+
+  dimensions = {
+    ServiceName = module.ecs_service_scheduler_low_freq.service_name
+    ClusterName = module.ecs_cluster.cluster_name
+  }
+
+  tags = local.common_tags
+}
