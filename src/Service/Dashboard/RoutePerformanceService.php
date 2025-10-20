@@ -6,6 +6,7 @@ namespace App\Service\Dashboard;
 
 use App\Dto\RouteDetailDto;
 use App\Dto\RouteMetricDto;
+use App\Entity\City;
 use App\Entity\Route;
 use App\Repository\ArrivalLogRepository;
 use App\Repository\RealtimeRepository;
@@ -33,15 +34,37 @@ final readonly class RoutePerformanceService
     /**
      * Get route list with current performance metrics.
      *
+     * @param City|null $city   Optional city filter
+     * @param string    $search Search query
+     * @param string    $sort   Sort field
+     *
      * @return list<RouteMetricDto>
      */
-    public function getRouteListWithMetrics(string $search = '', string $sort = 'name'): array
+    public function getRouteListWithMetrics(?City $city = null, string $search = '', string $sort = 'name'): array
     {
-        // Get all routes
-        $routes = $this->routeRepo->findAll();
+        // Get routes, optionally filtered by city
+        if ($city !== null) {
+            $routes = $this->routeRepo->findBy(['city' => $city]);
+        } else {
+            $routes = $this->routeRepo->findAll();
+        }
 
         // Get current scores from Redis
-        $scores     = $this->realtimeRepo->readScores();
+        $scores = $this->realtimeRepo->readScores();
+
+        // Aggregate vehicle counts by route (sum across all directions)
+        $vehicleCountByRoute = [];
+        foreach ($scores['items'] as $score) {
+            $routeId  = $score['route_id'] ?? '';
+            $vehicles = $score['vehicles'] ?? 0;
+
+            if (!isset($vehicleCountByRoute[$routeId])) {
+                $vehicleCountByRoute[$routeId] = 0;
+            }
+            $vehicleCountByRoute[$routeId] += $vehicles;
+        }
+
+        // Keep the last score per route for grade information
         $scoresById = [];
         foreach ($scores['items'] as $score) {
             $scoresById[$score['route_id'] ?? ''] = $score;
@@ -88,7 +111,7 @@ final readonly class RoutePerformanceService
                 grade: $grade,
                 onTimePercentage: $avgOnTime,
                 colour: $route->getColour(),
-                activeVehicles: $score !== null ? ($score['vehicles'] ?? 0) : 0,
+                activeVehicles: $vehicleCountByRoute[$gtfsId] ?? 0,
                 trend: null,
                 issue: null,
             );

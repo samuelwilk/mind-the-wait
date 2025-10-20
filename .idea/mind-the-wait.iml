@@ -164,6 +164,8 @@
       <excludeFolder url="file://$MODULE_DIR$/vendor/psr/http-factory" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/nelmio/cors-bundle" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/symfony/rate-limiter" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/nelmio/api-doc-bundle" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/zircote/swagger-php" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

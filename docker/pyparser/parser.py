@@ -8,6 +8,7 @@ VEH_URL   = os.getenv("VEH_URL")
 TRIP_URL  = os.getenv("TRIP_URL")
 ALERT_URL = os.getenv("ALERT_URL")
 POLL_SEC  = int(os.getenv("POLL_SEC", "12"))
+CITY_SLUG = os.getenv("CITY_SLUG", "saskatoon")  # City slug for Redis namespacing
 
 r = redis.Redis.from_url(REDIS_URL)
 
@@ -22,6 +23,8 @@ def trim(kind, feed):
                 "trip": v.trip.trip_id if v.HasField("trip") else None,
                 "route": v.trip.route_id if v.HasField("trip") else None,
                 "lat": p.latitude, "lon": p.longitude,
+                "bearing": p.bearing if p.HasField("bearing") else None,
+                "speed": p.speed if p.HasField("speed") else None,
                 "ts": int(v.timestamp or ts)
             })
         elif kind == "trips" and e.HasField("trip_update"):
@@ -56,11 +59,12 @@ async def poll_loop(kind, url, interval, initial_delay=0):
             try:
                 feed = await fetch_pb(session, url)
                 ts, out = trim(kind, feed)
-                r.hset(f"mtw:{kind}", mapping={"ts": str(ts), "json": json.dumps(out)})
-                r.expire(f"mtw:{kind}", 180)
-                print(time.strftime("%Y-%m-%d %H:%M:%S"), f"{kind}: n={len(out)} ts={ts}")
+                key = f"mtw:{CITY_SLUG}:{kind}"
+                r.hset(key, mapping={"ts": str(ts), "json": json.dumps(out)})
+                r.expire(key, 180)
+                print(time.strftime("%Y-%m-%d %H:%M:%S"), f"[{CITY_SLUG}] {kind}: n={len(out)} ts={ts}")
             except Exception as e:
-                print(time.strftime("%Y-%m-%d %H:%M:%S"), f"{kind} ERR:", e)
+                print(time.strftime("%Y-%m-%d %H:%M:%S"), f"[{CITY_SLUG}] {kind} ERR:", e)
             await asyncio.sleep(interval)
 
 async def main():

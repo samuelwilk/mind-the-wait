@@ -31,6 +31,10 @@ class Route
     #[ORM\Column(nullable: true, enumType: RouteTypeEnum::class)]
     private ?RouteTypeEnum $routeType = null;
 
+    #[ORM\ManyToOne(targetEntity: City::class)]
+    #[ORM\JoinColumn(nullable: false)]
+    private City $city;
+
     /**
      * @var Collection<int, Trip>
      */
@@ -103,6 +107,18 @@ class Route
     public function setRouteType(?RouteTypeEnum $routeType): static
     {
         $this->routeType = $routeType;
+
+        return $this;
+    }
+
+    public function getCity(): City
+    {
+        return $this->city;
+    }
+
+    public function setCity(City $city): static
+    {
+        $this->city = $city;
 
         return $this;
     }

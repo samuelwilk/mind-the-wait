@@ -1,0 +1,832 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Mind The Wait API",
+        "description": "Mobile API for iOS app - Transit headway monitoring and predictions",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "https://localhost",
+            "description": "Local development"
+        },
+        {
+            "url": "https://mindthewait.ca",
+            "description": "Production"
+        }
+    ],
+    "paths": {
+        "/api/v1/cities": {
+            "get": {
+                "tags": [
+                    "Cities"
+                ],
+                "summary": "List cities",
+                "description": "Returns all active cities for multi-city support",
+                "operationId": "get_api_v1_cities_list",
+                "responses": {
+                    "200": {
+                        "description": "List of active cities",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "cities": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "Saskatoon"
+                                                    },
+                                                    "slug": {
+                                                        "type": "string",
+                                                        "example": "saskatoon"
+                                                    },
+                                                    "country": {
+                                                        "type": "string",
+                                                        "example": "CA"
+                                                    },
+                                                    "center_lat": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 52.1332
+                                                    },
+                                                    "center_lon": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": -106.67
+                                                    },
+                                                    "zoom_level": {
+                                                        "type": "integer",
+                                                        "example": 12
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/live-activity/route/{gtfsId}": {
+            "get": {
+                "tags": [
+                    "Live Activities"
+                ],
+                "summary": "Get route status for Live Activity",
+                "description": "Returns minimal route status payload optimized for iOS Live Activities (<4KB)",
+                "operationId": "get_api_v1_live_activity_route_status",
+                "parameters": [
+                    {
+                        "name": "gtfsId",
+                        "in": "path",
+                        "description": "Route GTFS ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Route status summary",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "route_id": {
+                                            "type": "string",
+                                            "example": "14514"
+                                        },
+                                        "short_name": {
+                                            "type": "string",
+                                            "example": "16"
+                                        },
+                                        "color": {
+                                            "type": "string",
+                                            "example": "FF8000"
+                                        },
+                                        "active_vehicles": {
+                                            "type": "integer",
+                                            "example": 5
+                                        },
+                                        "on_time_vehicles": {
+                                            "type": "integer",
+                                            "example": 3
+                                        },
+                                        "late_vehicles": {
+                                            "type": "integer",
+                                            "example": 2
+                                        },
+                                        "early_vehicles": {
+                                            "type": "integer",
+                                            "example": 0
+                                        },
+                                        "health_percent": {
+                                            "type": "integer",
+                                            "example": 60
+                                        },
+                                        "timestamp": {
+                                            "type": "integer",
+                                            "example": 1760940344
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Route not found"
+                    }
+                }
+            }
+        },
+        "/api/v1/live-activity/stop/{gtfsId}/next-arrivals": {
+            "get": {
+                "tags": [
+                    "Live Activities"
+                ],
+                "summary": "Get next arrivals for Live Activity",
+                "description": "Returns next 3 arrivals with minimal payload for Live Activity countdown",
+                "operationId": "get_api_v1_live_activity_stop_next_arrivals",
+                "parameters": [
+                    {
+                        "name": "gtfsId",
+                        "in": "path",
+                        "description": "Stop GTFS ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Next arrivals at stop",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "stop_id": {
+                                            "type": "string",
+                                            "example": "4000"
+                                        },
+                                        "stop_name": {
+                                            "type": "string",
+                                            "example": "19th Street / 2nd Avenue"
+                                        },
+                                        "arrivals": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "route_short_name": {
+                                                        "type": "string",
+                                                        "example": "16"
+                                                    },
+                                                    "seconds_until": {
+                                                        "type": "integer",
+                                                        "example": 180
+                                                    },
+                                                    "confidence": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "HIGH",
+                                                            "MEDIUM",
+                                                            "LOW"
+                                                        ],
+                                                        "example": "HIGH"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "timestamp": {
+                                            "type": "integer",
+                                            "example": 1760940344
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Stop not found"
+                    }
+                }
+            }
+        },
+        "/api/v1/routes": {
+            "get": {
+                "tags": [
+                    "Routes"
+                ],
+                "summary": "List routes",
+                "description": "Returns all routes with performance metrics and grades",
+                "operationId": "get_api_v1_routes_list",
+                "parameters": [
+                    {
+                        "name": "city",
+                        "in": "query",
+                        "description": "Filter routes by city slug",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of routes with performance metrics",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "routes": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string",
+                                                        "example": "14514"
+                                                    },
+                                                    "short_name": {
+                                                        "type": "string",
+                                                        "example": "16"
+                                                    },
+                                                    "long_name": {
+                                                        "type": "string",
+                                                        "example": "Exhibition / 8th Street"
+                                                    },
+                                                    "color": {
+                                                        "type": "string",
+                                                        "example": "FF8000"
+                                                    },
+                                                    "grade": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "A",
+                                                            "B",
+                                                            "C",
+                                                            "D",
+                                                            "F"
+                                                        ],
+                                                        "example": "A"
+                                                    },
+                                                    "on_time_pct": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 92.5
+                                                    },
+                                                    "active_vehicles": {
+                                                        "type": "integer",
+                                                        "example": 3
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "timestamp": {
+                                            "type": "integer",
+                                            "example": 1760939266
+                                        },
+                                        "city": {
+                                            "type": "string",
+                                            "example": "saskatoon",
+                                            "nullable": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/routes/{gtfsId}": {
+            "get": {
+                "tags": [
+                    "Routes"
+                ],
+                "summary": "Get route details",
+                "description": "Returns detailed route metadata and 30-day performance statistics",
+                "operationId": "get_api_v1_route_detail",
+                "parameters": [
+                    {
+                        "name": "gtfsId",
+                        "in": "path",
+                        "description": "Route GTFS ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Route details with performance stats",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "route": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string",
+                                                    "example": "14514"
+                                                },
+                                                "short_name": {
+                                                    "type": "string",
+                                                    "example": "16"
+                                                },
+                                                "long_name": {
+                                                    "type": "string",
+                                                    "example": "Exhibition / 8th Street"
+                                                },
+                                                "color": {
+                                                    "type": "string",
+                                                    "example": "FF8000"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "stats": {
+                                            "description": "30-day performance statistics",
+                                            "type": "object"
+                                        },
+                                        "timestamp": {
+                                            "type": "integer",
+                                            "example": 1760940344
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Route not found"
+                    }
+                }
+            }
+        },
+        "/api/v1/stops": {
+            "get": {
+                "tags": [
+                    "Stops"
+                ],
+                "summary": "List stops",
+                "description": "Returns all stops or stops for a specific route",
+                "operationId": "get_api_v1_stops_list",
+                "parameters": [
+                    {
+                        "name": "route_id",
+                        "in": "query",
+                        "description": "Filter stops by GTFS route ID",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of stops",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "stops": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string",
+                                                        "example": "4000"
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "19th Street / 2nd Avenue"
+                                                    },
+                                                    "lat": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 52.124263
+                                                    },
+                                                    "lon": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": -106.666571
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "timestamp": {
+                                            "type": "integer",
+                                            "example": 1760939266
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/stops/{gtfsId}/predictions": {
+            "get": {
+                "tags": [
+                    "Stops"
+                ],
+                "summary": "Get stop predictions",
+                "description": "Returns next vehicle arrivals for a specific stop",
+                "operationId": "get_api_v1_stop_predictions",
+                "parameters": [
+                    {
+                        "name": "gtfsId",
+                        "in": "path",
+                        "description": "Stop GTFS ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "description": "Maximum number of predictions to return (default: 5)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 5
+                        }
+                    },
+                    {
+                        "name": "route_id",
+                        "in": "query",
+                        "description": "Filter predictions by route ID",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Arrival predictions for stop",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "stop": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string",
+                                                    "example": "4000"
+                                                },
+                                                "name": {
+                                                    "type": "string",
+                                                    "example": "19th Street / 2nd Avenue"
+                                                },
+                                                "lat": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 52.124263
+                                                },
+                                                "lon": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": -106.666571
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "predictions": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "route_id": {
+                                                        "type": "string",
+                                                        "example": "14514"
+                                                    },
+                                                    "route_short_name": {
+                                                        "type": "string",
+                                                        "example": "16"
+                                                    },
+                                                    "arrival_time": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "example": "2025-10-19T12:30:00Z"
+                                                    },
+                                                    "delay_sec": {
+                                                        "type": "integer",
+                                                        "example": 120
+                                                    },
+                                                    "confidence": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "HIGH",
+                                                            "MEDIUM",
+                                                            "LOW"
+                                                        ],
+                                                        "example": "HIGH"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "timestamp": {
+                                            "type": "integer",
+                                            "example": 1760939266
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Stop not found"
+                    }
+                }
+            }
+        },
+        "/api/debug/database-stats": {
+            "get": {
+                "summary": "Get database table counts and basic stats.",
+                "description": "GET /api/debug/database-stats",
+                "operationId": "get_app_debug_databasestats",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/healthz": {
+            "get": {
+                "summary": "Health check endpoint.",
+                "description": "Returns a simple JSON response indicating the application is operational.\nUsed by AWS Application Load Balancer health checks and monitoring systems.",
+                "operationId": "get_api_health",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/realtime": {
+            "get": {
+                "tags": [
+                    "Realtime"
+                ],
+                "summary": "Get realtime transit data",
+                "description": "Returns current vehicle positions, trip updates, and service alerts",
+                "operationId": "get_api_realtime",
+                "parameters": [
+                    {
+                        "name": "route_id",
+                        "in": "query",
+                        "description": "Filter vehicles by route GTFS ID",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "city",
+                        "in": "query",
+                        "description": "City slug (default: saskatoon)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "saskatoon"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Realtime snapshot",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "ts": {
+                                            "description": "Unix timestamp",
+                                            "type": "integer",
+                                            "example": 1760940344
+                                        },
+                                        "vehicles": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string",
+                                                        "example": "veh-123"
+                                                    },
+                                                    "route": {
+                                                        "type": "string",
+                                                        "example": "14514"
+                                                    },
+                                                    "lat": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 52.124263
+                                                    },
+                                                    "lon": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": -106.666571
+                                                    },
+                                                    "bearing": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 180.5
+                                                    },
+                                                    "speed": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 35.5
+                                                    },
+                                                    "delay_sec": {
+                                                        "type": "integer",
+                                                        "example": 120
+                                                    },
+                                                    "status": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "on_time",
+                                                            "late",
+                                                            "early"
+                                                        ],
+                                                        "example": "late"
+                                                    },
+                                                    "ts": {
+                                                        "type": "integer",
+                                                        "example": 1760940344
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "trips": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        },
+                                        "alerts": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "cause": {
+                                                        "type": "integer",
+                                                        "example": 10
+                                                    },
+                                                    "effect": {
+                                                        "type": "integer",
+                                                        "example": 9
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/score": {
+            "get": {
+                "summary": "Get headway scores for routes.",
+                "description": "Query parameters:\n- city: City slug (optional, defaults to 'saskatoon')",
+                "operationId": "get_api_score",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/stops": {
+            "get": {
+                "operationId": "get_stops_search",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/stops/{stopId}/nearby": {
+            "get": {
+                "operationId": "get_stops_nearby_vehicles",
+                "parameters": [
+                    {
+                        "name": "stopId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/stops/{stopId}/predictions": {
+            "get": {
+                "operationId": "get_stop_predictions",
+                "parameters": [
+                    {
+                        "name": "stopId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/vehicle-feedback": {
+            "post": {
+                "operationId": "post_vehicle_feedback_submit",
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/vehicle-feedback/{vehicleId}": {
+            "get": {
+                "operationId": "get_vehicle_feedback_summary",
+                "parameters": [
+                    {
+                        "name": "vehicleId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": ""
+                    }
+                }
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Cities",
+            "description": "Cities"
+        },
+        {
+            "name": "Live Activities",
+            "description": "Live Activities"
+        },
+        {
+            "name": "Routes",
+            "description": "Routes"
+        },
+        {
+            "name": "Stops",
+            "description": "Stops"
+        },
+        {
+            "name": "Realtime",
+            "description": "Realtime"
+        }
+    ]
+}

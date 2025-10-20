@@ -6,6 +6,7 @@ use App\Dto\VehicleDto;
 use Predis\ClientInterface;
 
 use function is_array;
+use function sprintf;
 
 use const JSON_THROW_ON_ERROR;
 use const JSON_UNESCAPED_UNICODE;
@@ -19,13 +20,15 @@ final readonly class RealtimeRepository
     /**
      * Return a stable payload for the API.
      *
+     * @param string $citySlug City slug for Redis namespace (e.g., 'saskatoon', 'regina')
+     *
      * @return array{ts:int, vehicles:array, trips:array, alerts:array}
      */
-    public function snapshot(): array
+    public function snapshot(string $citySlug = 'saskatoon'): array
     {
-        $veh = $this->redis->hgetall('mtw:vehicles') ?: [];
-        $tri = $this->redis->hgetall('mtw:trips') ?: [];
-        $alt = $this->redis->hgetall('mtw:alerts') ?: [];
+        $veh = $this->redis->hgetall($this->getKey('vehicles', $citySlug)) ?: [];
+        $tri = $this->redis->hgetall($this->getKey('trips', $citySlug)) ?: [];
+        $alt = $this->redis->hgetall($this->getKey('alerts', $citySlug)) ?: [];
 
         $vehicles = $this->safeJsonDecode($veh['json'] ?? '[]');
         $trips    = $this->safeJsonDecode($tri['json'] ?? '[]');
@@ -41,10 +44,14 @@ final readonly class RealtimeRepository
         ];
     }
 
-    /** @return list<VehicleDto> */
-    public function getVehicles(): array
+    /**
+     * @param string $citySlug City slug for Redis namespace
+     *
+     * @return list<VehicleDto>
+     */
+    public function getVehicles(string $citySlug = 'saskatoon'): array
     {
-        $h   = $this->redis->hgetall('mtw:vehicles');
+        $h   = $this->redis->hgetall($this->getKey('vehicles', $citySlug));
         $arr = isset($h['json']) ? json_decode($h['json'], true) : [];
         if (!is_array($arr)) {
             return [];
@@ -70,24 +77,36 @@ final readonly class RealtimeRepository
         return $out;
     }
 
-    public function getVehiclesTimestamps(): int
+    /**
+     * @param string $citySlug City slug for Redis namespace
+     */
+    public function getVehiclesTimestamps(string $citySlug = 'saskatoon'): int
     {
-        $h = $this->redis->hgetall('mtw:vehicles');
+        $h = $this->redis->hgetall($this->getKey('vehicles', $citySlug));
 
         return (int) ($h['ts'] ?? 0);
     }
 
-    /** @param list<array<string,mixed>> $rows */
-    public function saveScores(int $ts, array $rows): void
+    /**
+     * @param int                       $ts       Timestamp
+     * @param list<array<string,mixed>> $rows     Score data
+     * @param string                    $citySlug City slug for Redis namespace
+     */
+    public function saveScores(int $ts, array $rows, string $citySlug = 'saskatoon'): void
     {
-        $this->redis->hset('mtw:score', 'ts', (string) $ts);
-        $this->redis->hset('mtw:score', 'json', json_encode($rows, JSON_UNESCAPED_UNICODE));
+        $key = $this->getKey('score', $citySlug);
+        $this->redis->hset($key, 'ts', (string) $ts);
+        $this->redis->hset($key, 'json', json_encode($rows, JSON_UNESCAPED_UNICODE));
     }
 
-    /** @return array{ts:int,items:list<array<string,mixed>>} */
-    public function readScores(): array
+    /**
+     * @param string $citySlug City slug for Redis namespace
+     *
+     * @return array{ts:int,items:list<array<string,mixed>>}
+     */
+    public function readScores(string $citySlug = 'saskatoon'): array
     {
-        $h     = $this->redis->hgetall('mtw:score');
+        $h     = $this->redis->hgetall($this->getKey('score', $citySlug));
         $items = isset($h['json']) ? json_decode($h['json'], true) : [];
         if (!is_array($items)) {
             $items = [];
@@ -105,9 +124,23 @@ final readonly class RealtimeRepository
             return ['redis' => 'down', 'error' => $e->getMessage()];
         }
 
-        $vehTs = (int) ($this->redis->hget('mtw:vehicles', 'ts') ?: 0);
+        // Check default city (Saskatoon) for backwards compatibility
+        $vehTs = (int) ($this->redis->hget($this->getKey('vehicles', 'saskatoon'), 'ts') ?: 0);
 
         return ['redis' => (string) $pong, 'rtTs' => $vehTs];
+    }
+
+    /**
+     * Build Redis key with city namespace.
+     *
+     * @param string $type     Key type (vehicles, trips, alerts, score)
+     * @param string $citySlug City slug
+     *
+     * @return string Namespaced Redis key (e.g., 'mtw:saskatoon:vehicles')
+     */
+    private function getKey(string $type, string $citySlug): string
+    {
+        return sprintf('mtw:%s:%s', $citySlug, $type);
     }
 
     private function safeJsonDecode(string $json): mixed

@@ -32,6 +32,10 @@ class Trip
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $headsign = null;
 
+    #[ORM\ManyToOne(targetEntity: City::class)]
+    #[ORM\JoinColumn(nullable: false)]
+    private City $city;
+
     /**
      * @var Collection<int, StopTime>
      */
@@ -104,6 +108,18 @@ class Trip
     public function setHeadsign(?string $headsign): static
     {
         $this->headsign = $headsign;
+
+        return $this;
+    }
+
+    public function getCity(): City
+    {
+        return $this->city;
+    }
+
+    public function setCity(City $city): static
+    {
+        $this->city = $city;
 
         return $this;
     }

@@ -1,0 +1,14 @@
+nelmio_api_doc:
+    documentation:
+        info:
+            title: Mind The Wait API
+            description: Mobile API for iOS app - Transit headway monitoring and predictions
+            version: 1.0.0
+        servers:
+            - url: https://localhost
+              description: Local development
+            - url: https://mindthewait.ca
+              description: Production
+    areas:
+        path_patterns:
+            - ^/api # Document all API endpoints (v1 and realtime)

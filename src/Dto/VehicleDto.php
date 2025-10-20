@@ -15,6 +15,8 @@ final readonly class VehicleDto
         public ?float $lat = null,
         public ?float $lon = null,
         public ?string $tripId = null,
+        public ?float $bearing = null,  // degrees (0-360), for 3D vehicle rotation
+        public ?float $speed = null,    // m/s, optional
     ) {
     }
 
@@ -46,7 +48,11 @@ final readonly class VehicleDto
         $trip   = $row['trip'] ?? $row['trip_id'] ?? $row['tripId'] ?? null;
         $tripId = $trip !== null ? (string) $trip : null;
 
-        return new self((string) $route, $direction, $ts, $lat, $lon, $tripId);
+        // bearing and speed (for 3D visualization)
+        $bearing = isset($row['bearing']) && is_numeric($row['bearing']) ? (float) $row['bearing'] : null;
+        $speed   = isset($row['speed'])   && is_numeric($row['speed']) ? (float) $row['speed'] : null;
+
+        return new self((string) $route, $direction, $ts, $lat, $lon, $tripId, $bearing, $speed);
     }
 
     /** @param array<string,mixed> $row */
@@ -62,7 +68,16 @@ final readonly class VehicleDto
             $directionFromMap = DirectionEnum::tryFrom((int) $tripDirMap[$dto->tripId]);
 
             // Create new instance with resolved direction since properties are readonly
-            return new self($dto->routeId, $directionFromMap, $dto->timestamp, $dto->lat, $dto->lon, $dto->tripId);
+            return new self(
+                $dto->routeId,
+                $directionFromMap,
+                $dto->timestamp,
+                $dto->lat,
+                $dto->lon,
+                $dto->tripId,
+                $dto->bearing,
+                $dto->speed
+            );
         }
 
         return $dto;

@@ -14,9 +14,12 @@ final readonly class RealtimeSnapshotService
     ) {
     }
 
-    public function snapshot(): array
+    /**
+     * @param string $citySlug City slug for Redis namespace (e.g., 'saskatoon', 'regina')
+     */
+    public function snapshot(string $citySlug = 'saskatoon'): array
     {
-        $snapshot = $this->repository->snapshot();
+        $snapshot = $this->repository->snapshot($citySlug);
 
         return $this->vehicleStatusService->enrichSnapshot($snapshot);
     }

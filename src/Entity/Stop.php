@@ -27,6 +27,10 @@ class Stop
     #[ORM\Column]
     private ?float $long = null;
 
+    #[ORM\ManyToOne(targetEntity: City::class)]
+    #[ORM\JoinColumn(nullable: false)]
+    private City $city;
+
     /**
      * @var Collection<int, StopTime>
      */
@@ -87,6 +91,18 @@ class Stop
     public function setLong(float $long): static
     {
         $this->long = $long;
+
+        return $this;
+    }
+
+    public function getCity(): City
+    {
+        return $this->city;
+    }
+
+    public function setCity(City $city): static
+    {
+        $this->city = $city;
 
         return $this;
     }
