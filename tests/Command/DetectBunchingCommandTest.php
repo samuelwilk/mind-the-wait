@@ -5,18 +5,16 @@ declare(strict_types=1);
 namespace App\Tests\Command;
 
 use App\Command\DetectBunchingCommand;
-use App\Entity\ArrivalLog;
-use App\Entity\Route;
-use App\Entity\Stop;
-use App\Enum\PredictionConfidence;
-use App\Enum\RouteTypeEnum;
-use App\Tests\InjectableHelperTrait;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Factory\ArrivalLogFactory;
+use App\Factory\RouteFactory;
+use App\Factory\StopFactory;
 use PHPUnit\Framework\Attributes\CoversClass;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use Zenstruck\Foundry\Test\Factories;
+use Zenstruck\Foundry\Test\ResetDatabase;
 
 /**
  * Integration tests for DetectBunchingCommand using real database.
@@ -24,16 +22,14 @@ use Symfony\Component\Console\Tester\CommandTester;
 #[CoversClass(DetectBunchingCommand::class)]
 final class DetectBunchingCommandTest extends KernelTestCase
 {
-    use InjectableHelperTrait;
+    use Factories;
+    use ResetDatabase;
 
-    private EntityManagerInterface $em;
     private CommandTester $commandTester;
 
     protected function setUp(): void
     {
         self::bootKernel(['environment' => 'test', 'debug' => true]);
-
-        $this->em = $this->getInjectable(EntityManagerInterface::class);
 
         $application         = new Application(self::$kernel);
         $command             = $application->find('app:detect:bunching');
@@ -42,16 +38,31 @@ final class DetectBunchingCommandTest extends KernelTestCase
 
     public function testExecuteWithDetectedIncidents(): void
     {
-        $route = $this->createRoute('route-cmd-1');
-        $stop  = $this->createStop('stop-cmd-1');
-        $date  = new \DateTimeImmutable('yesterday');
+        $route = RouteFactory::createOne(['gtfsId' => 'route-cmd-1']);
+        $stop  = StopFactory::createOne(['gtfsId' => 'stop-cmd-1']);
+        $date  = new \DateTimeImmutable('2025-02-20');
 
-        // Create bunching incident
-        $this->createArrivalLog($route, $stop, $date->setTime(10, 0, 0), 'veh-1');
-        $this->createArrivalLog($route, $stop, $date->setTime(10, 1, 0), 'veh-2');
-        $this->em->flush();
+        // Create bunching incident (2 vehicles arriving within 1 minute)
+        ArrivalLogFactory::createOne([
+            'route'              => $route,
+            'stop'               => $stop,
+            'vehicleId'          => 'veh-1',
+            'tripId'             => 'trip-1',
+            'predictedArrivalAt' => $date->setTime(10, 0, 0),
+            'predictedAt'        => $date->setTime(9, 55, 0),
+        ]);
+        ArrivalLogFactory::createOne([
+            'route'              => $route,
+            'stop'               => $stop,
+            'vehicleId'          => 'veh-2',
+            'tripId'             => 'trip-2',
+            'predictedArrivalAt' => $date->setTime(10, 1, 0),
+            'predictedAt'        => $date->setTime(9, 55, 0),
+        ]);
 
-        $exitCode = $this->commandTester->execute([]);
+        $exitCode = $this->commandTester->execute([
+            '--date' => '2025-02-20',
+        ]);
 
         $this->assertEquals(Command::SUCCESS, $exitCode);
         $this->assertStringContainsString('Successfully detected', $this->commandTester->getDisplay());
@@ -70,14 +81,20 @@ final class DetectBunchingCommandTest extends KernelTestCase
 
     public function testExecuteWithCustomDate(): void
     {
-        $route = $this->createRoute('route-cmd-2');
-        $stop  = $this->createStop('stop-cmd-2');
+        $route = RouteFactory::createOne(['gtfsId' => 'route-cmd-2']);
+        $stop  = StopFactory::createOne(['gtfsId' => 'stop-cmd-2']);
         $date  = new \DateTimeImmutable('2025-02-15');
 
         // Create bunching for specific date
-        $this->createArrivalLog($route, $stop, $date->setTime(10, 0, 0), 'veh-1');
-        $this->createArrivalLog($route, $stop, $date->setTime(10, 1, 0), 'veh-2');
-        $this->em->flush();
+        ArrivalLogFactory::createMany(2, [
+            'route' => $route,
+            'stop'  => $stop,
+        ], function (int $i) use ($date) {
+            return [
+                'predictedArrivalAt' => $date->setTime(10, $i, 0),
+                'predictedAt'        => $date->setTime(9, 55, 0),
+            ];
+        });
 
         $exitCode = $this->commandTester->execute([
             '--date' => '2025-02-15',
@@ -99,14 +116,23 @@ final class DetectBunchingCommandTest extends KernelTestCase
 
     public function testExecuteWithCustomTimeWindow(): void
     {
-        $route = $this->createRoute('route-cmd-3');
-        $stop  = $this->createStop('stop-cmd-3');
+        $route = RouteFactory::createOne(['gtfsId' => 'route-cmd-3']);
+        $stop  = StopFactory::createOne(['gtfsId' => 'stop-cmd-3']);
         $date  = new \DateTimeImmutable('2025-02-16');
 
         // Create vehicles 90 seconds apart
-        $this->createArrivalLog($route, $stop, $date->setTime(10, 0, 0), 'veh-1');
-        $this->createArrivalLog($route, $stop, $date->setTime(10, 1, 30), 'veh-2');
-        $this->em->flush();
+        ArrivalLogFactory::createOne([
+            'route'              => $route,
+            'stop'               => $stop,
+            'predictedArrivalAt' => $date->setTime(10, 0, 0),
+            'predictedAt'        => $date->setTime(9, 55, 0),
+        ]);
+        ArrivalLogFactory::createOne([
+            'route'              => $route,
+            'stop'               => $stop,
+            'predictedArrivalAt' => $date->setTime(10, 1, 30),
+            'predictedAt'        => $date->setTime(9, 55, 0),
+        ]);
 
         // With 60s window, should not detect
         $exitCode = $this->commandTester->execute([
@@ -140,13 +166,16 @@ final class DetectBunchingCommandTest extends KernelTestCase
 
     public function testExecuteWithShortOptions(): void
     {
-        $route = $this->createRoute('route-cmd-4');
-        $stop  = $this->createStop('stop-cmd-4');
+        $route = RouteFactory::createOne(['gtfsId' => 'route-cmd-4']);
+        $stop  = StopFactory::createOne(['gtfsId' => 'stop-cmd-4']);
         $date  = new \DateTimeImmutable('2025-02-17');
 
-        $this->createArrivalLog($route, $stop, $date->setTime(10, 0, 0), 'veh-1');
-        $this->createArrivalLog($route, $stop, $date->setTime(10, 1, 0), 'veh-2');
-        $this->em->flush();
+        ArrivalLogFactory::createMany(2, [
+            'route' => $route,
+            'stop'  => $stop,
+        ], function (int $i) use ($date) {
+            return ['predictedArrivalAt' => $date->setTime(10, $i, 0)];
+        });
 
         $exitCode = $this->commandTester->execute([
             '-d' => '2025-02-17',
@@ -155,50 +184,5 @@ final class DetectBunchingCommandTest extends KernelTestCase
 
         $this->assertEquals(Command::SUCCESS, $exitCode);
         $this->assertStringContainsString('2025-02-17', $this->commandTester->getDisplay());
-    }
-
-    private function createRoute(string $gtfsId): Route
-    {
-        $route = new Route();
-        $route->setGtfsId($gtfsId);
-        $route->setShortName($gtfsId);
-        $route->setLongName('Test Route '.$gtfsId);
-        $route->setColour('FF0000');
-        $route->setRouteType(RouteTypeEnum::Bus);
-        $this->em->persist($route);
-
-        return $route;
-    }
-
-    private function createStop(string $gtfsId): Stop
-    {
-        $stop = new Stop();
-        $stop->setGtfsId($gtfsId);
-        $stop->setName('Test Stop '.$gtfsId);
-        $stop->setLat(52.1332);
-        $stop->setLong(-106.6700);
-        $this->em->persist($stop);
-
-        return $stop;
-    }
-
-    private function createArrivalLog(
-        Route $route,
-        Stop $stop,
-        \DateTimeImmutable $arrivalTime,
-        string $vehicleId,
-    ): ArrivalLog {
-        $log = new ArrivalLog();
-        $log->setRoute($route);
-        $log->setStop($stop);
-        $log->setVehicleId($vehicleId);
-        $log->setTripId('trip-'.random_int(1000, 9999));
-        $log->setPredictedArrivalAt($arrivalTime);
-        $log->setPredictedAt($arrivalTime->modify('-5 minutes'));
-        $log->setConfidence(PredictionConfidence::HIGH);
-        $log->setDelaySec(0);
-        $this->em->persist($log);
-
-        return $log;
     }
 }

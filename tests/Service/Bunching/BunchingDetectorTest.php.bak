@@ -13,9 +13,8 @@ use App\Enum\RouteTypeEnum;
 use App\Enum\TransitImpact;
 use App\Repository\BunchingIncidentRepository;
 use App\Service\Bunching\BunchingDetector;
-use App\Tests\CityAwareTestTrait;
 use App\Tests\InjectableHelperTrait;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Tests\CityAwareTestTrait;use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
@@ -27,8 +26,8 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 #[CoversClass(BunchingDetector::class)]
 final class BunchingDetectorTest extends KernelTestCase
 {
-    use CityAwareTestTrait;
     use InjectableHelperTrait;
+    use CityAwareTestTrait;
     private EntityManagerInterface $em;
     private BunchingDetector $detector;
     private BunchingIncidentRepository $bunchingRepo;

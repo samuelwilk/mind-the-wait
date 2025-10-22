@@ -15,9 +15,8 @@ use App\Repository\ArrivalLogRepository;
 use App\Repository\RouteRepository;
 use App\Repository\WeatherObservationRepository;
 use App\Service\History\PerformanceAggregator;
-use App\Tests\CityAwareTestTrait;
 use App\Tests\InjectableHelperTrait;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Tests\CityAwareTestTrait;use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
@@ -27,8 +26,8 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
  */
 final class PerformanceAggregatorTest extends KernelTestCase
 {
-    use CityAwareTestTrait;
     use InjectableHelperTrait;
+    use CityAwareTestTrait;
     private EntityManagerInterface $em;
     private RouteRepository $routeRepo;
     private ArrivalLogRepository $arrivalLogRepo;
@@ -423,7 +422,6 @@ final class PerformanceAggregatorTest extends KernelTestCase
         $stop->setName('Test Stop '.$gtfsId);
         $stop->setLat(52.1324);
         $stop->setLong(-106.6607);
-        $stop->setCity($this->getTestCity($this->em));
         $this->em->persist($stop);
 
         return $stop;
