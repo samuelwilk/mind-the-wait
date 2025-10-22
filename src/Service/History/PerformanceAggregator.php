@@ -4,15 +4,12 @@ declare(strict_types=1);
 
 namespace App\Service\History;
 
-use App\Dto\RoutePerformanceDto;
-use App\Enum\PredictionConfidence;
 use App\Repository\ArrivalLogRepository;
 use App\Repository\RoutePerformanceDailyRepository;
 use App\Repository\RouteRepository;
 use App\Repository\WeatherObservationRepository;
 use Psr\Log\LoggerInterface;
 
-use function array_sum;
 use function count;
 use function round;
 use function sort;
@@ -20,11 +17,11 @@ use function sprintf;
 
 /**
  * Aggregates arrival log data into daily performance metrics.
+ *
+ * Uses SQL aggregations in repository to avoid loading large entity collections into PHP.
  */
 final readonly class PerformanceAggregator
 {
-    private const ON_TIME_THRESHOLD_SEC = 180; // ±3 minutes
-
     public function __construct(
         private ArrivalLogRepository $arrivalLogRepo,
         private RoutePerformanceDailyRepository $performanceRepo,
@@ -54,17 +51,19 @@ final readonly class PerformanceAggregator
 
         foreach ($routes as $route) {
             try {
-                $logs = $this->arrivalLogRepo->findByRouteAndDateRange(
+                // Delegate aggregation to repository (SQL aggregation, not PHP loops)
+                $metrics = $this->arrivalLogRepo->aggregateMetricsForRoute(
                     $route->getId(),
                     $startOfDay,
                     $endOfDay
                 );
 
-                if (count($logs) === 0) {
+                if ($metrics->totalPredictions === 0) {
                     continue; // Skip routes with no activity
                 }
 
-                $metrics = $this->calculateMetrics($logs);
+                // Calculate median in PHP (requires sorted delays array)
+                $medianDelaySec = $this->calculateMedian($metrics->delays);
 
                 // Find or create performance record
                 $performance = $this->performanceRepo->findOrCreate($route->getId(), $date);
@@ -73,7 +72,7 @@ final readonly class PerformanceAggregator
                 $performance->setMediumConfidenceCount($metrics->mediumConfidenceCount);
                 $performance->setLowConfidenceCount($metrics->lowConfidenceCount);
                 $performance->setAvgDelaySec($metrics->avgDelaySec);
-                $performance->setMedianDelaySec($metrics->medianDelaySec);
+                $performance->setMedianDelaySec($medianDelaySec);
                 $performance->setOnTimePercentage($metrics->onTimePercentage !== null ? (string) $metrics->onTimePercentage : null);
                 $performance->setLatePercentage($metrics->latePercentage !== null ? (string) $metrics->latePercentage : null);
                 $performance->setEarlyPercentage($metrics->earlyPercentage !== null ? (string) $metrics->earlyPercentage : null);
@@ -108,69 +107,6 @@ final readonly class PerformanceAggregator
         $this->logger->info(sprintf('Aggregated performance for %d routes (%d failed)', $success, $failed));
 
         return ['success' => $success, 'failed' => $failed];
-    }
-
-    /**
-     * Calculate performance metrics from arrival logs.
-     *
-     * @param list<\App\Entity\ArrivalLog> $logs
-     */
-    private function calculateMetrics(array $logs): RoutePerformanceDto
-    {
-        $total            = count($logs);
-        $highConfidence   = 0;
-        $mediumConfidence = 0;
-        $lowConfidence    = 0;
-        $delays           = [];
-        $onTimeCount      = 0;
-        $lateCount        = 0;
-        $earlyCount       = 0;
-
-        foreach ($logs as $log) {
-            // Count by confidence
-            match ($log->getConfidence()) {
-                PredictionConfidence::HIGH   => ++$highConfidence,
-                PredictionConfidence::MEDIUM => ++$mediumConfidence,
-                PredictionConfidence::LOW    => ++$lowConfidence,
-            };
-
-            // Collect delay data
-            $delaySec = $log->getDelaySec();
-            if ($delaySec !== null) {
-                $delays[] = $delaySec;
-
-                // Categorize by punctuality (±3 minutes = on-time)
-                if ($delaySec > self::ON_TIME_THRESHOLD_SEC) {
-                    ++$lateCount;
-                } elseif ($delaySec < -self::ON_TIME_THRESHOLD_SEC) {
-                    ++$earlyCount;
-                } else {
-                    ++$onTimeCount;
-                }
-            }
-        }
-
-        // Calculate delay statistics
-        $avgDelay    = count($delays) > 0 ? (int) round(array_sum($delays) / count($delays)) : null;
-        $medianDelay = $this->calculateMedian($delays);
-
-        // Calculate percentages
-        $totalWithDelay   = $onTimeCount + $lateCount + $earlyCount;
-        $onTimePercentage = $totalWithDelay > 0 ? round(($onTimeCount / $totalWithDelay) * 100, 2) : null;
-        $latePercentage   = $totalWithDelay > 0 ? round(($lateCount / $totalWithDelay) * 100, 2) : null;
-        $earlyPercentage  = $totalWithDelay > 0 ? round(($earlyCount / $totalWithDelay) * 100, 2) : null;
-
-        return new RoutePerformanceDto(
-            totalPredictions: $total,
-            highConfidenceCount: $highConfidence,
-            mediumConfidenceCount: $mediumConfidence,
-            lowConfidenceCount: $lowConfidence,
-            avgDelaySec: $avgDelay,
-            medianDelaySec: $medianDelay,
-            onTimePercentage: $onTimePercentage,
-            latePercentage: $latePercentage,
-            earlyPercentage: $earlyPercentage,
-        );
     }
 
     /**

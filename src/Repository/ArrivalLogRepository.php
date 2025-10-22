@@ -6,11 +6,13 @@ namespace App\Repository;
 
 use App\Dto\BunchingCandidateDto;
 use App\Dto\RoutePerformanceHeatmapBucketDto;
+use App\Dto\RoutePerformanceMetricsDto;
 use App\Entity\ArrivalLog;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 
+use function round;
 use function sprintf;
 
 /**
@@ -236,5 +238,105 @@ final class ArrivalLogRepository extends BaseRepository
         }
 
         return $candidates;
+    }
+
+    /**
+     * Aggregate performance metrics for a route on a specific date.
+     *
+     * Uses SQL aggregation to avoid loading entity collections into PHP.
+     */
+    public function aggregateMetricsForRoute(int $routeId, \DateTimeInterface $start, \DateTimeInterface $end): RoutePerformanceMetricsDto
+    {
+        $sql = <<<'SQL'
+            SELECT
+                COUNT(*) as total_predictions,
+                SUM(CASE WHEN confidence = 'high' THEN 1 ELSE 0 END) as high_confidence_count,
+                SUM(CASE WHEN confidence = 'medium' THEN 1 ELSE 0 END) as medium_confidence_count,
+                SUM(CASE WHEN confidence = 'low' THEN 1 ELSE 0 END) as low_confidence_count,
+                AVG(CASE WHEN delay_sec IS NOT NULL THEN delay_sec ELSE NULL END) as avg_delay_sec,
+                SUM(CASE WHEN delay_sec IS NOT NULL AND delay_sec > 180 THEN 1 ELSE 0 END) as late_count,
+                SUM(CASE WHEN delay_sec IS NOT NULL AND delay_sec < -180 THEN 1 ELSE 0 END) as early_count,
+                SUM(CASE WHEN delay_sec IS NOT NULL AND delay_sec BETWEEN -180 AND 180 THEN 1 ELSE 0 END) as on_time_count
+            FROM arrival_log
+            WHERE route_id = :route_id
+              AND predicted_at >= :start_date
+              AND predicted_at < :end_date
+        SQL;
+
+        $connection = $this->getEntityManager()->getConnection();
+        $row        = $connection->executeQuery(
+            $sql,
+            [
+                'route_id'   => $routeId,
+                'start_date' => $start->format('Y-m-d H:i:s'),
+                'end_date'   => $end->format('Y-m-d H:i:s'),
+            ],
+            [
+                'route_id'   => Types::INTEGER,
+                'start_date' => Types::STRING,
+                'end_date'   => Types::STRING,
+            ],
+        )->fetchAssociative();
+
+        if ($row === false) {
+            // No data for this route
+            return new RoutePerformanceMetricsDto(
+                totalPredictions: 0,
+                highConfidenceCount: 0,
+                mediumConfidenceCount: 0,
+                lowConfidenceCount: 0,
+                avgDelaySec: null,
+                delays: [],
+                onTimeCount: 0,
+                lateCount: 0,
+                earlyCount: 0,
+                onTimePercentage: null,
+                latePercentage: null,
+                earlyPercentage: null,
+            );
+        }
+
+        $totalPredictions      = (int) $row['total_predictions'];
+        $highConfidenceCount   = (int) $row['high_confidence_count'];
+        $mediumConfidenceCount = (int) $row['medium_confidence_count'];
+        $lowConfidenceCount    = (int) $row['low_confidence_count'];
+        $avgDelaySec           = $row['avg_delay_sec'] !== null ? (int) round((float) $row['avg_delay_sec']) : null;
+        $lateCount             = (int) $row['late_count'];
+        $earlyCount            = (int) $row['early_count'];
+        $onTimeCount           = (int) $row['on_time_count'];
+
+        // Fetch all delays for median calculation (cannot easily do in SQL without complex queries)
+        $delaysSql = 'SELECT delay_sec FROM arrival_log WHERE route_id = :route_id AND predicted_at >= :start_date AND predicted_at < :end_date AND delay_sec IS NOT NULL ORDER BY delay_sec';
+        $delays    = $connection->executeQuery(
+            $delaysSql,
+            [
+                'route_id'   => $routeId,
+                'start_date' => $start->format('Y-m-d H:i:s'),
+                'end_date'   => $end->format('Y-m-d H:i:s'),
+            ],
+        )->fetchFirstColumn();
+
+        $delaysInt = array_map('intval', $delays);
+
+        // Calculate percentages
+        $totalWithDelay   = $onTimeCount + $lateCount + $earlyCount;
+        $onTimePercentage = $totalWithDelay > 0 ? round(($onTimeCount / $totalWithDelay) * 100, 2) : null;
+        $latePercentage   = $totalWithDelay > 0 ? round(($lateCount / $totalWithDelay) * 100, 2) : null;
+        $earlyPercentage  = $totalWithDelay > 0 ? round(($earlyCount / $totalWithDelay) * 100, 2) : null;
+
+        return new RoutePerformanceMetricsDto(
+            totalPredictions: $totalPredictions,
+            highConfidenceCount: $highConfidenceCount,
+            mediumConfidenceCount: $mediumConfidenceCount,
+            lowConfidenceCount: $lowConfidenceCount,
+            avgDelaySec: $avgDelaySec,
+            delays: $delaysInt,
+            onTimeCount: $onTimeCount,
+            lateCount: $lateCount,
+            earlyCount: $earlyCount,
+            onTimePercentage: $onTimePercentage,
+            latePercentage: $latePercentage,
+            earlyPercentage: $earlyPercentage,
+        );
     }
 }
