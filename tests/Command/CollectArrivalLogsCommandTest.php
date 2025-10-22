@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Command;
 
 use App\Command\CollectArrivalLogsCommand;
+use App\Entity\City;
 use App\Entity\Route;
 use App\Entity\Stop;
 use App\Entity\StopTime;
@@ -34,6 +35,7 @@ final class CollectArrivalLogsCommandTest extends KernelTestCase
     private EntityManagerInterface $em;
     private ClientInterface $redis;
     private CommandTester $commandTester;
+    private City $testCity;
 
     protected function setUp(): void
     {
@@ -42,6 +44,9 @@ final class CollectArrivalLogsCommandTest extends KernelTestCase
         $this->em    = $this->getInjectable(EntityManagerInterface::class);
         $this->redis = $this->getInjectable(ClientInterface::class);
 
+        // Create test city for multi-city support
+        $this->testCity = $this->createTestCity();
+
         $application         = new Application(self::$kernel);
         $command             = $application->find('app:collect:arrival-logs');
         $this->commandTester = new CommandTester($command);
@@ -49,17 +54,17 @@ final class CollectArrivalLogsCommandTest extends KernelTestCase
 
     protected function tearDown(): void
     {
-        // Clean up Redis keys after each test
-        $this->redis->del('mtw:vehicles');
-        $this->redis->del('mtw:trips');
+        // Clean up Redis keys after each test (use saskatoon cityslug for compatibility)
+        $this->redis->del('mtw:saskatoon:vehicles');
+        $this->redis->del('mtw:saskatoon:trips');
         parent::tearDown();
     }
 
     public function testExecuteWithNoVehicles(): void
     {
-        // Arrange: Empty Redis (no vehicles)
-        $this->redis->hset('mtw:vehicles', 'ts', time());
-        $this->redis->hset('mtw:vehicles', 'json', json_encode([]));
+        // Arrange: Empty Redis (no vehicles) - use saskatoon city key
+        $this->redis->hset('mtw:saskatoon:vehicles', 'ts', time());
+        $this->redis->hset('mtw:saskatoon:vehicles', 'json', json_encode([]));
 
         // Act
         $exitCode = $this->commandTester->execute([]);
@@ -71,14 +76,14 @@ final class CollectArrivalLogsCommandTest extends KernelTestCase
 
     public function testExecuteWithVehiclesMissingRequiredData(): void
     {
-        // Arrange: Vehicles with missing required fields
+        // Arrange: Vehicles with missing required fields - use saskatoon city key
         $vehicles = [
             ['id' => 'veh-1'], // Missing trip and route
             ['trip'  => 'trip-1'], // Missing id and route
             ['route' => 'route-1'], // Missing id and trip
         ];
-        $this->redis->hset('mtw:vehicles', 'ts', time());
-        $this->redis->hset('mtw:vehicles', 'json', json_encode($vehicles));
+        $this->redis->hset('mtw:saskatoon:vehicles', 'ts', time());
+        $this->redis->hset('mtw:saskatoon:vehicles', 'json', json_encode($vehicles));
 
         // Act
         $exitCode = $this->commandTester->execute([]);
@@ -92,7 +97,7 @@ final class CollectArrivalLogsCommandTest extends KernelTestCase
 
     public function testExecuteWithValidVehicleButNoTripData(): void
     {
-        // Arrange: Valid vehicle but no trip/stop data in database
+        // Arrange: Valid vehicle but no trip/stop data in database - use saskatoon city key
         $vehicles = [
             [
                 'id'    => 'veh-test-1',
@@ -103,8 +108,8 @@ final class CollectArrivalLogsCommandTest extends KernelTestCase
                 'ts'    => time(),
             ],
         ];
-        $this->redis->hset('mtw:vehicles', 'ts', time());
-        $this->redis->hset('mtw:vehicles', 'json', json_encode($vehicles));
+        $this->redis->hset('mtw:saskatoon:vehicles', 'ts', time());
+        $this->redis->hset('mtw:saskatoon:vehicles', 'json', json_encode($vehicles));
 
         // Act
         $exitCode = $this->commandTester->execute([]);
@@ -132,7 +137,7 @@ final class CollectArrivalLogsCommandTest extends KernelTestCase
 
         $this->em->flush();
 
-        // Add vehicle to Redis
+        // Add vehicle to Redis - use saskatoon city key
         $vehicles = [
             [
                 'id'    => 'veh-test-valid',
@@ -143,8 +148,8 @@ final class CollectArrivalLogsCommandTest extends KernelTestCase
                 'ts'    => time(),
             ],
         ];
-        $this->redis->hset('mtw:vehicles', 'ts', time());
-        $this->redis->hset('mtw:vehicles', 'json', json_encode($vehicles));
+        $this->redis->hset('mtw:saskatoon:vehicles', 'ts', time());
+        $this->redis->hset('mtw:saskatoon:vehicles', 'json', json_encode($vehicles));
 
         // Act
         $exitCode = $this->commandTester->execute([]);
@@ -173,6 +178,26 @@ final class CollectArrivalLogsCommandTest extends KernelTestCase
         );
     }
 
+    private function createTestCity(): City
+    {
+        // Check if test city already exists
+        $city = $this->em->getRepository(City::class)->findOneBy(['slug' => 'test-city']);
+
+        if ($city === null) {
+            $city = new City();
+            $city->setName('Test City');
+            $city->setSlug('test-city');
+            $city->setCountry('CA');
+            $city->setCenterLat('52.1324');
+            $city->setCenterLon('-106.6689');
+            $city->setActive(true);
+            $this->em->persist($city);
+            $this->em->flush();
+        }
+
+        return $city;
+    }
+
     private function createRoute(string $gtfsId): Route
     {
         $route = new Route();
@@ -181,6 +206,7 @@ final class CollectArrivalLogsCommandTest extends KernelTestCase
         $route->setLongName('Test Route '.$gtfsId);
         $route->setRouteType(RouteTypeEnum::Bus);
         $route->setColour('FF0000');
+        $route->setCity($this->testCity);
         $this->em->persist($route);
 
         return $route;
@@ -193,6 +219,7 @@ final class CollectArrivalLogsCommandTest extends KernelTestCase
         $trip->setRoute($route);
         $trip->setHeadsign('Test Headsign');
         $trip->setDirection(DirectionEnum::Zero);
+        $trip->setCity($this->testCity);
         $this->em->persist($trip);
 
         return $trip;
@@ -205,6 +232,7 @@ final class CollectArrivalLogsCommandTest extends KernelTestCase
         $stop->setName('Test Stop '.$gtfsId);
         $stop->setLat(52.1332 + random_int(-100, 100) / 10000);
         $stop->setLong(-106.6700 + random_int(-100, 100) / 10000);
+        $stop->setCity($this->testCity);
         $this->em->persist($stop);
 
         return $stop;
