@@ -29,6 +29,7 @@ final class RouteSearchComponent
     #[ExposeInTemplate('routes')]
     public function getRoutes(): array
     {
-        return $this->performanceService->getRouteListWithMetrics($this->search, $this->sort);
+        // Pass null for city to show all routes (web dashboard shows all cities)
+        return $this->performanceService->getRouteListWithMetrics(null, $this->search, $this->sort);
     }
 }
