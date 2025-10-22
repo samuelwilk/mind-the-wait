@@ -7,14 +7,23 @@ namespace App\Service\Bunching;
 use App\Entity\BunchingIncident;
 use App\Repository\ArrivalLogRepository;
 use App\Repository\BunchingIncidentRepository;
+use App\Repository\RouteRepository;
+use App\Repository\StopRepository;
 use App\Repository\WeatherObservationRepository;
 use Psr\Log\LoggerInterface;
+
+use function count;
 
 /**
  * Detects vehicle bunching incidents from arrival logs.
  *
  * Bunching occurs when 2+ vehicles on the same route arrive at a stop
  * within a short time window (default: 120 seconds / 2 minutes).
+ *
+ * This service orchestrates bunching detection by:
+ * 1. Querying arrival logs for bunching candidates (delegated to repository)
+ * 2. Enriching candidates with route, stop, and weather data
+ * 3. Batch-persisting incidents for better performance
  */
 final readonly class BunchingDetector
 {
@@ -23,6 +32,8 @@ final readonly class BunchingDetector
     public function __construct(
         private ArrivalLogRepository $arrivalLogRepo,
         private BunchingIncidentRepository $bunchingRepo,
+        private RouteRepository $routeRepo,
+        private StopRepository $stopRepo,
         private WeatherObservationRepository $weatherRepo,
         private LoggerInterface $logger,
     ) {
@@ -43,104 +54,59 @@ final readonly class BunchingDetector
             'time_window_seconds' => $timeWindowSeconds,
         ]);
 
-        // Use native SQL for better performance with window functions
-        $conn = $this->arrivalLogRepo->getEntityManager()->getConnection();
+        // Delegate SQL query to repository - returns typed DTOs
+        $candidates = $this->arrivalLogRepo->findBunchingCandidates($startOfDay, $endOfDay, $timeWindowSeconds);
 
-        $sql = "
-            WITH vehicle_arrivals AS (
-                SELECT
-                    route_id,
-                    stop_id,
-                    vehicle_id,
-                    predicted_arrival_at,
-                    predicted_at,
-                    -- Get the previous vehicle's arrival time for this route/stop
-                    LAG(predicted_arrival_at) OVER (
-                        PARTITION BY route_id, stop_id
-                        ORDER BY predicted_arrival_at
-                    ) as prev_arrival_at,
-                    -- Get the previous vehicle ID
-                    LAG(vehicle_id) OVER (
-                        PARTITION BY route_id, stop_id
-                        ORDER BY predicted_arrival_at
-                    ) as prev_vehicle_id
-                FROM arrival_log
-                WHERE predicted_at >= :start_date
-                    AND predicted_at < :end_date
-                    AND predicted_arrival_at IS NOT NULL
-            ),
-            bunching_candidates AS (
-                SELECT
-                    route_id,
-                    stop_id,
-                    predicted_arrival_at as bunching_time,
-                    vehicle_id,
-                    prev_vehicle_id,
-                    EXTRACT(EPOCH FROM (predicted_arrival_at - prev_arrival_at)) as time_gap_seconds
-                FROM vehicle_arrivals
-                WHERE prev_arrival_at IS NOT NULL
-                    AND vehicle_id != prev_vehicle_id  -- Different vehicles
-                    AND EXTRACT(EPOCH FROM (predicted_arrival_at - prev_arrival_at)) <= :time_window
-                    AND EXTRACT(EPOCH FROM (predicted_arrival_at - prev_arrival_at)) > 0
-            )
-            SELECT
-                route_id,
-                stop_id,
-                bunching_time,
-                COUNT(*) + 1 as vehicle_count,  -- +1 to include the first vehicle
-                STRING_AGG(DISTINCT vehicle_id || ',' || prev_vehicle_id, ';') as vehicle_ids
-            FROM bunching_candidates
-            GROUP BY route_id, stop_id, bunching_time
-            ORDER BY bunching_time
-        ";
+        $incidents = [];
+        $skipped   = 0;
 
-        $results = $conn->executeQuery($sql, [
-            'start_date'  => $startOfDay->format('Y-m-d H:i:s'),
-            'end_date'    => $endOfDay->format('Y-m-d H:i:s'),
-            'time_window' => $timeWindowSeconds,
-        ])->fetchAllAssociative();
-
-        $detected = 0;
-        $skipped  = 0;
-
-        foreach ($results as $row) {
+        foreach ($candidates as $candidate) {
             try {
-                $bunchingTime = new \DateTimeImmutable($row['bunching_time']);
-
                 // Find nearest weather observation
-                $weather = $this->weatherRepo->findClosestTo($bunchingTime);
+                $weather = $this->weatherRepo->findClosestTo($candidate->bunchingTime);
 
-                // Get route and stop entities
-                $route = $this->arrivalLogRepo->getEntityManager()->find(\App\Entity\Route::class, (int) $row['route_id']);
-                $stop  = $this->arrivalLogRepo->getEntityManager()->find(\App\Entity\Stop::class, (int) $row['stop_id']);
+                // Get route and stop entities via repositories (not EntityManager)
+                $route = $this->routeRepo->find($candidate->routeId);
+                $stop  = $this->stopRepo->find($candidate->stopId);
 
                 if ($route === null || $stop === null) {
                     ++$skipped;
+                    $this->logger->warning('Route or stop not found for bunching candidate', [
+                        'route_id' => $candidate->routeId,
+                        'stop_id'  => $candidate->stopId,
+                    ]);
 
                     continue;
                 }
 
+                // Build incident entity from DTO
                 $incident = new BunchingIncident();
                 $incident->setRoute($route);
                 $incident->setStop($stop);
-                $incident->setDetectedAt($bunchingTime);
-                $incident->setVehicleCount((int) $row['vehicle_count']);
+                $incident->setDetectedAt($candidate->bunchingTime);
+                $incident->setVehicleCount($candidate->vehicleCount);
                 $incident->setTimeWindowSeconds($timeWindowSeconds);
-                $incident->setVehicleIds($row['vehicle_ids']);
+                $incident->setVehicleIds($candidate->vehicleIds);
                 $incident->setWeatherObservation($weather);
 
-                $this->bunchingRepo->save($incident, flush: true);
-                ++$detected;
+                $incidents[] = $incident;
             } catch (\Exception $e) {
                 ++$skipped;
-                $this->logger->error('Failed to save bunching incident', [
-                    'route_id'      => $row['route_id'],
-                    'stop_id'       => $row['stop_id'],
-                    'bunching_time' => $row['bunching_time'],
+                $this->logger->error('Failed to build bunching incident', [
+                    'route_id'      => $candidate->routeId,
+                    'stop_id'       => $candidate->stopId,
+                    'bunching_time' => $candidate->bunchingTime->format('Y-m-d H:i:s'),
                     'error'         => $e->getMessage(),
                 ]);
             }
         }
+
+        // Batch persist all incidents in a single transaction
+        if (count($incidents) > 0) {
+            $this->bunchingRepo->saveBatch($incidents);
+        }
+
+        $detected = count($incidents);
 
         $this->logger->info('Bunching detection completed', [
             'date'     => $date->format('Y-m-d'),

@@ -2,7 +2,12 @@
 
 namespace App\Repository;
 
+use App\Dto\RealtimeSnapshotDto;
+use App\Dto\RouteScoreDto;
+use App\Dto\RouteScoresDto;
 use App\Dto\VehicleDto;
+use App\Dto\VehicleFeedbackDto;
+use App\Dto\VehicleSnapshotDto;
 use Predis\ClientInterface;
 
 use function is_array;
@@ -103,6 +108,8 @@ final readonly class RealtimeRepository
      * @param string $citySlug City slug for Redis namespace
      *
      * @return array{ts:int,items:list<array<string,mixed>>}
+     *
+     * @deprecated Use getScores() instead for typed DTO access
      */
     public function readScores(string $citySlug = 'saskatoon'): array
     {
@@ -113,6 +120,94 @@ final readonly class RealtimeRepository
         }
 
         return ['ts' => (int) ($h['ts'] ?? 0), 'items' => $items];
+    }
+
+    /**
+     * Get route scores as typed DTO.
+     *
+     * @param string $citySlug City slug for Redis namespace
+     */
+    public function getScores(string $citySlug = 'saskatoon'): RouteScoresDto
+    {
+        $h     = $this->redis->hgetall($this->getKey('score', $citySlug));
+        $items = isset($h['json']) ? json_decode($h['json'], true) : [];
+        if (!is_array($items)) {
+            $items = [];
+        }
+
+        $dtos = [];
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $dtos[] = new RouteScoreDto(
+                routeId: (string) ($item['route_id'] ?? ''),
+                direction: (int) ($item['direction'] ?? 0),
+                observedHeadwaySec: isset($item['observed_headway_sec']) ? (int) $item['observed_headway_sec'] : null,
+                scheduledHeadwaySec: isset($item['scheduled_headway_sec']) ? (int) $item['scheduled_headway_sec'] : null,
+                vehicles: (int) ($item['vehicles'] ?? 0),
+                grade: (string) ($item['grade'] ?? 'N/A'),
+                confidence: (string) ($item['confidence'] ?? 'low'),
+                asOf: (int) ($item['as_of'] ?? 0),
+            );
+        }
+
+        return new RouteScoresDto(
+            ts: (int) ($h['ts'] ?? 0),
+            items: $dtos,
+        );
+    }
+
+    /**
+     * Get realtime snapshot as typed DTO.
+     *
+     * @param string $citySlug City slug for Redis namespace
+     */
+    public function getSnapshot(string $citySlug = 'saskatoon'): RealtimeSnapshotDto
+    {
+        $veh = $this->redis->hgetall($this->getKey('vehicles', $citySlug)) ?: [];
+
+        $vehicles = $this->safeJsonDecode($veh['json'] ?? '[]');
+        $ts       = (int) ($veh['ts'] ?? 0);
+
+        if (!is_array($vehicles)) {
+            $vehicles = [];
+        }
+
+        $vehicleDtos = [];
+        foreach ($vehicles as $vehicle) {
+            if (!is_array($vehicle)) {
+                continue;
+            }
+
+            $feedback = $vehicle['feedback'] ?? [];
+            if (!is_array($feedback)) {
+                $feedback = [];
+            }
+
+            $vehicleDtos[] = new VehicleSnapshotDto(
+                id: (string) ($vehicle['id'] ?? ''),
+                trip: (string) ($vehicle['trip'] ?? ''),
+                route: (string) ($vehicle['route'] ?? ''),
+                lat: (float) ($vehicle['lat'] ?? 0.0),
+                lon: (float) ($vehicle['lon'] ?? 0.0),
+                bearing: (int) ($vehicle['bearing'] ?? 0),
+                speed: isset($vehicle['speed']) ? (float) $vehicle['speed'] : null,
+                ts: (int) ($vehicle['ts'] ?? 0),
+                feedback: new VehicleFeedbackDto(
+                    ahead: (int) ($feedback['ahead'] ?? 0),
+                    onTime: (int) ($feedback['on_time'] ?? 0),
+                    late: (int) ($feedback['late'] ?? 0),
+                    total: (int) ($feedback['total'] ?? 0),
+                ),
+            );
+        }
+
+        return new RealtimeSnapshotDto(
+            ts: $ts,
+            vehicles: $vehicleDtos,
+        );
     }
 
     /** Quick health info for /healthz or logs */

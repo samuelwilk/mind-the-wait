@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Dashboard;
 
 use App\Dto\RouteMetricDto;
+use App\Dto\RouteScoreDto;
 use App\Dto\SystemMetricsDto;
 use App\Dto\WeatherDataDto;
 use App\Entity\WeatherObservation;
@@ -35,18 +36,18 @@ final readonly class OverviewService
      */
     public function getSystemMetrics(): SystemMetricsDto
     {
-        // Get current realtime snapshot
-        $snapshot = $this->realtimeRepo->snapshot();
-        $scores   = $this->realtimeRepo->readScores();
+        // Get current realtime snapshot as typed DTO
+        $snapshot = $this->realtimeRepo->getSnapshot();
+        $scores   = $this->realtimeRepo->getScores();
 
         // Count active vehicles
-        $activeVehicles = count($snapshot['vehicles'] ?? []);
+        $activeVehicles = count($snapshot->vehicles);
 
         // Count total routes
         $totalRoutes = $this->routeRepo->count();
 
         // Calculate system-wide grade and on-time percentage from scores
-        [$systemGrade, $onTimePercentage] = $this->calculateSystemGrade($scores['items']);
+        [$systemGrade, $onTimePercentage] = $this->calculateSystemGrade($scores->items);
 
         // Get yesterday's performance for trend
         $changeVsYesterday = $this->calculateTrendVsYesterday();
@@ -55,10 +56,10 @@ final readonly class OverviewService
         $currentWeather = $this->getCurrentWeather();
 
         // Get top performers (top 5 routes by grade)
-        $topPerformers = $this->getTopPerformers($scores['items'], limit: 5);
+        $topPerformers = $this->getTopPerformers($scores->items, limit: 5);
 
         // Get routes needing attention (bottom 5 routes by grade)
-        $needsAttention = $this->getNeedsAttention($scores['items'], limit: 5);
+        $needsAttention = $this->getNeedsAttention($scores->items, limit: 5);
 
         // Get historical top/worst performers (last 30 days)
         $historicalTopPerformers   = $this->getHistoricalTopPerformers(days: 30, limit: 5);
@@ -88,7 +89,7 @@ final readonly class OverviewService
     /**
      * Calculate system-wide grade and on-time percentage from route scores.
      *
-     * @param list<array<string,mixed>> $scores
+     * @param list<RouteScoreDto> $scores
      *
      * @return array{0: string, 1: float}
      */
@@ -112,14 +113,11 @@ final readonly class OverviewService
         $totalVehicles = 0;
 
         foreach ($scores as $score) {
-            $grade    = $score['grade']    ?? 'N/A';
-            $vehicles = $score['vehicles'] ?? 1;
-
-            $points = $gradePoints[$grade] ?? 2.0;
+            $points = $gradePoints[$score->grade] ?? 2.0;
 
             // Weight by number of vehicles on route
-            $totalPoints   += $points * $vehicles;
-            $totalVehicles += $vehicles;
+            $totalPoints   += $points * $score->vehicles;
+            $totalVehicles += $score->vehicles;
         }
 
         if ($totalVehicles === 0) {
@@ -226,15 +224,14 @@ final readonly class OverviewService
     /**
      * Get top performing routes.
      *
-     * @param list<array<string,mixed>> $scores
+     * @param list<RouteScoreDto> $scores
      *
      * @return list<RouteMetricDto>
      */
     private function getTopPerformers(array $scores, int $limit = 5): array
     {
         // Filter out N/A grades AND routes with no vehicles
-        $validScores = array_filter($scores, fn (array $score) => ($score['grade'] ?? 'N/A') !== 'N/A' && ($score['vehicles'] ?? 0) > 0
-        );
+        $validScores = array_filter($scores, fn (RouteScoreDto $score) => $score->grade !== 'N/A' && $score->vehicles > 0);
 
         if (count($validScores) === 0) {
             return [];
@@ -243,9 +240,9 @@ final readonly class OverviewService
         // Sort by grade (A > B > C > D > F), then by vehicle count (more vehicles = higher confidence)
         $gradeOrder = ['A' => 5, 'B' => 4, 'C' => 3, 'D' => 2, 'F' => 1];
 
-        usort($validScores, function ($a, $b) use ($gradeOrder) {
-            $gradeA = $gradeOrder[$a['grade'] ?? 'N/A'] ?? 0;
-            $gradeB = $gradeOrder[$b['grade'] ?? 'N/A'] ?? 0;
+        usort($validScores, function (RouteScoreDto $a, RouteScoreDto $b) use ($gradeOrder) {
+            $gradeA = $gradeOrder[$a->grade] ?? 0;
+            $gradeB = $gradeOrder[$b->grade] ?? 0;
 
             // Primary sort: grade
             if ($gradeA !== $gradeB) {
@@ -253,14 +250,11 @@ final readonly class OverviewService
             }
 
             // Secondary sort: vehicle count (higher is better for confidence)
-            $vehiclesA = $a['vehicles'] ?? 0;
-            $vehiclesB = $b['vehicles'] ?? 0;
-
-            return $vehiclesB <=> $vehiclesA;
+            return $b->vehicles <=> $a->vehicles;
         });
 
         return array_map(
-            fn (array $score) => $this->scoreToRouteMetric($score),
+            fn (RouteScoreDto $score) => $this->scoreToRouteMetric($score),
             array_slice($validScores, 0, $limit)
         );
     }
@@ -268,7 +262,7 @@ final readonly class OverviewService
     /**
      * Get routes needing attention.
      *
-     * @param list<array<string,mixed>> $scores
+     * @param list<RouteScoreDto> $scores
      *
      * @return list<RouteMetricDto>
      */
@@ -276,21 +270,18 @@ final readonly class OverviewService
     {
         // Filter: Keep routes with grades D or F, or grade C with issues
         // Also filter out routes with no vehicles
-        $validScores = array_filter($scores, function (array $score) {
-            $grade    = $score['grade']    ?? 'N/A';
-            $vehicles = $score['vehicles'] ?? 0;
-
-            if ($vehicles === 0 || $grade === 'N/A') {
+        $validScores = array_filter($scores, function (RouteScoreDto $score) {
+            if ($score->vehicles === 0 || $score->grade === 'N/A') {
                 return false;
             }
 
             // Always include D and F grades
-            if ($grade === 'D' || $grade === 'F') {
+            if ($score->grade === 'D' || $score->grade === 'F') {
                 return true;
             }
 
             // Include grade C if it's a single-vehicle route (limited data)
-            if ($grade === 'C' && $vehicles === 1) {
+            if ($score->grade === 'C' && $score->vehicles === 1) {
                 return true;
             }
 
@@ -304,9 +295,9 @@ final readonly class OverviewService
         // Sort by grade (F > D > C) - worst first
         $gradeOrder = ['A' => 5, 'B' => 4, 'C' => 3, 'D' => 2, 'F' => 1];
 
-        usort($validScores, function ($a, $b) use ($gradeOrder) {
-            $gradeA = $gradeOrder[$a['grade'] ?? 'N/A'] ?? 0;
-            $gradeB = $gradeOrder[$b['grade'] ?? 'N/A'] ?? 0;
+        usort($validScores, function (RouteScoreDto $a, RouteScoreDto $b) use ($gradeOrder) {
+            $gradeA = $gradeOrder[$a->grade] ?? 0;
+            $gradeB = $gradeOrder[$b->grade] ?? 0;
 
             // Primary sort: grade (worst first)
             if ($gradeA !== $gradeB) {
@@ -314,53 +305,45 @@ final readonly class OverviewService
             }
 
             // Secondary sort: vehicle count (fewer vehicles = more concerning for single-vehicle routes)
-            $vehiclesA = $a['vehicles'] ?? 0;
-            $vehiclesB = $b['vehicles'] ?? 0;
-
-            return $vehiclesA <=> $vehiclesB;
+            return $a->vehicles <=> $b->vehicles;
         });
 
         return array_map(
-            fn (array $score) => $this->scoreToRouteMetric($score, includeIssue: true),
+            fn (RouteScoreDto $score) => $this->scoreToRouteMetric($score, includeIssue: true),
             array_slice($validScores, 0, $limit)
         );
     }
 
     /**
-     * Convert score array to RouteMetricDto.
-     *
-     * @param array<string,mixed> $score
+     * Convert score DTO to RouteMetricDto.
      */
-    private function scoreToRouteMetric(array $score, bool $includeIssue = false): RouteMetricDto
+    private function scoreToRouteMetric(RouteScoreDto $score, bool $includeIssue = false): RouteMetricDto
     {
-        $routeId = $score['route_id'] ?? 'unknown';
-        $route   = $this->routeRepo->findOneBy(['gtfsId' => $routeId]);
+        $route = $this->routeRepo->findOneBy(['gtfsId' => $score->routeId]);
 
-        $shortName = $route?->getShortName() ?? $routeId;
+        $shortName = $route?->getShortName() ?? $score->routeId;
         $longName  = $route?->getLongName()  ?? 'Unknown Route';
 
-        $grade            = $score['grade']    ?? 'N/A';
-        $vehicleCount     = $score['vehicles'] ?? 0;
-        $onTimePercentage = $this->gradeToOnTimePercentage($grade);
+        $onTimePercentage = $this->gradeToOnTimePercentage($score->grade);
 
         $issue = null;
-        if ($includeIssue && ($grade === 'D' || $grade === 'F')) {
+        if ($includeIssue && ($score->grade === 'D' || $score->grade === 'F')) {
             $issue = $this->identifyIssue($score);
         }
 
         // For single-vehicle routes with grade C, indicate limited data
-        if ($vehicleCount === 1 && $grade === 'C' && ($score['observed_headway_sec'] ?? null) === null) {
+        if ($score->vehicles === 1 && $score->grade === 'C' && $score->observedHeadwaySec === null) {
             $issue = $issue ?? 'limited_data';
         }
 
         return new RouteMetricDto(
-            routeId: $routeId,
+            routeId: $score->routeId,
             shortName: $shortName,
             longName: $longName,
-            grade: $grade,
+            grade: $score->grade,
             onTimePercentage: $onTimePercentage,
             colour: $route?->getColour(),
-            activeVehicles: $vehicleCount,
+            activeVehicles: $score->vehicles,
             trend: null, // TODO: Calculate trend when we have historical data
             issue: $issue,
         );
@@ -383,25 +366,20 @@ final readonly class OverviewService
 
     /**
      * Identify issue for poorly performing route.
-     *
-     * @param array<string,mixed> $score
      */
-    private function identifyIssue(array $score): string
+    private function identifyIssue(RouteScoreDto $score): string
     {
-        $observedHeadway  = $score['observed_headway_sec']  ?? null;
-        $scheduledHeadway = $score['scheduled_headway_sec'] ?? null;
-
-        if ($observedHeadway === null || $scheduledHeadway === null) {
+        if ($score->observedHeadwaySec === null || $score->scheduledHeadwaySec === null) {
             return 'delays';
         }
 
         // If observed headway is much shorter than scheduled, it's bunching
-        if ($observedHeadway < $scheduledHeadway * 0.5) {
+        if ($score->observedHeadwaySec < $score->scheduledHeadwaySec * 0.5) {
             return 'bunching';
         }
 
         // If observed headway is much longer, it's gaps
-        if ($observedHeadway > $scheduledHeadway * 1.5) {
+        if ($score->observedHeadwaySec > $score->scheduledHeadwaySec * 1.5) {
             return 'gaps';
         }
 

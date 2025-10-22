@@ -30,6 +30,22 @@ final class BunchingIncidentRepository extends ServiceEntityRepository
     }
 
     /**
+     * Save multiple bunching incidents in a single batch.
+     *
+     * @param list<BunchingIncident> $incidents
+     */
+    public function saveBatch(array $incidents): void
+    {
+        $em = $this->getEntityManager();
+
+        foreach ($incidents as $incident) {
+            $em->persist($incident);
+        }
+
+        $em->flush();
+    }
+
+    /**
      * Find bunching incidents within a date range.
      *
      * @return list<BunchingIncident>
