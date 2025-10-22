@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Service\Dashboard;
 
+use App\Dto\Insight\BunchingByWeatherStatsDto;
+use App\Dto\Insight\DashboardTemperatureStatsDto;
+use App\Dto\Insight\DashboardWinterImpactStatsDto;
+use App\Dto\Insight\TemperatureThresholdStatsDto;
+use App\Dto\Insight\WeatherImpactMatrixStatsDto;
+use App\Dto\Insight\WinterOperationsStatsDto;
 use App\Service\Dashboard\InsightGeneratorService;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
@@ -30,12 +36,12 @@ final class InsightGeneratorServiceTest extends TestCase
 
     public function testGenerateWinterOperationsInsightReturnsCachedContent(): void
     {
-        $stats = [
-            'worstRoute'      => 'Route 27',
-            'clearPerf'       => 78.0,
-            'snowPerf'        => 45.0,
-            'performanceDrop' => 33.0,
-        ];
+        $stats = new WinterOperationsStatsDto(
+            worstRoute: 'Route 27',
+            clearPerf: 78.0,
+            snowPerf: 45.0,
+            performanceDrop: 33.0,
+        );
 
         $cachedContent = '<p>Test cached content</p>';
 
@@ -60,13 +66,13 @@ final class InsightGeneratorServiceTest extends TestCase
 
     public function testGenerateTemperatureThresholdInsightReturnsCachedContent(): void
     {
-        $stats = [
-            'aboveThreshold'  => 79.2,
-            'belowThreshold'  => 58.5,
-            'performanceDrop' => 20.7,
-            'daysAbove'       => 150,
-            'daysBelow'       => 30,
-        ];
+        $stats = new TemperatureThresholdStatsDto(
+            aboveThreshold: 79.2,
+            belowThreshold: 58.5,
+            performanceDrop: 20.7,
+            daysAbove: 150,
+            daysBelow: 30,
+        );
 
         $cachedContent = '<p>Temperature insight</p>';
 
@@ -91,11 +97,11 @@ final class InsightGeneratorServiceTest extends TestCase
 
     public function testGenerateWeatherImpactMatrixInsightReturnsCachedContent(): void
     {
-        $stats = [
-            'worstCondition' => 'Snow',
-            'avgPerformance' => 55.5,
-            'dayCount'       => 45,
-        ];
+        $stats = new WeatherImpactMatrixStatsDto(
+            worstCondition: 'Snow',
+            avgPerformance: 55.5,
+            dayCount: 45,
+        );
 
         $cachedContent = '<p>Matrix insight</p>';
 
@@ -120,16 +126,16 @@ final class InsightGeneratorServiceTest extends TestCase
 
     public function testGenerateBunchingByWeatherInsightReturnsCachedContent(): void
     {
-        $stats = [
-            'snow_rate'   => 5.35,
-            'rain_rate'   => 3.21,
-            'clear_rate'  => 1.48,
-            'snow_hours'  => 72.0,
-            'rain_hours'  => 48.0,
-            'clear_hours' => 600.0,
-            'multiplier'  => 3.6,
-            'hasData'     => true,
-        ];
+        $stats = new BunchingByWeatherStatsDto(
+            hasData: true,
+            snowRate: 5.35,
+            snowHours: 72,
+            rainRate: 3.21,
+            rainHours: 48,
+            clearRate: 1.48,
+            clearHours: 600,
+            multiplier: 3.6,
+        );
 
         $cachedContent = '<p>Bunching insight</p>';
 
@@ -177,7 +183,7 @@ final class InsightGeneratorServiceTest extends TestCase
 
     public function testGenerateDashboardWinterImpactCardReturnsCachedContent(): void
     {
-        $stats         = ['avgDrop' => 33.0];
+        $stats         = new DashboardWinterImpactStatsDto(avgDrop: 33.0);
         $cachedContent = '<p>Dashboard winter card</p>';
 
         $cacheItem = $this->createMock(CacheItemInterface::class);
@@ -201,10 +207,12 @@ final class InsightGeneratorServiceTest extends TestCase
 
     public function testGenerateDashboardTemperatureCardReturnsCachedContent(): void
     {
-        $stats = [
-            'threshold'     => '-20',
-            'delayIncrease' => '5-7',
-        ];
+        $stats = new DashboardTemperatureStatsDto(
+            threshold: -20,
+            aboveThreshold: 78.0,
+            belowThreshold: 65.0,
+            performanceDrop: 13.0,
+        );
         $cachedContent = '<p>Dashboard temperature card</p>';
 
         $cacheItem = $this->createMock(CacheItemInterface::class);
@@ -228,8 +236,18 @@ final class InsightGeneratorServiceTest extends TestCase
 
     public function testCacheKeysAreDifferentForDifferentStats(): void
     {
-        $stats1 = ['worstRoute' => 'Route 27', 'clearPerf' => 78.0, 'snowPerf' => 45.0, 'performanceDrop' => 33.0];
-        $stats2 = ['worstRoute' => 'Route 14', 'clearPerf' => 92.0, 'snowPerf' => 84.0, 'performanceDrop' => 8.0];
+        $stats1 = new WinterOperationsStatsDto(
+            worstRoute: 'Route 27',
+            clearPerf: 78.0,
+            snowPerf: 45.0,
+            performanceDrop: 33.0
+        );
+        $stats2 = new WinterOperationsStatsDto(
+            worstRoute: 'Route 14',
+            clearPerf: 92.0,
+            snowPerf: 84.0,
+            performanceDrop: 8.0
+        );
 
         $cacheItem = $this->createMock(CacheItemInterface::class);
         $cacheItem->method('isHit')->willReturn(true);

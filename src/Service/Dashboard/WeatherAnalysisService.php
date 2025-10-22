@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Service\Dashboard;
 
+use App\Dto\Insight\BunchingByWeatherStatsDto;
+use App\Dto\Insight\TemperatureThresholdStatsDto;
+use App\Dto\Insight\WeatherImpactMatrixStatsDto;
+use App\Dto\Insight\WinterOperationsStatsDto;
 use App\Dto\WeatherImpactDto;
 use App\Enum\WeatherCondition;
 use App\Repository\BunchingIncidentRepository;
@@ -80,31 +84,29 @@ final readonly class WeatherAnalysisService
 
     /**
      * Build statistics for winter operations story card.
-     *
-     * @return array<string, mixed>
      */
-    private function buildWinterOperationsStats(): array
+    private function buildWinterOperationsStats(): WinterOperationsStatsDto
     {
         // Get worst affected route from repository
         $results = $this->performanceRepo->findWinterPerformanceComparison(minDays: 3, limit: 1);
 
         if (empty($results)) {
-            return [
-                'worstRoute'      => 'N/A',
-                'clearPerf'       => 0.0,
-                'snowPerf'        => 0.0,
-                'performanceDrop' => 0.0,
-            ];
+            return new WinterOperationsStatsDto(
+                worstRoute: 'N/A',
+                clearPerf: 0.0,
+                snowPerf: 0.0,
+                performanceDrop: 0.0,
+            );
         }
 
         $worst = $results[0];
 
-        return [
-            'worstRoute'      => 'Route '.$worst->shortName,
-            'clearPerf'       => round($worst->clearPerformance, 1),
-            'snowPerf'        => round($worst->snowPerformance, 1),
-            'performanceDrop' => round($worst->performanceDrop, 1),
-        ];
+        return new WinterOperationsStatsDto(
+            worstRoute: 'Route '.$worst->shortName,
+            clearPerf: round($worst->clearPerformance, 1),
+            snowPerf: round($worst->snowPerformance, 1),
+            performanceDrop: round($worst->performanceDrop, 1),
+        );
     }
 
     /**
@@ -137,10 +139,8 @@ final readonly class WeatherAnalysisService
 
     /**
      * Build statistics for temperature threshold story card.
-     *
-     * @return array<string, mixed>
      */
-    private function buildTemperatureThresholdStats(): array
+    private function buildTemperatureThresholdStats(): TemperatureThresholdStatsDto
     {
         // Get temperature threshold comparison from repository
         $result = $this->performanceRepo->findPerformanceByTemperatureThreshold(threshold: -20.0);
@@ -148,13 +148,13 @@ final readonly class WeatherAnalysisService
         $aboveThreshold = $result['above']->avgPerformance;
         $belowThreshold = $result['below']->avgPerformance;
 
-        return [
-            'aboveThreshold'  => $aboveThreshold,
-            'belowThreshold'  => $belowThreshold,
-            'performanceDrop' => round($aboveThreshold - $belowThreshold, 1),
-            'daysAbove'       => $result['above']->dayCount,
-            'daysBelow'       => $result['below']->dayCount,
-        ];
+        return new TemperatureThresholdStatsDto(
+            aboveThreshold: $aboveThreshold,
+            belowThreshold: $belowThreshold,
+            performanceDrop: round($aboveThreshold - $belowThreshold, 1),
+            daysAbove: $result['above']->dayCount,
+            daysBelow: $result['below']->dayCount,
+        );
     }
 
     /**
@@ -201,27 +201,25 @@ final readonly class WeatherAnalysisService
 
     /**
      * Build statistics for weather impact matrix story card.
-     *
-     * @return array<string, mixed>
      */
-    private function buildWeatherImpactStats(): array
+    private function buildWeatherImpactStats(): WeatherImpactMatrixStatsDto
     {
         // Get worst performing weather condition from repository
         $result = $this->performanceRepo->findWorstPerformingWeatherCondition();
 
         if ($result === null) {
-            return [
-                'worstCondition' => 'N/A',
-                'avgPerformance' => 0.0,
-                'dayCount'       => 0,
-            ];
+            return new WeatherImpactMatrixStatsDto(
+                worstCondition: 'N/A',
+                avgPerformance: 0.0,
+                dayCount: 0,
+            );
         }
 
-        return [
-            'worstCondition' => $result->weatherCondition->label(),
-            'avgPerformance' => $result->avgPerformance,
-            'dayCount'       => $result->dayCount,
-        ];
+        return new WeatherImpactMatrixStatsDto(
+            worstCondition: $result->weatherCondition->label(),
+            avgPerformance: $result->avgPerformance,
+            dayCount: $result->dayCount,
+        );
     }
 
     /**
@@ -267,10 +265,8 @@ final readonly class WeatherAnalysisService
 
     /**
      * Build statistics for bunching story card with normalized rates.
-     *
-     * @return array<string, mixed>
      */
-    private function buildBunchingByWeatherStats(): array
+    private function buildBunchingByWeatherStats(): BunchingByWeatherStatsDto
     {
         $endDate   = new \DateTimeImmutable('today');
         $startDate = $endDate->modify('-30 days');
@@ -280,9 +276,9 @@ final readonly class WeatherAnalysisService
         $snowRate   = 0.0;
         $rainRate   = 0.0;
         $clearRate  = 0.0;
-        $snowHours  = 0.0;
-        $rainHours  = 0.0;
-        $clearHours = 0.0;
+        $snowHours  = 0;
+        $rainHours  = 0;
+        $clearHours = 0;
 
         foreach ($results as $dto) {
             match ($dto->weatherCondition) {
@@ -306,15 +302,15 @@ final readonly class WeatherAnalysisService
         $multiplier = $clearRate      > 0 ? round($snowRate / $clearRate, 1) : 0.0;
         $hasData    = count($results) > 0;
 
-        return [
-            'snow_rate'   => $snowRate,
-            'rain_rate'   => $rainRate,
-            'clear_rate'  => $clearRate,
-            'snow_hours'  => $snowHours,
-            'rain_hours'  => $rainHours,
-            'clear_hours' => $clearHours,
-            'multiplier'  => $multiplier,
-            'hasData'     => $hasData,
-        ];
+        return new BunchingByWeatherStatsDto(
+            hasData: $hasData,
+            snowRate: $snowRate,
+            snowHours: $snowHours,
+            rainRate: $rainRate,
+            rainHours: $rainHours,
+            clearRate: $clearRate,
+            clearHours: $clearHours,
+            multiplier: $multiplier,
+        );
     }
 }

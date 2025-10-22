@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repository;
 
+use App\Dto\WeatherObservationDto;
 use App\Entity\WeatherObservation;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
@@ -177,6 +178,51 @@ final class WeatherObservationRepository extends BaseRepository
         $this->save($observation, flush: true);
 
         return $observation;
+    }
+
+    /**
+     * Create or update weather observation from DTO.
+     *
+     * Handles entity construction and persistence, separating service layer from entity details.
+     * If observation with same observed_at exists, updates it. Otherwise creates new.
+     */
+    public function upsertFromDto(WeatherObservationDto $dto): WeatherObservation
+    {
+        $existing = $this->findByObservedAt($dto->observedAt);
+
+        if ($existing !== null) {
+            // Update existing observation
+            $this->hydrateEntityFromDto($existing, $dto);
+            $this->save($existing, flush: true);
+
+            return $existing;
+        }
+
+        // Create new observation
+        $observation = new WeatherObservation();
+        $this->hydrateEntityFromDto($observation, $dto);
+        $this->save($observation, flush: true);
+
+        return $observation;
+    }
+
+    /**
+     * Hydrate entity from DTO (shared logic for create/update).
+     */
+    private function hydrateEntityFromDto(WeatherObservation $entity, WeatherObservationDto $dto): void
+    {
+        $entity->setObservedAt($dto->observedAt);
+        $entity->setTemperatureCelsius($dto->temperatureCelsius);
+        $entity->setFeelsLikeCelsius($dto->feelsLikeCelsius);
+        $entity->setPrecipitationMm($dto->precipitationMm);
+        $entity->setSnowfallCm($dto->snowfallCm);
+        $entity->setSnowDepthCm($dto->snowDepthCm);
+        $entity->setWeatherCode($dto->weatherCode);
+        $entity->setWeatherCondition($dto->weatherCondition);
+        $entity->setVisibilityKm($dto->visibilityKm);
+        $entity->setWindSpeedKmh($dto->windSpeedKmh);
+        $entity->setTransitImpact($dto->transitImpact);
+        $entity->setDataSource($dto->dataSource);
     }
 
     /**

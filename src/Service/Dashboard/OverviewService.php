@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\Dashboard;
 
+use App\Dto\Insight\DashboardTemperatureStatsDto;
+use App\Dto\Insight\DashboardWinterImpactStatsDto;
 use App\Dto\RouteMetricDto;
 use App\Dto\RouteScoreDto;
 use App\Dto\SystemMetricsDto;
@@ -438,15 +440,13 @@ final readonly class OverviewService
 
     /**
      * Calculate winter impact statistics for dashboard card.
-     *
-     * @return array<string, mixed>
      */
-    private function calculateWinterImpactStats(): array
+    private function calculateWinterImpactStats(): DashboardWinterImpactStatsDto
     {
         $results = $this->performanceRepo->findWinterPerformanceComparison(minDays: 1, limit: 100);
 
         if (count($results) === 0) {
-            return ['avgDrop' => 0.0];
+            return new DashboardWinterImpactStatsDto(avgDrop: 0.0);
         }
 
         // Calculate average drop across all routes
@@ -457,27 +457,23 @@ final readonly class OverviewService
 
         $avgDrop = round($totalDrop / count($results), 1);
 
-        return [
-            'avgDrop' => $avgDrop,
-        ];
+        return new DashboardWinterImpactStatsDto(avgDrop: $avgDrop);
     }
 
     /**
      * Calculate temperature threshold statistics for dashboard card.
-     *
-     * @return array<string, mixed>
      */
-    private function calculateTemperatureThresholdStats(): array
+    private function calculateTemperatureThresholdStats(): DashboardTemperatureStatsDto
     {
         $result = $this->performanceRepo->findPerformanceByTemperatureThreshold(threshold: -20.0);
 
         $performanceDrop = $result['above']->avgPerformance - $result['below']->avgPerformance;
 
-        return [
-            'threshold'       => '-20',
-            'performanceDrop' => round($performanceDrop, 1),
-            'aboveThreshold'  => $result['above']->avgPerformance,
-            'belowThreshold'  => $result['below']->avgPerformance,
-        ];
+        return new DashboardTemperatureStatsDto(
+            threshold: -20,
+            aboveThreshold: $result['above']->avgPerformance,
+            belowThreshold: $result['below']->avgPerformance,
+            performanceDrop: round($performanceDrop, 1),
+        );
     }
 }

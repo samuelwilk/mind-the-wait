@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace App\Service\Dashboard;
 
+use App\Dto\Insight\BunchingByWeatherStatsDto;
+use App\Dto\Insight\DashboardTemperatureStatsDto;
+use App\Dto\Insight\DashboardWinterImpactStatsDto;
+use App\Dto\Insight\TemperatureThresholdStatsDto;
+use App\Dto\Insight\WeatherImpactMatrixStatsDto;
+use App\Dto\Insight\WinterOperationsStatsDto;
 use OpenAI;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
@@ -25,12 +31,10 @@ final readonly class InsightGeneratorService
 
     /**
      * Generate winter operations insight narrative.
-     *
-     * @param array<string, mixed> $stats Statistics from WeatherAnalysisService
      */
-    public function generateWinterOperationsInsight(array $stats): string
+    public function generateWinterOperationsInsight(WinterOperationsStatsDto $stats): string
     {
-        $cacheKey = 'insight_winter_ops_'.md5(serialize($stats));
+        $cacheKey = 'insight_winter_ops_'.md5(json_encode($stats));
         $item     = $this->cache->getItem($cacheKey);
 
         if ($item->isHit()) {
@@ -41,10 +45,10 @@ final readonly class InsightGeneratorService
 You are a transit data analyst writing insights for a public-facing transit dashboard.
 
 Based on this real data about route performance in clear vs snow conditions:
-- Worst affected route: {$stats['worstRoute']}
-- Performance in clear weather: {$stats['clearPerf']}%
-- Performance in snow: {$stats['snowPerf']}%
-- Performance drop: {$stats['performanceDrop']}%
+- Worst affected route: {$stats->worstRoute}
+- Performance in clear weather: {$stats->clearPerf}%
+- Performance in snow: {$stats->snowPerf}%
+- Performance drop: {$stats->performanceDrop}%
 
 Write a brief 2-paragraph insight (max 150 words):
 1. State the key finding and explain why this route is vulnerable
@@ -67,12 +71,10 @@ PROMPT;
 
     /**
      * Generate temperature threshold insight narrative.
-     *
-     * @param array<string, mixed> $stats Statistics from WeatherAnalysisService
      */
-    public function generateTemperatureThresholdInsight(array $stats): string
+    public function generateTemperatureThresholdInsight(TemperatureThresholdStatsDto $stats): string
     {
-        $cacheKey = 'insight_temp_threshold_'.md5(serialize($stats));
+        $cacheKey = 'insight_temp_threshold_'.md5(json_encode($stats));
         $item     = $this->cache->getItem($cacheKey);
 
         if ($item->isHit()) {
@@ -83,11 +85,11 @@ PROMPT;
 You are a transit data analyst writing insights for a public-facing transit dashboard.
 
 Based on this real data about transit performance at different temperatures:
-- Performance above -20°C: {$stats['aboveThreshold']}%
-- Performance below -20°C: {$stats['belowThreshold']}%
-- Performance drop: {$stats['performanceDrop']}%
-- Days observed above -20°C: {$stats['daysAbove']}
-- Days observed below -20°C: {$stats['daysBelow']}
+- Performance above -20°C: {$stats->aboveThreshold}%
+- Performance below -20°C: {$stats->belowThreshold}%
+- Performance drop: {$stats->performanceDrop}%
+- Days observed above -20°C: {$stats->daysAbove}
+- Days observed below -20°C: {$stats->daysBelow}
 
 Write a brief 2-paragraph insight (max 150 words):
 1. State the critical temperature threshold and describe the performance impact
@@ -110,12 +112,10 @@ PROMPT;
 
     /**
      * Generate weather impact matrix insight narrative.
-     *
-     * @param array<string, mixed> $stats Statistics from WeatherAnalysisService
      */
-    public function generateWeatherImpactMatrixInsight(array $stats): string
+    public function generateWeatherImpactMatrixInsight(WeatherImpactMatrixStatsDto $stats): string
     {
-        $cacheKey = 'insight_impact_matrix_'.md5(serialize($stats));
+        $cacheKey = 'insight_impact_matrix_'.md5(json_encode($stats));
         $item     = $this->cache->getItem($cacheKey);
 
         if ($item->isHit()) {
@@ -126,9 +126,9 @@ PROMPT;
 You are a transit data analyst writing insights for a public-facing transit dashboard.
 
 Based on this real data about system-wide weather impact:
-- Worst weather condition: {$stats['worstCondition']}
-- Average performance in this condition: {$stats['avgPerformance']}%
-- Days observed: {$stats['dayCount']}
+- Worst weather condition: {$stats->worstCondition}
+- Average performance in this condition: {$stats->avgPerformance}%
+- Days observed: {$stats->dayCount}
 
 Write a brief 2-paragraph insight (max 120 words):
 1. Explain how to read the heatmap (red = poor performance, green = good)
@@ -151,16 +151,14 @@ PROMPT;
 
     /**
      * Generate bunching by weather insight narrative.
-     *
-     * @param array<string, mixed> $stats Statistics from WeatherAnalysisService
      */
-    public function generateBunchingByWeatherInsight(array $stats): string
+    public function generateBunchingByWeatherInsight(BunchingByWeatherStatsDto $stats): string
     {
-        if (!$stats['hasData']) {
+        if (!$stats->hasData) {
             return '<p>No bunching data available yet. Run the bunching detection command to analyze arrival patterns.</p>';
         }
 
-        $cacheKey = 'insight_bunching_'.md5(serialize($stats));
+        $cacheKey = 'insight_bunching_'.md5(json_encode($stats));
         $item     = $this->cache->getItem($cacheKey);
 
         if ($item->isHit()) {
@@ -173,11 +171,11 @@ You are a transit data analyst writing insights for a public-facing transit dash
 Based on 30 days of transit data for Saskatoon Transit:
 
 Bunching rates by weather condition (incidents per hour):
-- Snow: {$stats['snow_rate']} incidents/hour ({$stats['snow_hours']} hours exposure)
-- Rain: {$stats['rain_rate']} incidents/hour ({$stats['rain_hours']} hours exposure)
-- Clear: {$stats['clear_rate']} incidents/hour ({$stats['clear_hours']} hours exposure)
+- Snow: {$stats->snowRate} incidents/hour ({$stats->snowHours} hours exposure)
+- Rain: {$stats->rainRate} incidents/hour ({$stats->rainHours} hours exposure)
+- Clear: {$stats->clearRate} incidents/hour ({$stats->clearHours} hours exposure)
 
-Snow weather has a {$stats['multiplier']}× higher bunching rate than clear weather.
+Snow weather has a {$stats->multiplier}× higher bunching rate than clear weather.
 
 Write a brief 2-paragraph insight (max 140 words):
 1. Explain what bunching is and why weather increases it
@@ -237,12 +235,10 @@ PROMPT;
 
     /**
      * Generate dashboard insight card: Winter Weather Impact.
-     *
-     * @param array<string, mixed> $stats Quick stats for the card
      */
-    public function generateDashboardWinterImpactCard(array $stats): string
+    public function generateDashboardWinterImpactCard(DashboardWinterImpactStatsDto $stats): string
     {
-        $cacheKey = 'insight_dashboard_winter_'.md5(serialize($stats));
+        $cacheKey = 'insight_dashboard_winter_'.md5(json_encode($stats));
         $item     = $this->cache->getItem($cacheKey);
 
         if ($item->isHit()) {
@@ -252,7 +248,7 @@ PROMPT;
         $prompt = <<<PROMPT
 You are writing a brief insight card for a transit dashboard homepage.
 
-Based on system-wide data showing routes experience an average {$stats['avgDrop']}% drop in performance during snow vs clear conditions.
+Based on system-wide data showing routes experience an average {$stats->avgDrop}% drop in performance during snow vs clear conditions.
 
 Write 1-2 sentences that:
 1. State the key finding concisely
@@ -274,12 +270,10 @@ PROMPT;
 
     /**
      * Generate dashboard insight card: Temperature Threshold.
-     *
-     * @param array<string, mixed> $stats Quick stats for the card
      */
-    public function generateDashboardTemperatureCard(array $stats): string
+    public function generateDashboardTemperatureCard(DashboardTemperatureStatsDto $stats): string
     {
-        $cacheKey = 'insight_dashboard_temp_'.md5(serialize($stats));
+        $cacheKey = 'insight_dashboard_temp_'.md5(json_encode($stats));
         $item     = $this->cache->getItem($cacheKey);
 
         if ($item->isHit()) {
@@ -289,7 +283,7 @@ PROMPT;
         $prompt = <<<PROMPT
 You are writing a brief insight card for a transit dashboard homepage.
 
-Based on data showing on-time performance drops sharply below {$stats['threshold']}°C, declining from {$stats['aboveThreshold']}% on-time (above threshold) to {$stats['belowThreshold']}% (below threshold) - a drop of {$stats['performanceDrop']} percentage points.
+Based on data showing on-time performance drops sharply below {$stats->threshold}°C, declining from {$stats->aboveThreshold}% on-time (above threshold) to {$stats->belowThreshold}% (below threshold) - a drop of {$stats->performanceDrop} percentage points.
 
 Write 1-2 sentences that:
 1. State the temperature threshold and impact

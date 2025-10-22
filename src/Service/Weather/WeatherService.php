@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Weather;
 
 use App\Dto\WeatherDataDto;
+use App\Dto\WeatherObservationDto;
 use App\Entity\WeatherObservation;
 use App\Enum\TransitImpact;
 use App\Repository\WeatherObservationRepository;
@@ -65,22 +66,23 @@ final readonly class WeatherService
                 windSpeedKmh: $weatherData->windSpeedKmh       ?? 0
             );
 
-            // Create and persist weather observation (upsert to handle duplicate timestamps)
-            $observation = new WeatherObservation();
-            $observation->setObservedAt($weatherData->time);
-            $observation->setTemperatureCelsius((string) $weatherData->temperatureCelsius);
-            $observation->setFeelsLikeCelsius($weatherData->apparentTemperatureCelsius !== null ? (string) $weatherData->apparentTemperatureCelsius : null);
-            $observation->setPrecipitationMm($weatherData->precipitationMm !== null ? (string) $weatherData->precipitationMm : null);
-            $observation->setSnowfallCm($weatherData->snowfallCm !== null ? (string) $weatherData->snowfallCm : null);
-            $observation->setSnowDepthCm($weatherData->snowDepthCm);
-            $observation->setWeatherCode($weatherData->weatherCode);
-            $observation->setWeatherCondition($condition);
-            $observation->setVisibilityKm($weatherData->visibilityM !== null ? (string) ($weatherData->visibilityM / 1000) : null);
-            $observation->setWindSpeedKmh($weatherData->windSpeedKmh !== null ? (string) $weatherData->windSpeedKmh : null);
-            $observation->setTransitImpact($impact);
-            $observation->setDataSource('open_meteo');
+            // Create DTO and delegate persistence to repository
+            $dto = new WeatherObservationDto(
+                observedAt: $weatherData->time,
+                temperatureCelsius: (string) $weatherData->temperatureCelsius,
+                feelsLikeCelsius: $weatherData->apparentTemperatureCelsius !== null ? (string) $weatherData->apparentTemperatureCelsius : null,
+                precipitationMm: $weatherData->precipitationMm             !== null ? (string) $weatherData->precipitationMm : null,
+                snowfallCm: $weatherData->snowfallCm                       !== null ? (string) $weatherData->snowfallCm : null,
+                snowDepthCm: $weatherData->snowDepthCm,
+                weatherCode: $weatherData->weatherCode,
+                weatherCondition: $condition,
+                visibilityKm: $weatherData->visibilityM  !== null ? (string) ($weatherData->visibilityM / 1000) : null,
+                windSpeedKmh: $weatherData->windSpeedKmh !== null ? (string) $weatherData->windSpeedKmh : null,
+                transitImpact: $impact,
+                dataSource: 'open_meteo',
+            );
 
-            $observation = $this->weatherRepo->upsert($observation);
+            $observation = $this->weatherRepo->upsertFromDto($dto);
 
             $this->logger->info('Weather observation collected', [
                 'observed_at' => $observation->getObservedAt()->format('Y-m-d H:i'),
@@ -138,39 +140,23 @@ final readonly class WeatherService
                         windSpeedKmh: $weatherData->windSpeedKmh       ?? 0
                     );
 
-                    $observation = new WeatherObservation();
-                    $observation->setObservedAt($weatherData->time);
-                    $observation->setTemperatureCelsius((string) $weatherData->temperatureCelsius);
-                    $observation->setFeelsLikeCelsius($weatherData->apparentTemperatureCelsius !== null ? (string) $weatherData->apparentTemperatureCelsius : null);
-                    $observation->setPrecipitationMm($weatherData->precipitationMm !== null ? (string) $weatherData->precipitationMm : null);
-                    $observation->setSnowfallCm($weatherData->snowfallCm !== null ? (string) $weatherData->snowfallCm : null);
-                    $observation->setSnowDepthCm($weatherData->snowDepthCm);
-                    $observation->setWeatherCode($weatherData->weatherCode);
-                    $observation->setWeatherCondition($condition);
-                    $observation->setVisibilityKm($weatherData->visibilityM !== null ? (string) ($weatherData->visibilityM / 1000) : null);
-                    $observation->setWindSpeedKmh($weatherData->windSpeedKmh !== null ? (string) $weatherData->windSpeedKmh : null);
-                    $observation->setTransitImpact($impact);
-                    $observation->setDataSource('open_meteo');
+                    // Create DTO and delegate persistence to repository
+                    $dto = new WeatherObservationDto(
+                        observedAt: $weatherData->time,
+                        temperatureCelsius: (string) $weatherData->temperatureCelsius,
+                        feelsLikeCelsius: $weatherData->apparentTemperatureCelsius !== null ? (string) $weatherData->apparentTemperatureCelsius : null,
+                        precipitationMm: $weatherData->precipitationMm             !== null ? (string) $weatherData->precipitationMm : null,
+                        snowfallCm: $weatherData->snowfallCm                       !== null ? (string) $weatherData->snowfallCm : null,
+                        snowDepthCm: $weatherData->snowDepthCm,
+                        weatherCode: $weatherData->weatherCode,
+                        weatherCondition: $condition,
+                        visibilityKm: $weatherData->visibilityM  !== null ? (string) ($weatherData->visibilityM / 1000) : null,
+                        windSpeedKmh: $weatherData->windSpeedKmh !== null ? (string) $weatherData->windSpeedKmh : null,
+                        transitImpact: $impact,
+                        dataSource: 'open_meteo',
+                    );
 
-                    // Use upsert for idempotency (but skip flush for performance)
-                    $existing = $this->weatherRepo->findByObservedAt($weatherData->time);
-                    if ($existing !== null) {
-                        // Update existing
-                        $existing->setTemperatureCelsius((string) $weatherData->temperatureCelsius);
-                        $existing->setFeelsLikeCelsius($weatherData->apparentTemperatureCelsius !== null ? (string) $weatherData->apparentTemperatureCelsius : null);
-                        $existing->setPrecipitationMm($weatherData->precipitationMm !== null ? (string) $weatherData->precipitationMm : null);
-                        $existing->setSnowfallCm($weatherData->snowfallCm !== null ? (string) $weatherData->snowfallCm : null);
-                        $existing->setSnowDepthCm($weatherData->snowDepthCm);
-                        $existing->setWeatherCode($weatherData->weatherCode);
-                        $existing->setWeatherCondition($condition);
-                        $existing->setVisibilityKm($weatherData->visibilityM !== null ? (string) ($weatherData->visibilityM / 1000) : null);
-                        $existing->setWindSpeedKmh($weatherData->windSpeedKmh !== null ? (string) $weatherData->windSpeedKmh : null);
-                        $existing->setTransitImpact($impact);
-                        $existing->setDataSource('open_meteo');
-                    } else {
-                        // Insert new
-                        $this->weatherRepo->save($observation, flush: false);
-                    }
+                    $this->weatherRepo->upsertFromDto($dto);
                     ++$success;
                 } catch (\Exception $e) {
                     ++$failed;
@@ -180,8 +166,6 @@ final readonly class WeatherService
                     ]);
                 }
             }
-
-            $this->weatherRepo->flush();
 
             $this->logger->info(sprintf('Backfilled %d weather observations (%d failed)', $success, $failed));
         } catch (\Exception $e) {
