@@ -4,21 +4,31 @@ declare(strict_types=1);
 
 namespace App\Tests\Repository;
 
-use App\Dto\BunchingCountDto;
 use App\Entity\BunchingIncident;
-use App\Entity\Route;
-use App\Entity\Stop;
-use App\Entity\WeatherObservation;
-use App\Enum\TransitImpact;
+use App\Factory\BunchingIncidentFactory;
+use App\Factory\WeatherObservationFactory;
 use App\Repository\BunchingIncidentRepository;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\TestCase;
+use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Zenstruck\Foundry\Test\Factories;
 
 use const PHP_FLOAT_MAX;
 
 #[CoversClass(BunchingIncidentRepository::class)]
-final class BunchingIncidentRepositoryTest extends TestCase
+final class BunchingIncidentRepositoryTest extends KernelTestCase
 {
+    use Factories;
+    // Note: Using DAMA\DoctrineTestBundle for transaction isolation (configured in phpunit.dist.xml)
+    // Do NOT use ResetDatabase trait when using DAMA
+
+    private BunchingIncidentRepository $repository;
+
+    protected function setUp(): void
+    {
+        self::bootKernel(['environment' => 'test', 'debug' => true]);
+        $this->repository = self::getContainer()->get(BunchingIncidentRepository::class);
+    }
+
     /**
      * Test that countByWeatherCondition groups incidents correctly.
      */
@@ -27,18 +37,35 @@ final class BunchingIncidentRepositoryTest extends TestCase
         $startDate = new \DateTimeImmutable('2025-01-01');
         $endDate   = new \DateTimeImmutable('2025-02-01');
 
-        // Simulate database results: each incident linked to a weather condition
-        $incidents = [
-            $this->createIncident('2025-01-05 10:00:00', 'Snow'),
-            $this->createIncident('2025-01-05 11:00:00', 'Snow'),
-            $this->createIncident('2025-01-05 12:00:00', 'Snow'),
-            $this->createIncident('2025-01-10 14:00:00', 'Rain'),
-            $this->createIncident('2025-01-15 16:00:00', 'Rain'),
-            $this->createIncident('2025-01-20 18:00:00', 'Clear'),
-        ];
+        // Create incidents with weather conditions
+        $snowWeather = WeatherObservationFactory::createOne([
+            'weatherCondition' => 'Snow',
+            'observedAt'       => new \DateTimeImmutable('2025-01-05 10:00:00'),
+        ]);
+        BunchingIncidentFactory::createMany(3, [
+            'detectedAt'         => new \DateTimeImmutable('2025-01-05 10:00:00'),
+            'weatherObservation' => $snowWeather,
+        ]);
 
-        // Count by weather condition
-        $counts = $this->groupByWeatherCondition($incidents);
+        $rainWeather = WeatherObservationFactory::createOne([
+            'weatherCondition' => 'Rain',
+            'observedAt'       => new \DateTimeImmutable('2025-01-10 14:00:00'),
+        ]);
+        BunchingIncidentFactory::createMany(2, [
+            'detectedAt'         => new \DateTimeImmutable('2025-01-10 14:00:00'),
+            'weatherObservation' => $rainWeather,
+        ]);
+
+        $clearWeather = WeatherObservationFactory::createOne([
+            'weatherCondition' => 'Clear',
+            'observedAt'       => new \DateTimeImmutable('2025-01-20 18:00:00'),
+        ]);
+        BunchingIncidentFactory::createOne([
+            'detectedAt'         => new \DateTimeImmutable('2025-01-20 18:00:00'),
+            'weatherObservation' => $clearWeather,
+        ]);
+
+        $counts = $this->repository->countByWeatherCondition($startDate, $endDate);
 
         $this->assertCount(3, $counts, 'Should have 3 unique weather conditions');
         $this->assertEquals('Snow', $counts[0]->weatherCondition);
@@ -54,23 +81,29 @@ final class BunchingIncidentRepositoryTest extends TestCase
      */
     public function testCountByWeatherConditionFiltersDateRange(): void
     {
-        // Only include incidents within date range
         $startDate = new \DateTimeImmutable('2025-01-10');
         $endDate   = new \DateTimeImmutable('2025-01-20');
 
-        $incidents = [
-            $this->createIncident('2025-01-05 10:00:00', 'Snow'), // Before range (excluded)
-            $this->createIncident('2025-01-15 11:00:00', 'Snow'), // In range
-            $this->createIncident('2025-01-25 12:00:00', 'Rain'), // After range (excluded)
-        ];
+        // Create incidents outside and inside date range
+        $snowWeather1 = WeatherObservationFactory::createOne(['weatherCondition' => 'Snow']);
+        BunchingIncidentFactory::createOne([
+            'detectedAt'         => new \DateTimeImmutable('2025-01-05 10:00:00'), // Before range
+            'weatherObservation' => $snowWeather1,
+        ]);
 
-        // Filter incidents within date range
-        $filtered = array_filter(
-            $incidents,
-            fn ($i) => $i->getDetectedAt() >= $startDate && $i->getDetectedAt() < $endDate
-        );
+        $snowWeather2 = WeatherObservationFactory::createOne(['weatherCondition' => 'Snow']);
+        BunchingIncidentFactory::createOne([
+            'detectedAt'         => new \DateTimeImmutable('2025-01-15 11:00:00'), // In range
+            'weatherObservation' => $snowWeather2,
+        ]);
 
-        $counts = $this->groupByWeatherCondition($filtered);
+        $rainWeather = WeatherObservationFactory::createOne(['weatherCondition' => 'Rain']);
+        BunchingIncidentFactory::createOne([
+            'detectedAt'         => new \DateTimeImmutable('2025-01-25 12:00:00'), // After range
+            'weatherObservation' => $rainWeather,
+        ]);
+
+        $counts = $this->repository->countByWeatherCondition($startDate, $endDate);
 
         $this->assertCount(1, $counts, 'Should only include incidents within date range');
         $this->assertEquals('Snow', $counts[0]->weatherCondition);
@@ -82,20 +115,33 @@ final class BunchingIncidentRepositoryTest extends TestCase
      */
     public function testCountByWeatherConditionExcludesNullWeather(): void
     {
-        $incidents = [
-            $this->createIncident('2025-01-05 10:00:00', 'Snow'),
-            $this->createIncident('2025-01-10 11:00:00', null), // No weather data
-            $this->createIncident('2025-01-15 12:00:00', 'Rain'),
-        ];
+        $startDate = new \DateTimeImmutable('2025-01-01');
+        $endDate   = new \DateTimeImmutable('2025-02-01');
 
-        // Filter out incidents without weather observation
-        $filtered = array_filter($incidents, fn ($i) => $i->getWeatherObservation() !== null);
+        $snowWeather = WeatherObservationFactory::createOne(['weatherCondition' => 'Snow']);
+        BunchingIncidentFactory::createOne([
+            'detectedAt'         => new \DateTimeImmutable('2025-01-05 10:00:00'),
+            'weatherObservation' => $snowWeather,
+        ]);
 
-        $counts = $this->groupByWeatherCondition($filtered);
+        BunchingIncidentFactory::createOne([
+            'detectedAt'         => new \DateTimeImmutable('2025-01-10 11:00:00'),
+            'weatherObservation' => null, // No weather data
+        ]);
+
+        $rainWeather = WeatherObservationFactory::createOne(['weatherCondition' => 'Rain']);
+        BunchingIncidentFactory::createOne([
+            'detectedAt'         => new \DateTimeImmutable('2025-01-15 12:00:00'),
+            'weatherObservation' => $rainWeather,
+        ]);
+
+        $counts = $this->repository->countByWeatherCondition($startDate, $endDate);
 
         $this->assertCount(2, $counts, 'Should exclude incidents with null weather');
-        $this->assertEquals('Snow', $counts[0]->weatherCondition);
-        $this->assertEquals('Rain', $counts[1]->weatherCondition);
+        // Both Snow and Rain should be present (order may vary since both have count=1)
+        $conditions = array_map(fn ($c) => $c->weatherCondition, $counts);
+        $this->assertContains('Snow', $conditions);
+        $this->assertContains('Rain', $conditions);
     }
 
     /**
@@ -103,17 +149,28 @@ final class BunchingIncidentRepositoryTest extends TestCase
      */
     public function testCountByWeatherConditionOrdersByCountDescending(): void
     {
-        $incidents = [
-            $this->createIncident('2025-01-05 10:00:00', 'Clear'),
-            $this->createIncident('2025-01-05 11:00:00', 'Rain'),
-            $this->createIncident('2025-01-05 12:00:00', 'Rain'),
-            $this->createIncident('2025-01-05 13:00:00', 'Snow'),
-            $this->createIncident('2025-01-05 14:00:00', 'Snow'),
-            $this->createIncident('2025-01-05 15:00:00', 'Snow'),
-            $this->createIncident('2025-01-05 16:00:00', 'Snow'),
-        ];
+        $startDate = new \DateTimeImmutable('2025-01-01');
+        $endDate   = new \DateTimeImmutable('2025-02-01');
 
-        $counts = $this->groupByWeatherCondition($incidents);
+        $clearWeather = WeatherObservationFactory::createOne(['weatherCondition' => 'Clear']);
+        BunchingIncidentFactory::createOne([
+            'detectedAt'         => new \DateTimeImmutable('2025-01-05 10:00:00'),
+            'weatherObservation' => $clearWeather,
+        ]);
+
+        $rainWeather = WeatherObservationFactory::createOne(['weatherCondition' => 'Rain']);
+        BunchingIncidentFactory::createMany(2, [
+            'detectedAt'         => new \DateTimeImmutable('2025-01-05 11:00:00'),
+            'weatherObservation' => $rainWeather,
+        ]);
+
+        $snowWeather = WeatherObservationFactory::createOne(['weatherCondition' => 'Snow']);
+        BunchingIncidentFactory::createMany(4, [
+            'detectedAt'         => new \DateTimeImmutable('2025-01-05 13:00:00'),
+            'weatherObservation' => $snowWeather,
+        ]);
+
+        $counts = $this->repository->countByWeatherCondition($startDate, $endDate);
 
         // Verify ordering: Snow (4) > Rain (2) > Clear (1)
         $this->assertEquals('Snow', $counts[0]->weatherCondition);
@@ -129,9 +186,10 @@ final class BunchingIncidentRepositoryTest extends TestCase
      */
     public function testCountByWeatherConditionReturnsEmptyArrayWhenNoIncidents(): void
     {
-        $incidents = [];
+        $startDate = new \DateTimeImmutable('2025-01-01');
+        $endDate   = new \DateTimeImmutable('2025-02-01');
 
-        $counts = $this->groupByWeatherCondition($incidents);
+        $counts = $this->repository->countByWeatherCondition($startDate, $endDate);
 
         $this->assertCount(0, $counts, 'Should return empty array when no incidents');
     }
@@ -141,15 +199,16 @@ final class BunchingIncidentRepositoryTest extends TestCase
      */
     public function testCountByWeatherConditionAggregatesSameConditions(): void
     {
-        $incidents = [
-            $this->createIncident('2025-01-05 10:00:00', 'Snow'),
-            $this->createIncident('2025-01-05 11:00:00', 'Snow'),
-            $this->createIncident('2025-01-05 12:00:00', 'Snow'),
-            $this->createIncident('2025-01-05 13:00:00', 'Snow'),
-            $this->createIncident('2025-01-05 14:00:00', 'Snow'),
-        ];
+        $startDate = new \DateTimeImmutable('2025-01-01');
+        $endDate   = new \DateTimeImmutable('2025-02-01');
 
-        $counts = $this->groupByWeatherCondition($incidents);
+        $snowWeather = WeatherObservationFactory::createOne(['weatherCondition' => 'Snow']);
+        BunchingIncidentFactory::createMany(5, [
+            'detectedAt'         => new \DateTimeImmutable('2025-01-05 10:00:00'),
+            'weatherObservation' => $snowWeather,
+        ]);
+
+        $counts = $this->repository->countByWeatherCondition($startDate, $endDate);
 
         $this->assertCount(1, $counts, 'Should aggregate all incidents into one group');
         $this->assertEquals('Snow', $counts[0]->weatherCondition);
@@ -161,13 +220,28 @@ final class BunchingIncidentRepositoryTest extends TestCase
      */
     public function testCountByWeatherConditionPreservesWeatherConditionCase(): void
     {
-        $incidents = [
-            $this->createIncident('2025-01-05 10:00:00', 'Heavy Snow'),
-            $this->createIncident('2025-01-05 11:00:00', 'Light Rain'),
-            $this->createIncident('2025-01-05 12:00:00', 'Overcast'),
-        ];
+        $startDate = new \DateTimeImmutable('2025-01-01');
+        $endDate   = new \DateTimeImmutable('2025-02-01');
 
-        $counts = $this->groupByWeatherCondition($incidents);
+        $weather1 = WeatherObservationFactory::createOne(['weatherCondition' => 'Heavy Snow']);
+        BunchingIncidentFactory::createOne([
+            'detectedAt'         => new \DateTimeImmutable('2025-01-05 10:00:00'),
+            'weatherObservation' => $weather1,
+        ]);
+
+        $weather2 = WeatherObservationFactory::createOne(['weatherCondition' => 'Light Rain']);
+        BunchingIncidentFactory::createOne([
+            'detectedAt'         => new \DateTimeImmutable('2025-01-05 11:00:00'),
+            'weatherObservation' => $weather2,
+        ]);
+
+        $weather3 = WeatherObservationFactory::createOne(['weatherCondition' => 'Overcast']);
+        BunchingIncidentFactory::createOne([
+            'detectedAt'         => new \DateTimeImmutable('2025-01-05 12:00:00'),
+            'weatherObservation' => $weather3,
+        ]);
+
+        $counts = $this->repository->countByWeatherCondition($startDate, $endDate);
 
         $this->assertEquals('Heavy Snow', $counts[0]->weatherCondition);
         $this->assertEquals('Light Rain', $counts[1]->weatherCondition);
@@ -182,22 +256,27 @@ final class BunchingIncidentRepositoryTest extends TestCase
         $startDate = new \DateTimeImmutable('2025-01-10');
         $endDate   = new \DateTimeImmutable('2025-01-20');
 
-        $incidents = [
-            $this->createIncident('2025-01-05 10:00:00', 'Snow'), // Before range
-            $this->createIncident('2025-01-12 11:00:00', 'Rain'), // In range
-            $this->createIncident('2025-01-15 12:00:00', 'Snow'), // In range
-            $this->createIncident('2025-01-11 13:00:00', 'Clear'), // In range
-            $this->createIncident('2025-01-25 14:00:00', 'Rain'), // After range
-        ];
+        BunchingIncidentFactory::createOne([
+            'detectedAt' => new \DateTimeImmutable('2025-01-05 10:00:00'),
+        ]); // Before range
 
-        // Filter incidents within date range
-        $filtered = array_filter(
-            $incidents,
-            fn ($i) => $i->getDetectedAt() >= $startDate && $i->getDetectedAt() < $endDate
-        );
+        BunchingIncidentFactory::createOne([
+            'detectedAt' => new \DateTimeImmutable('2025-01-12 11:00:00'),
+        ]); // In range
 
-        // Sort by detected_at ascending
-        usort($filtered, fn ($a, $b) => $a->getDetectedAt() <=> $b->getDetectedAt());
+        BunchingIncidentFactory::createOne([
+            'detectedAt' => new \DateTimeImmutable('2025-01-15 12:00:00'),
+        ]); // In range
+
+        BunchingIncidentFactory::createOne([
+            'detectedAt' => new \DateTimeImmutable('2025-01-11 13:00:00'),
+        ]); // In range
+
+        BunchingIncidentFactory::createOne([
+            'detectedAt' => new \DateTimeImmutable('2025-01-25 14:00:00'),
+        ]); // After range
+
+        $filtered = $this->repository->findByDateRange($startDate, $endDate);
 
         $this->assertCount(3, $filtered, 'Should include only incidents within date range');
         $this->assertEquals('2025-01-11', $filtered[0]->getDetectedAt()->format('Y-m-d'));
@@ -210,53 +289,16 @@ final class BunchingIncidentRepositoryTest extends TestCase
      */
     public function testSaveMethodPersistsIncident(): void
     {
-        $incident = $this->createIncident('2025-01-05 10:00:00', 'Snow');
+        $incident = BunchingIncidentFactory::createOne([
+            'detectedAt'        => new \DateTimeImmutable('2025-01-05 10:00:00'),
+            'vehicleCount'      => 2,
+            'timeWindowSeconds' => 120,
+        ]);
 
-        // In real implementation, this would call EntityManager::persist()
-        // For unit test, we just verify the incident object is valid
-        $this->assertInstanceOf(BunchingIncident::class, $incident);
-        $this->assertEquals('Snow', $incident->getWeatherObservation()?->getWeatherCondition());
+        $this->assertInstanceOf(BunchingIncident::class, $incident->_real());
         $this->assertEquals(2, $incident->getVehicleCount());
         $this->assertEquals(120, $incident->getTimeWindowSeconds());
-    }
-
-    /**
-     * Simulate grouping and counting logic from countByWeatherCondition.
-     *
-     * @param list<BunchingIncident> $incidents
-     *
-     * @return list<BunchingCountDto>
-     */
-    private function groupByWeatherCondition(array $incidents): array
-    {
-        // Group by weather condition
-        $grouped = [];
-        foreach ($incidents as $incident) {
-            $weather = $incident->getWeatherObservation();
-            if ($weather === null) {
-                continue;
-            }
-
-            $condition = $weather->getWeatherCondition();
-            if (!isset($grouped[$condition])) {
-                $grouped[$condition] = 0;
-            }
-            ++$grouped[$condition];
-        }
-
-        // Convert to DTOs
-        $results = [];
-        foreach ($grouped as $condition => $count) {
-            $results[] = new BunchingCountDto(
-                weatherCondition: $condition,
-                incidentCount: $count,
-            );
-        }
-
-        // Sort by count descending
-        usort($results, fn ($a, $b) => $b->incidentCount <=> $a->incidentCount);
-
-        return $results;
+        $this->assertNotNull($incident->getId());
     }
 
     /**
@@ -362,42 +404,5 @@ final class BunchingIncidentRepositoryTest extends TestCase
             $this->assertLessThanOrEqual($previousRate, $result['incidents_per_hour'], 'Results should be ordered by rate descending');
             $previousRate = $result['incidents_per_hour'];
         }
-    }
-
-    private function createIncident(string $dateTime, ?string $weatherCondition): BunchingIncident
-    {
-        $route = new Route();
-        $route->setGtfsId('route-1');
-        $route->setShortName('1');
-        $route->setLongName('Test Route');
-        $route->setColour('FF0000');
-
-        $stop = new Stop();
-        $stop->setGtfsId('stop-1');
-        $stop->setName('Test Stop');
-        $stop->setLat(52.1332);
-        $stop->setLong(-106.6700);
-        $stop->setCity($this->getTestCity($this->em));
-
-        $incident = new BunchingIncident();
-        $incident->setRoute($route);
-        $incident->setStop($stop);
-        $incident->setDetectedAt(new \DateTimeImmutable($dateTime));
-        $incident->setVehicleCount(2);
-        $incident->setTimeWindowSeconds(120);
-        $incident->setVehicleIds('veh-1,veh-2');
-
-        if ($weatherCondition !== null) {
-            $weather = new WeatherObservation();
-            $weather->setObservedAt(new \DateTimeImmutable($dateTime));
-            $weather->setWeatherCondition($weatherCondition);
-            $weather->setWeatherCode(0);
-            $weather->setTemperatureCelsius('0.0');
-            $weather->setTransitImpact(TransitImpact::NONE);
-            $weather->setDataSource('test');
-            $incident->setWeatherObservation($weather);
-        }
-
-        return $incident;
     }
 }

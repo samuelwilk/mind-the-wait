@@ -5,23 +5,24 @@ declare(strict_types=1);
 namespace App\Tests\Controller;
 
 use App\Controller\DebugController;
-use App\Entity\Route;
-use App\Entity\RoutePerformanceDaily;
-use App\Entity\WeatherObservation;
-use App\Enum\RouteTypeEnum;
 use App\Enum\TransitImpact;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Factory\RouteFactory;
+use App\Factory\RoutePerformanceDailyFactory;
+use App\Factory\WeatherObservationFactory;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Zenstruck\Foundry\Test\Factories;
 
 final class DebugControllerTest extends KernelTestCase
 {
-    private EntityManagerInterface $em;
+    use Factories;
+    // Note: Using DAMA\DoctrineTestBundle for transaction isolation (configured in phpunit.dist.xml)
+    // Do NOT use ResetDatabase trait when using DAMA
+
     private DebugController $controller;
 
     protected function setUp(): void
     {
         self::bootKernel(['environment' => 'test', 'debug' => true]);
-        $this->em         = self::getContainer()->get(EntityManagerInterface::class);
         $this->controller = self::getContainer()->get(DebugController::class);
     }
 
@@ -48,23 +49,19 @@ final class DebugControllerTest extends KernelTestCase
 
     public function testDatabaseStatsWithWeatherData(): void
     {
-        // Create a weather observation
-        $weather = new WeatherObservation();
-        $weather->setObservedAt(new \DateTimeImmutable('2025-10-15 01:00:00'));
-        $weather->setTemperatureCelsius('3.8');
-        $weather->setFeelsLikeCelsius('2.5');
-        $weather->setWeatherCode(3); // Overcast
-        $weather->setWeatherCondition('Overcast');
-        $weather->setTransitImpact(TransitImpact::NONE);
-        $weather->setPrecipitationMm('0.0');
-        $weather->setSnowfallCm('0.0');
-        $weather->setSnowDepthCm(0);
-        $weather->setVisibilityKm('10.0');
-        $weather->setWindSpeedKmh('5.0');
-        $weather->setDataSource('test');
-
-        $this->em->persist($weather);
-        $this->em->flush();
+        WeatherObservationFactory::createOne([
+            'observedAt'         => new \DateTimeImmutable('2025-10-15 01:00:00'),
+            'temperatureCelsius' => '3.8',
+            'feelsLikeCelsius'   => '2.5',
+            'weatherCode'        => 3,
+            'weatherCondition'   => 'Overcast',
+            'transitImpact'      => TransitImpact::NONE,
+            'precipitationMm'    => '0.0',
+            'snowfallCm'         => '0.0',
+            'snowDepthCm'        => 0,
+            'visibilityKm'       => '10.0',
+            'windSpeedKmh'       => '5.0',
+        ]);
 
         $response = $this->controller->databaseStats();
         $data     = json_decode($response->getContent(), true);
@@ -79,35 +76,26 @@ final class DebugControllerTest extends KernelTestCase
 
     public function testDatabaseStatsWithPerformanceData(): void
     {
-        // Create a route
-        $route = new Route();
-        $route->setGtfsId('test-route-1');
-        $route->setShortName('1');
-        $route->setLongName('Test Route 1');
-        $route->setRouteType(RouteTypeEnum::Bus);
-        $route->setCity($this->getTestCity($this->em));
-        $route->setColour('FF0000');
+        $route = RouteFactory::createOne([
+            'gtfsId'    => 'test-route-1',
+            'shortName' => '1',
+            'longName'  => 'Test Route 1',
+        ]);
 
-        $this->em->persist($route);
-        $this->em->flush();
-
-        // Create performance record
-        $performance = new RoutePerformanceDaily();
-        $performance->setRoute($route);
-        $performance->setDate(new \DateTimeImmutable('2025-10-14'));
-        $performance->setTotalPredictions(100);
-        $performance->setHighConfidenceCount(80);
-        $performance->setMediumConfidenceCount(15);
-        $performance->setLowConfidenceCount(5);
-        $performance->setAvgDelaySec(120);
-        $performance->setMedianDelaySec(90);
-        $performance->setOnTimePercentage('75.50');
-        $performance->setLatePercentage('20.00');
-        $performance->setEarlyPercentage('4.50');
-        $performance->setBunchingIncidents(0);
-
-        $this->em->persist($performance);
-        $this->em->flush();
+        RoutePerformanceDailyFactory::createOne([
+            'route'                 => $route,
+            'date'                  => new \DateTimeImmutable('2025-10-14'),
+            'totalPredictions'      => 100,
+            'highConfidenceCount'   => 80,
+            'mediumConfidenceCount' => 15,
+            'lowConfidenceCount'    => 5,
+            'avgDelaySec'           => 120,
+            'medianDelaySec'        => 90,
+            'onTimePercentage'      => '75.50',
+            'latePercentage'        => '20.00',
+            'earlyPercentage'       => '4.50',
+            'bunchingIncidents'     => 0,
+        ]);
 
         $response = $this->controller->databaseStats();
         $data     = json_decode($response->getContent(), true);
@@ -198,16 +186,11 @@ final class DebugControllerTest extends KernelTestCase
 
     public function testDoesNotExposeFullDatabaseRecords(): void
     {
-        // Create test data
-        $route = new Route();
-        $route->setGtfsId('sensitive-route-id');
-        $route->setShortName('999');
-        $route->setLongName('Sensitive Route Name');
-        $route->setRouteType(RouteTypeEnum::Bus);
-        $route->setCity($this->getTestCity($this->em));
-
-        $this->em->persist($route);
-        $this->em->flush();
+        RouteFactory::createOne([
+            'gtfsId'    => 'sensitive-route-id',
+            'shortName' => '999',
+            'longName'  => 'Sensitive Route Name',
+        ]);
 
         $response = $this->controller->databaseStats();
         $content  = $response->getContent();

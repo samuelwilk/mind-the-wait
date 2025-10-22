@@ -14,7 +14,6 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Zenstruck\Foundry\Test\Factories;
-use Zenstruck\Foundry\Test\ResetDatabase;
 
 /**
  * Integration tests for DetectBunchingCommand using real database.
@@ -23,7 +22,8 @@ use Zenstruck\Foundry\Test\ResetDatabase;
 final class DetectBunchingCommandTest extends KernelTestCase
 {
     use Factories;
-    use ResetDatabase;
+    // Note: Using DAMA\DoctrineTestBundle for transaction isolation (configured in phpunit.dist.xml)
+    // Do NOT use ResetDatabase trait when using DAMA
 
     private CommandTester $commandTester;
 
