@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0](https://github.com/samuelwilk/mind-the-wait/compare/v0.8.2...v0.9.0) (2025-10-22)
+
+
+### Features
+
+* comprehensive API improvements ([ca584b0](https://github.com/samuelwilk/mind-the-wait/commit/ca584b00c66d2ec26fccf7877ab652531cac44c3))
+* migrate all ECS services to Fargate Spot for 70% cost savings ([970a928](https://github.com/samuelwilk/mind-the-wait/commit/970a9285eb919105d110a33469f1a6d5eed68911))
+
+
+### Bug Fixes
+
+* enable DAMA bundle and refactor tests with Foundry factories ([84052d6](https://github.com/samuelwilk/mind-the-wait/commit/84052d6cdf815bbea48c048f7dda227ef29ba875))
+* order route stops by sequence for proper visualization ([a371f3a](https://github.com/samuelwilk/mind-the-wait/commit/a371f3a6bd5093025aff2e056f068e792b618738))
+* update RouteSearchComponent for multi-city support ([23e31a5](https://github.com/samuelwilk/mind-the-wait/commit/23e31a54154819488fa0507920ea46a855f7c245))
+
+
+### Code Refactoring
+
+* use Foundry factories for test fixtures ([8600deb](https://github.com/samuelwilk/mind-the-wait/commit/8600deb7aec4a0279bd94a4426ff271da4f4b00c))
+
 ## [0.8.2](https://github.com/samuelwilk/mind-the-wait/compare/v0.8.1...v0.8.2) (2025-10-19)
 
 
