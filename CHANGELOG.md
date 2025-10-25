@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1](https://github.com/samuelwilk/mind-the-wait/compare/v0.9.0...v0.9.1) (2025-10-25)
+
+
+### Bug Fixes
+
+* implement Bayesian adjustment for small sample size bias ([5197fdf](https://github.com/samuelwilk/mind-the-wait/commit/5197fdf8754ff72b599a64134030d4ef525fdb2d))
+
+
+### Documentation
+
+* update code quality audit to reflect completed refactors ([4dfe15f](https://github.com/samuelwilk/mind-the-wait/commit/4dfe15f1c439b273d2272629099e668125b184c8))
+
+
+### Code Refactoring
+
+* complete high-priority code quality improvements ([9a31327](https://github.com/samuelwilk/mind-the-wait/commit/9a31327f0ca9554a830e7220908a1f411affa7f2))
+* implement medium-priority refactors (WeatherService + InsightGenerator) ([5685f5f](https://github.com/samuelwilk/mind-the-wait/commit/5685f5f95066a1daf33e8c26880bad1cf8fdd57c))
+* move PerformanceAggregator calculations to repository layer ([8bdcce4](https://github.com/samuelwilk/mind-the-wait/commit/8bdcce44c121b8656737967e647c4137f0fc88b6))
+
 ## [0.9.0](https://github.com/samuelwilk/mind-the-wait/compare/v0.8.2...v0.9.0) (2025-10-22)
 
 
