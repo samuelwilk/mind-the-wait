@@ -59,6 +59,15 @@
                                 <div class="mt-1 space-y-1 h-12">
                                     <p class="text-sm text-gray-600">
                                         30-Day Avg: <span class="font-semibold">{{ route.onTimePercentage|round(1) }}%</span>
+                                        {% if route.confidenceLevel == 'low' %}
+                                            <span class="inline-flex items-center ml-2 px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800" title="Limited data - {{ route.daysOfData }} days">
+                                                ⚠️ {{ route.daysOfData }} day{{ route.daysOfData != 1 ? 's' : '' }}
+                                            </span>
+                                        {% elseif route.confidenceLevel == 'medium' %}
+                                            <span class="inline-flex items-center ml-2 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800" title="Medium confidence - {{ route.daysOfData }} days">
+                                                {{ route.daysOfData }} day{{ route.daysOfData != 1 ? 's' : '' }}
+                                            </span>
+                                        {% endif %}
                                     </p>
                                     <p class="text-sm text-gray-500">
                                         {% if route.activeVehicles > 0 %}

@@ -16,6 +16,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 
 use function array_slice;
+use function count;
 use function sprintf;
 
 /**
@@ -488,6 +489,44 @@ final class RoutePerformanceDailyRepository extends BaseRepository
             ),
             $results
         );
+    }
+
+    /**
+     * Get system-wide median on-time percentage for a date range.
+     *
+     * Used for Bayesian adjustment of low-sample-size routes.
+     */
+    public function getSystemMedianPerformance(
+        \DateTimeImmutable $startDate,
+        \DateTimeImmutable $endDate,
+    ): float {
+        $qb = $this->createQueryBuilder('p');
+
+        $results = $qb
+            ->select('p.onTimePercentage')
+            ->where('p.date >= :start')
+            ->andWhere('p.date < :end')
+            ->andWhere('p.onTimePercentage IS NOT NULL')
+            ->setParameter('start', $startDate)
+            ->setParameter('end', $endDate)
+            ->getQuery()
+            ->getScalarResult();
+
+        if (count($results) === 0) {
+            return 75.0; // Default system baseline if no data
+        }
+
+        // Extract values and sort for median calculation
+        $values = array_map(fn (array $r) => (float) $r['onTimePercentage'], $results);
+        sort($values);
+
+        $count = count($values);
+        $mid   = (int) floor($count / 2);
+
+        // Calculate median
+        return $count % 2 === 0
+            ? ($values[$mid - 1] + $values[$mid]) / 2
+            : $values[$mid];
     }
 
     /**

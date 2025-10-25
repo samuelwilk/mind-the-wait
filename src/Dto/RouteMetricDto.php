@@ -16,6 +16,8 @@ final readonly class RouteMetricDto
         public ?int $activeVehicles = null,
         public ?string $trend = null,
         public ?string $issue = null,
+        public int $daysOfData = 0,
+        public string $confidenceLevel = 'unknown',
     ) {
     }
 
@@ -32,6 +34,8 @@ final readonly class RouteMetricDto
             'active_vehicles'    => $this->activeVehicles,
             'trend'              => $this->trend,
             'issue'              => $this->issue,
+            'days_of_data'       => $this->daysOfData,
+            'confidence_level'   => $this->confidenceLevel,
         ];
     }
 }

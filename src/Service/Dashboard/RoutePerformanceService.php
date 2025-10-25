@@ -70,6 +70,11 @@ final readonly class RoutePerformanceService
             $scoresById[$score['route_id'] ?? ''] = $score;
         }
 
+        // Get system baseline for Bayesian adjustment (cached for performance)
+        $endDate      = new \DateTimeImmutable('today');
+        $startDate    = $endDate->modify('-30 days');
+        $systemMedian = $this->performanceRepo->getSystemMedianPerformance($startDate, $endDate);
+
         // Build route metrics
         $routeMetrics = [];
         foreach ($routes as $route) {
@@ -82,26 +87,30 @@ final readonly class RoutePerformanceService
             }
 
             // Get 30-day average for more stable metric
-            $endDate   = new \DateTimeImmutable('today');
-            $startDate = $endDate->modify('-30 days');
-            $perf      = $this->performanceRepo->findByRouteAndDateRange($route->getId(), $startDate, $endDate);
+            $perf = $this->performanceRepo->findByRouteAndDateRange($route->getId(), $startDate, $endDate);
 
-            $avgOnTime = 0.0;
-            $count     = 0;
+            $avgOnTime  = 0.0;
+            $daysOfData = 0;
             foreach ($perf as $p) {
                 if ($p->getOnTimePercentage() !== null) {
                     $avgOnTime += (float) $p->getOnTimePercentage();
-                    ++$count;
+                    ++$daysOfData;
                 }
             }
-            $avgOnTime = $count > 0 ? $avgOnTime / $count : 0.0;
+            $rawAverage = $daysOfData > 0 ? $avgOnTime / $daysOfData : 0.0;
+
+            // Apply Bayesian adjustment for routes with limited data
+            $adjusted        = $this->calculateAdjustedPerformance($rawAverage, $daysOfData, $systemMedian);
+            $adjustedOnTime  = $adjusted['performance'];
+            $confidenceLevel = $adjusted['confidence'];
 
             // Fall back to realtime score if no historical data
-            $grade = $this->onTimePercentageToGrade($avgOnTime);
-            if ($avgOnTime === 0.0 && $score !== null && isset($score['grade']) && $score['grade'] !== 'N/A') {
+            $grade = $this->onTimePercentageToGrade($adjustedOnTime);
+            if ($adjustedOnTime === 0.0 && $score !== null && isset($score['grade']) && $score['grade'] !== 'N/A') {
                 // Use realtime grade and estimate percentage from grade
-                $grade     = $score['grade'];
-                $avgOnTime = $this->gradeToOnTimePercentage($grade);
+                $grade           = $score['grade'];
+                $adjustedOnTime  = $this->gradeToOnTimePercentage($grade);
+                $confidenceLevel = 'realtime';
             }
 
             $routeMetrics[] = new RouteMetricDto(
@@ -109,11 +118,13 @@ final readonly class RoutePerformanceService
                 shortName: $route->getShortName(),
                 longName: $route->getLongName(),
                 grade: $grade,
-                onTimePercentage: $avgOnTime,
+                onTimePercentage: $adjustedOnTime,
                 colour: $route->getColour(),
                 activeVehicles: $vehicleCountByRoute[$gtfsId] ?? 0,
                 trend: null,
                 issue: null,
+                daysOfData: $daysOfData,
+                confidenceLevel: $confidenceLevel,
             );
         }
 
@@ -326,5 +337,59 @@ final readonly class RoutePerformanceService
             'F'     => 50.0,
             default => 0.0,
         };
+    }
+
+    /**
+     * Calculate adjusted performance using Bayesian shrinkage.
+     *
+     * Routes with limited data are adjusted toward the system median
+     * to prevent small sample size bias.
+     *
+     * @param float $rawAverage   Raw average on-time percentage
+     * @param int   $daysOfData   Number of days of data
+     * @param float $systemMedian System-wide median performance
+     *
+     * @return array{performance: float, confidence: string}
+     */
+    private function calculateAdjustedPerformance(
+        float $rawAverage,
+        int $daysOfData,
+        float $systemMedian,
+    ): array {
+        // Determine confidence level
+        $confidenceLevel = match (true) {
+            $daysOfData >= 10 => 'high',
+            $daysOfData >= 5  => 'medium',
+            $daysOfData > 0   => 'low',
+            default           => 'none',
+        };
+
+        // No adjustment needed for high-confidence routes
+        if ($daysOfData >= 10) {
+            return [
+                'performance' => $rawAverage,
+                'confidence'  => $confidenceLevel,
+            ];
+        }
+
+        // No data - return system median
+        if ($daysOfData === 0) {
+            return [
+                'performance' => 0.0,
+                'confidence'  => 'none',
+            ];
+        }
+
+        // Apply Bayesian shrinkage for low-sample routes
+        // Confidence increases linearly from 0 (no data) to 1 (10+ days)
+        $confidence = min(1.0, $daysOfData / 10.0);
+
+        // Weighted average: (raw × confidence) + (baseline × (1 - confidence))
+        $adjusted = ($rawAverage * $confidence) + ($systemMedian * (1 - $confidence));
+
+        return [
+            'performance' => round($adjusted, 1),
+            'confidence'  => $confidenceLevel,
+        ];
     }
 }
