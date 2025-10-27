@@ -7,6 +7,7 @@ namespace App\Repository;
 use App\Dto\BunchingCandidateDto;
 use App\Dto\RoutePerformanceHeatmapBucketDto;
 use App\Dto\RoutePerformanceMetricsDto;
+use App\Dto\StopReliabilityDto;
 use App\Entity\ArrivalLog;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
@@ -309,6 +310,79 @@ final class ArrivalLogRepository extends BaseRepository
         }
 
         return round((float) $row['avg_ratio'], 3);
+    }
+
+    /**
+     * Find stop-level reliability data for a route.
+     *
+     * Returns average delay and on-time percentage for each stop on the route,
+     * helping identify bottleneck locations causing chronic delays.
+     *
+     * @param int                $routeId Route entity ID
+     * @param \DateTimeInterface $start   Start of date range
+     * @param \DateTimeInterface $end     End of date range
+     *
+     * @return list<StopReliabilityDto>
+     */
+    public function findStopReliabilityData(int $routeId, \DateTimeInterface $start, \DateTimeInterface $end): array
+    {
+        $sql = <<<'SQL'
+            SELECT
+                s.id as stop_id,
+                s.name as stop_name,
+                AVG(a.delay_sec) as avg_delay_sec,
+                COUNT(*) as sample_size,
+                SUM(CASE WHEN a.delay_sec BETWEEN -180 AND 180 THEN 1 ELSE 0 END) as on_time_count
+            FROM arrival_log a
+            INNER JOIN stop s ON s.id = a.stop_id
+            WHERE a.route_id = :route_id
+              AND a.predicted_at >= :start_date
+              AND a.predicted_at < :end_date
+              AND a.delay_sec IS NOT NULL
+            GROUP BY s.id, s.name
+            HAVING COUNT(*) >= 10
+            ORDER BY AVG(a.delay_sec) DESC
+        SQL;
+
+        $connection = $this->getEntityManager()->getConnection();
+        $rows       = $connection->executeQuery(
+            $sql,
+            [
+                'route_id'   => $routeId,
+                'start_date' => $start->format('Y-m-d H:i:s'),
+                'end_date'   => $end->format('Y-m-d H:i:s'),
+            ],
+            [
+                'route_id'   => Types::INTEGER,
+                'start_date' => Types::STRING,
+                'end_date'   => Types::STRING,
+            ],
+        )->fetchAllAssociative();
+
+        $results = [];
+        foreach ($rows as $row) {
+            $sampleSize       = (int) $row['sample_size'];
+            $onTimeCount      = (int) $row['on_time_count'];
+            $onTimePercentage = $sampleSize > 0 ? round(($onTimeCount / $sampleSize) * 100, 1) : 0.0;
+
+            // Determine confidence level based on sample size
+            $confidenceLevel = match (true) {
+                $sampleSize >= 50 => 'high',
+                $sampleSize >= 20 => 'medium',
+                default           => 'low',
+            };
+
+            $results[] = new StopReliabilityDto(
+                stopId: (int) $row['stop_id'],
+                stopName: (string) $row['stop_name'],
+                avgDelaySec: (int) round((float) $row['avg_delay_sec']),
+                onTimePercentage: $onTimePercentage,
+                sampleSize: $sampleSize,
+                confidenceLevel: $confidenceLevel,
+            );
+        }
+
+        return $results;
     }
 
     /**

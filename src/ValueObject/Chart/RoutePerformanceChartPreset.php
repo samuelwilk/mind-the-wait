@@ -133,4 +133,60 @@ final class RoutePerformanceChartPreset
             ])
             ->build();
     }
+
+    /**
+     * Create stop-level reliability chart showing which stops cause delays.
+     *
+     * Horizontal bar chart sorted by average delay (worst stops first).
+     *
+     * @param array<string> $stopNames Stop name labels
+     * @param array<int>    $delays    Average delay in seconds for each stop
+     * @param array<string> $colors    Bar colors indicating delay severity
+     */
+    public static function stopReliability(array $stopNames, array $delays, array $colors): Chart
+    {
+        // Convert delays to minutes for readability
+        $delaysInMinutes = array_map(fn ($delay) => round($delay / 60, 1), $delays);
+
+        $data = array_map(
+            fn ($value, $color) => ['value' => $value, 'itemStyle' => ['color' => $color]],
+            $delaysInMinutes,
+            $colors
+        );
+
+        return ChartBuilder::bar()
+            ->title('Stop-Level Reliability (Worst Delays First)')
+            ->custom('yAxis', [
+                'type' => 'category',
+                'data' => $stopNames,
+            ])
+            ->custom('xAxis', [
+                'type' => 'value',
+                'name' => 'Avg Delay (minutes)',
+            ])
+            ->tooltip([
+                'trigger'   => 'axis',
+                'formatter' => '{b}<br/>Avg Delay: {c} min',
+            ])
+            ->custom('series', [
+                [
+                    'name'  => 'Average Delay',
+                    'type'  => 'bar',
+                    'data'  => $data,
+                    'label' => [
+                        'show'      => true,
+                        'position'  => 'right',
+                        'formatter' => '{c} min',
+                    ],
+                ],
+            ])
+            ->grid([
+                'left'         => '35%',
+                'right'        => '15%',
+                'top'          => '60',
+                'bottom'       => '5%',
+                'containLabel' => false,
+            ])
+            ->build();
+    }
 }

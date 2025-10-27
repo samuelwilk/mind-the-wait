@@ -15,6 +15,7 @@ use App\Repository\RouteRepository;
 use App\ValueObject\Chart\Chart;
 use App\ValueObject\Chart\RoutePerformanceChartPreset;
 
+use function array_slice;
 use function count;
 use function usort;
 
@@ -153,6 +154,7 @@ final readonly class RoutePerformanceService
             performanceTrendChart: $this->buildPerformanceTrendChart($route, $startDate, $endDate),
             weatherImpactChart: $this->buildWeatherImpactChart($route, $startDate, $endDate),
             timeOfDayHeatmap: $this->buildTimeOfDayHeatmap($route, $startDate, $endDate),
+            stopReliabilityChart: $this->buildStopReliabilityChart($route, $startDate, $endDate),
             stats: $this->buildStats($route, $startDate, $endDate),
         );
     }
@@ -234,6 +236,44 @@ final readonly class RoutePerformanceService
     }
 
     /**
+     * Build stop-level reliability chart showing which stops cause delays.
+     *
+     * Returns null if no stop data available (< 10 arrivals per stop).
+     */
+    private function buildStopReliabilityChart(Route $route, \DateTimeImmutable $startDate, \DateTimeImmutable $endDate): ?Chart
+    {
+        $stopData = $this->arrivalLogRepo->findStopReliabilityData($route->getId(), $startDate, $endDate);
+
+        if (count($stopData) === 0) {
+            return null;
+        }
+
+        // Limit to top 15 worst-performing stops for readability
+        $topStops = array_slice($stopData, 0, 15);
+
+        $stopNames = [];
+        $delays    = [];
+        $colors    = [];
+
+        foreach ($topStops as $stop) {
+            $stopNames[] = $stop->stopName;
+            $delays[]    = $stop->avgDelaySec;
+
+            // Color based on delay severity
+            $colors[] = match (true) {
+                $stop->avgDelaySec <= -180 => '#3b82f6',  // Blue (very early)
+                $stop->avgDelaySec < -60   => '#60a5fa',  // Light blue (early)
+                $stop->avgDelaySec <= 60   => '#10b981',  // Green (on-time)
+                $stop->avgDelaySec <= 180  => '#f59e0b',  // Yellow (slightly late)
+                $stop->avgDelaySec <= 300  => '#ef4444',  // Red (late)
+                default                    => '#dc2626',  // Dark red (very late)
+            };
+        }
+
+        return RoutePerformanceChartPreset::stopReliability($stopNames, $delays, $colors);
+    }
+
+    /**
      * Build summary statistics.
      *
      * @return array<string, mixed>
@@ -280,7 +320,7 @@ final readonly class RoutePerformanceService
             }
         }
 
-        $avgPerformance       = $totalDays            > 0 ? $totalOnTime                     / $totalDays : 0.0;
+        $avgPerformance       = $totalDays            > 0 ? $totalOnTime          / $totalDays : 0.0;
         $avgScheduleRealism   = $scheduleRealismCount > 0 ? $totalScheduleRealism / $scheduleRealismCount : null;
         $scheduleRealismGrade = $avgScheduleRealism !== null
             ? \App\Enum\ScheduleRealismGrade::fromRatio($avgScheduleRealism)
