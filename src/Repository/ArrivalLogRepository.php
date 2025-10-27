@@ -241,6 +241,77 @@ final class ArrivalLogRepository extends BaseRepository
     }
 
     /**
+     * Calculate schedule realism ratio for a route.
+     *
+     * Compares actual travel time vs scheduled travel time across all trips.
+     * Returns ratio where:
+     * - < 1.0 = buses finish faster than scheduled (over-scheduled)
+     * - 1.0 = buses match schedule perfectly
+     * - > 1.0 = buses take longer than scheduled (under-scheduled)
+     *
+     * Returns null if insufficient data (< 5 unique trip instances).
+     *
+     * @param int                $routeId Route entity ID
+     * @param \DateTimeInterface $start   Start of date range
+     * @param \DateTimeInterface $end     End of date range
+     *
+     * @return float|null Average ratio (actual_time / scheduled_time), or null if insufficient data
+     */
+    public function calculateScheduleRealismRatio(int $routeId, \DateTimeInterface $start, \DateTimeInterface $end): ?float
+    {
+        $sql = <<<'SQL'
+            WITH trip_durations AS (
+                SELECT
+                    trip_id,
+                    EXTRACT(EPOCH FROM (MAX(predicted_arrival_at) - MIN(predicted_arrival_at))) as actual_duration_sec,
+                    EXTRACT(EPOCH FROM (MAX(scheduled_arrival_at) - MIN(scheduled_arrival_at))) as scheduled_duration_sec
+                FROM arrival_log
+                WHERE route_id = :route_id
+                  AND predicted_at >= :start_date
+                  AND predicted_at < :end_date
+                  AND predicted_arrival_at IS NOT NULL
+                  AND scheduled_arrival_at IS NOT NULL
+                GROUP BY trip_id
+                HAVING COUNT(DISTINCT stop_id) >= 3
+                   AND EXTRACT(EPOCH FROM (MAX(scheduled_arrival_at) - MIN(scheduled_arrival_at))) > 0
+            )
+            SELECT
+                AVG(actual_duration_sec / scheduled_duration_sec) as avg_ratio,
+                COUNT(*) as trip_count
+            FROM trip_durations
+            WHERE scheduled_duration_sec > 0
+        SQL;
+
+        $connection = $this->getEntityManager()->getConnection();
+        $row        = $connection->executeQuery(
+            $sql,
+            [
+                'route_id'   => $routeId,
+                'start_date' => $start->format('Y-m-d H:i:s'),
+                'end_date'   => $end->format('Y-m-d H:i:s'),
+            ],
+            [
+                'route_id'   => Types::INTEGER,
+                'start_date' => Types::STRING,
+                'end_date'   => Types::STRING,
+            ],
+        )->fetchAssociative();
+
+        if ($row === false || $row['avg_ratio'] === null) {
+            return null;
+        }
+
+        $tripCount = (int) $row['trip_count'];
+
+        // Require minimum 5 trip instances for reliable ratio
+        if ($tripCount < 5) {
+            return null;
+        }
+
+        return round((float) $row['avg_ratio'], 3);
+    }
+
+    /**
      * Aggregate performance metrics for a route on a specific date.
      *
      * Uses SQL aggregation to avoid loading entity collections into PHP.

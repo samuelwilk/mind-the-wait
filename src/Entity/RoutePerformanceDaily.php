@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Entity;
 
 use App\Entity\Trait\Timestampable;
+use App\Enum\ScheduleRealismGrade;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -82,6 +83,18 @@ class RoutePerformanceDaily
      */
     #[ORM\Column(type: Types::INTEGER)]
     private int $bunchingIncidents = 0;
+
+    /**
+     * Schedule realism ratio (actual time / scheduled time).
+     *
+     * - < 1.0 = over-scheduled (buses finish early)
+     * - 1.0 = perfectly scheduled
+     * - > 1.0 = under-scheduled (buses run late)
+     *
+     * Null if insufficient data (< 5 trip instances).
+     */
+    #[ORM\Column(type: Types::DECIMAL, precision: 5, scale: 3, nullable: true)]
+    private ?string $scheduleRealismRatio = null;
 
     /**
      * Representative weather observation for this day (nullable for historical data).
@@ -249,5 +262,33 @@ class RoutePerformanceDaily
         $this->weatherObservation = $weatherObservation;
 
         return $this;
+    }
+
+    public function getScheduleRealismRatio(): ?string
+    {
+        return $this->scheduleRealismRatio;
+    }
+
+    public function setScheduleRealismRatio(?float $scheduleRealismRatio): self
+    {
+        $this->scheduleRealismRatio = $scheduleRealismRatio !== null
+            ? (string) round($scheduleRealismRatio, 3)
+            : null;
+
+        return $this;
+    }
+
+    /**
+     * Get schedule realism grade based on the ratio.
+     *
+     * Converts the stored ratio into a human-readable grade.
+     */
+    public function getScheduleRealismGrade(): ScheduleRealismGrade
+    {
+        $ratio = $this->scheduleRealismRatio !== null
+            ? (float) $this->scheduleRealismRatio
+            : null;
+
+        return ScheduleRealismGrade::fromRatio($ratio);
     }
 }

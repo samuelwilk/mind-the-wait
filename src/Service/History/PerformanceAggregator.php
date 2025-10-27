@@ -77,6 +77,14 @@ final readonly class PerformanceAggregator
                 $performance->setLatePercentage($metrics->latePercentage !== null ? (string) $metrics->latePercentage : null);
                 $performance->setEarlyPercentage($metrics->earlyPercentage !== null ? (string) $metrics->earlyPercentage : null);
 
+                // Calculate schedule realism (actual vs scheduled travel time)
+                $scheduleRealismRatio = $this->arrivalLogRepo->calculateScheduleRealismRatio(
+                    $route->getId(),
+                    $startOfDay,
+                    $endOfDay
+                );
+                $performance->setScheduleRealismRatio($scheduleRealismRatio);
+
                 // Link weather observation for weather-correlated analysis
                 $performance->setWeatherObservation($weather);
 

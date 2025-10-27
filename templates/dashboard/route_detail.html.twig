@@ -94,6 +94,36 @@
             </div>
         </div>
 
+        <!-- Schedule Realism Card -->
+        {% if routeDetail.stats.scheduleRealismGrade.value != 'insufficient_data' %}
+            <div class="bg-white rounded-lg shadow-sm border-l-4 {{ routeDetail.stats.scheduleRealismGrade.value == 'severely_under_scheduled' ? 'border-danger-500' : (routeDetail.stats.scheduleRealismGrade.value == 'under_scheduled' ? 'border-warning-500' : 'border-success-500') }} p-4 sm:p-6 mb-8">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0 text-3xl sm:text-4xl">
+                        {{ routeDetail.stats.scheduleRealismGrade.icon }}
+                    </div>
+                    <div class="ml-3 sm:ml-4 flex-1">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-base sm:text-lg font-semibold text-gray-900">Schedule Realism</h3>
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ routeDetail.stats.scheduleRealismGrade.getColorClass }}">
+                                {{ routeDetail.stats.scheduleRealismGrade.label }}
+                            </span>
+                        </div>
+                        <div class="mt-2 text-xs sm:text-sm text-gray-700">
+                            <p class="mb-2">{{ routeDetail.stats.scheduleRealismGrade.description }}</p>
+                            <p class="font-medium text-gray-900">
+                                <strong>Recommendation:</strong> {{ routeDetail.stats.scheduleRealismGrade.recommendation }}
+                            </p>
+                            {% if routeDetail.stats.scheduleRealismRatio %}
+                                <p class="mt-2 text-xs text-gray-500">
+                                    Ratio: {{ routeDetail.stats.scheduleRealismRatio }} (actual time / scheduled time)
+                                </p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
         <!-- Performance Trend Chart -->
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-6 mb-8">
             <div

@@ -242,12 +242,14 @@ final readonly class RoutePerformanceService
     {
         $performances = $this->performanceRepo->findByRouteAndDateRange($route->getId(), $startDate, $endDate);
 
-        $totalDays   = 0;
-        $totalOnTime = 0.0;
-        $bestDay     = null;
-        $worstDay    = null;
-        $bestPerf    = 0.0;
-        $worstPerf   = 100.0;
+        $totalDays            = 0;
+        $totalOnTime          = 0.0;
+        $bestDay              = null;
+        $worstDay             = null;
+        $bestPerf             = 0.0;
+        $worstPerf            = 100.0;
+        $scheduleRealismCount = 0;
+        $totalScheduleRealism = 0.0;
 
         foreach ($performances as $perf) {
             $onTime = $perf->getOnTimePercentage();
@@ -269,18 +271,31 @@ final readonly class RoutePerformanceService
                 $worstPerf = $onTime;
                 $worstDay  = $perf->getDate();
             }
+
+            // Aggregate schedule realism ratio
+            $ratio = $perf->getScheduleRealismRatio();
+            if ($ratio !== null) {
+                $totalScheduleRealism += (float) $ratio;
+                ++$scheduleRealismCount;
+            }
         }
 
-        $avgPerformance = $totalDays > 0 ? $totalOnTime / $totalDays : 0.0;
+        $avgPerformance       = $totalDays            > 0 ? $totalOnTime                     / $totalDays : 0.0;
+        $avgScheduleRealism   = $scheduleRealismCount > 0 ? $totalScheduleRealism / $scheduleRealismCount : null;
+        $scheduleRealismGrade = $avgScheduleRealism !== null
+            ? \App\Enum\ScheduleRealismGrade::fromRatio($avgScheduleRealism)
+            : \App\Enum\ScheduleRealismGrade::INSUFFICIENT_DATA;
 
         return [
-            'totalDays'        => $totalDays,
-            'avgPerformance'   => round($avgPerformance, 1),
-            'bestDay'          => $bestDay?->format('M j'),
-            'bestPerformance'  => round($bestPerf, 1),
-            'worstDay'         => $worstDay?->format('M j'),
-            'worstPerformance' => round($worstPerf, 1),
-            'grade'            => $this->onTimePercentageToGrade($avgPerformance),
+            'totalDays'            => $totalDays,
+            'avgPerformance'       => round($avgPerformance, 1),
+            'bestDay'              => $bestDay?->format('M j'),
+            'bestPerformance'      => round($bestPerf, 1),
+            'worstDay'             => $worstDay?->format('M j'),
+            'worstPerformance'     => round($worstPerf, 1),
+            'grade'                => $this->onTimePercentageToGrade($avgPerformance),
+            'scheduleRealismRatio' => $avgScheduleRealism !== null ? round($avgScheduleRealism, 2) : null,
+            'scheduleRealismGrade' => $scheduleRealismGrade,
         ];
     }
 
