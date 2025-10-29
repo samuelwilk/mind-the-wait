@@ -336,6 +336,7 @@ final readonly class RoutePerformanceService
             'grade'                => $this->onTimePercentageToGrade($avgPerformance),
             'scheduleRealismRatio' => $avgScheduleRealism !== null ? round($avgScheduleRealism, 2) : null,
             'scheduleRealismGrade' => $scheduleRealismGrade,
+            'systemComparison'     => $this->performanceRepo->getRoutePerformanceRanking($route->getId(), $startDate, $endDate),
         ];
     }
 

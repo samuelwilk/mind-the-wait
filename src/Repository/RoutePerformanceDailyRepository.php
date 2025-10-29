@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Dto\RoutePerformanceSummaryDto;
+use App\Dto\SystemComparisonDto;
 use App\Dto\TemperatureBucketDto;
 use App\Dto\TemperatureThresholdDto;
 use App\Dto\WeatherImpactMatrixDto;
@@ -527,6 +528,70 @@ final class RoutePerformanceDailyRepository extends BaseRepository
         return $count % 2 === 0
             ? ($values[$mid - 1] + $values[$mid]) / 2
             : $values[$mid];
+    }
+
+    /**
+     * Get route performance ranking relative to all other routes in the system.
+     *
+     * Returns system comparison data showing how this route ranks among all routes.
+     *
+     * @param int                $routeId   Route entity ID
+     * @param \DateTimeImmutable $startDate Start of date range
+     * @param \DateTimeImmutable $endDate   End of date range
+     *
+     * @return SystemComparisonDto|null Null if route has no data
+     */
+    public function getRoutePerformanceRanking(
+        int $routeId,
+        \DateTimeImmutable $startDate,
+        \DateTimeImmutable $endDate,
+    ): ?SystemComparisonDto {
+        // Get average performance for all routes in date range
+        $qb = $this->createQueryBuilder('p');
+
+        $results = $qb
+            ->select('IDENTITY(p.route) as route_id, AVG(p.onTimePercentage) as avg_performance')
+            ->where('p.date >= :start')
+            ->andWhere('p.date < :end')
+            ->andWhere('p.onTimePercentage IS NOT NULL')
+            ->setParameter('start', $startDate)
+            ->setParameter('end', $endDate)
+            ->groupBy('p.route')
+            ->having('COUNT(p.id) >= 5') // Require minimum 5 days of data
+            ->orderBy('avg_performance', 'DESC')
+            ->getQuery()
+            ->getScalarResult();
+
+        if (count($results) === 0) {
+            return null;
+        }
+
+        // Find this route's performance and rank
+        $routePerformance = null;
+        $routeRank        = null;
+
+        foreach ($results as $index => $result) {
+            if ((int) $result['route_id'] === $routeId) {
+                $routePerformance = (float) $result['avg_performance'];
+                $routeRank        = $index + 1; // 1-indexed rank
+                break;
+            }
+        }
+
+        // Route not found in results (no data or insufficient days)
+        if ($routeRank === null || $routePerformance === null) {
+            return null;
+        }
+
+        // Get system median
+        $systemMedian = $this->getSystemMedianPerformance($startDate, $endDate);
+
+        return new SystemComparisonDto(
+            routeRank: $routeRank,
+            totalRoutes: count($results),
+            routePerformance: $routePerformance,
+            systemMedianPerformance: $systemMedian,
+        );
     }
 
     /**
