@@ -42,6 +42,11 @@ final readonly class OverviewService
         $snapshot = $this->realtimeRepo->getSnapshot();
         $scores   = $this->realtimeRepo->getScores();
 
+        // Check feed health (feeds should update every 12 seconds, alert if > 5 minutes old)
+        $feedLastUpdated = $snapshot->ts;
+        $feedAge         = time() - $feedLastUpdated;
+        $isFeedHealthy   = $feedAge < 300; // 5 minutes
+
         // Count active vehicles
         $activeVehicles = count($snapshot->vehicles);
 
@@ -85,6 +90,8 @@ final readonly class OverviewService
             winterWeatherImpactInsight: $this->insightGenerator->generateDashboardWinterImpactCard($winterImpactStats),
             temperatureThresholdInsight: $this->insightGenerator->generateDashboardTemperatureCard($tempThresholdStats),
             timestamp: time(),
+            isFeedHealthy: $isFeedHealthy,
+            feedLastUpdated: $feedLastUpdated,
         );
     }
 

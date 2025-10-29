@@ -13,6 +13,8 @@ final readonly class SystemMetricsDto
      * @param array<int, RouteMetricDto> $historicalWorstPerformers
      * @param string                     $winterWeatherImpactInsight  AI-generated insight card (HTML)
      * @param string                     $temperatureThresholdInsight AI-generated insight card (HTML)
+     * @param bool                       $isFeedHealthy               Whether GTFS-RT feeds are current (< 5 min old)
+     * @param int                        $feedLastUpdated             Unix timestamp of last feed update
      */
     public function __construct(
         public string $systemGrade,
@@ -28,6 +30,8 @@ final readonly class SystemMetricsDto
         public string $winterWeatherImpactInsight,
         public string $temperatureThresholdInsight,
         public int $timestamp,
+        public bool $isFeedHealthy,
+        public int $feedLastUpdated,
     ) {
     }
 
@@ -46,6 +50,8 @@ final readonly class SystemMetricsDto
             'historical_top_performers'   => array_map(fn (RouteMetricDto $r) => $r->toArray(), $this->historicalTopPerformers),
             'historical_worst_performers' => array_map(fn (RouteMetricDto $r) => $r->toArray(), $this->historicalWorstPerformers),
             'timestamp'                   => $this->timestamp,
+            'is_feed_healthy'             => $this->isFeedHealthy,
+            'feed_last_updated'           => $this->feedLastUpdated,
         ];
     }
 }

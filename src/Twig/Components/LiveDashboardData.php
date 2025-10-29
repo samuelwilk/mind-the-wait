@@ -57,4 +57,34 @@ final class LiveDashboardData
 
         return $now->format('g:i:s A');
     }
+
+    /**
+     * Check if GTFS-RT feeds are healthy (< 5 minutes old).
+     */
+    public function isFeedHealthy(): bool
+    {
+        $metrics = $this->overviewService->getSystemMetrics();
+
+        return $metrics->isFeedHealthy;
+    }
+
+    /**
+     * Get human-readable time since last feed update.
+     */
+    public function getFeedLastUpdated(): string
+    {
+        $metrics     = $this->overviewService->getSystemMetrics();
+        $lastUpdated = new \DateTime('@'.$metrics->feedLastUpdated);
+        $now         = new \DateTime();
+        $interval    = $now->diff($lastUpdated);
+
+        if ($interval->h > 0) {
+            return $interval->h.'h '.$interval->i.'m ago';
+        }
+        if ($interval->i > 0) {
+            return $interval->i.'m ago';
+        }
+
+        return 'just now';
+    }
 }
