@@ -257,3 +257,21 @@
         </div>
     </div>
 {% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    {# Track route view event in Google Analytics #}
+    {% if app.environment == 'prod' and app.request.server.get('GA4_MEASUREMENT_ID') %}
+        <script>
+            if (typeof gtag !== 'undefined' && localStorage.getItem('analytics-consent') === 'granted') {
+                gtag('event', 'view_route', {
+                    'route_id': '{{ route.gtfsId }}',
+                    'route_number': '{{ route.shortName }}',
+                    'route_name': '{{ route.longName }}',
+                    'route_grade': '{{ routeDetail.stats.grade }}',
+                    'avg_performance': {{ routeDetail.stats.avgPerformance }}
+                });
+            }
+        </script>
+    {% endif %}
+{% endblock %}

@@ -14,6 +14,35 @@
         {% block javascripts %}
             {% block importmap %}{{ importmap('app') }}{% endblock %}
         {% endblock %}
+
+        {# Google Analytics 4 - Only load in production with valid measurement ID #}
+        {% if app.environment == 'prod' and app.request.server.get('GA4_MEASUREMENT_ID') %}
+            <!-- Google Analytics 4 -->
+            <script async src="https://www.googletagmanager.com/gtag/js?id={{ app.request.server.get('GA4_MEASUREMENT_ID') }}"></script>
+            <script>
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+
+                // Initialize with consent denied (GDPR compliance)
+                gtag('consent', 'default', {
+                    'analytics_storage': 'denied'
+                });
+
+                gtag('js', new Date());
+                gtag('config', '{{ app.request.server.get('GA4_MEASUREMENT_ID') }}', {
+                    'anonymize_ip': true,
+                    'allow_google_signals': false,
+                    'allow_ad_personalization_signals': false
+                });
+
+                // Check if user has already consented
+                if (localStorage.getItem('analytics-consent') === 'granted') {
+                    gtag('consent', 'update', {
+                        'analytics_storage': 'granted'
+                    });
+                }
+            </script>
+        {% endif %}
     </head>
     <body class="h-full flex flex-col">
         <!-- Navigation -->
@@ -105,8 +134,16 @@
             <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
                 <p class="text-center text-sm text-gray-500">
                     Mind the Wait | Saskatoon Transit Insights
+                    {% if app.environment == 'prod' and app.request.server.get('GA4_MEASUREMENT_ID') %}
+                        · <a href="{{ path('app_privacy') }}" class="text-primary-600 hover:text-primary-700 no-underline">Privacy Policy</a>
+                    {% endif %}
                 </p>
             </div>
         </footer>
+
+        {# Cookie Consent Banner - Only show in production with GA4 enabled #}
+        {% if app.environment == 'prod' and app.request.server.get('GA4_MEASUREMENT_ID') %}
+            {% include 'components/cookie_banner.html.twig' %}
+        {% endif %}
     </body>
 </html>

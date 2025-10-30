@@ -147,3 +147,17 @@
         </div>
     </div>
 {% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    {# Track weather impact page view in Google Analytics #}
+    {% if app.environment == 'prod' and app.request.server.get('GA4_MEASUREMENT_ID') %}
+        <script>
+            if (typeof gtag !== 'undefined' && localStorage.getItem('analytics-consent') === 'granted') {
+                gtag('event', 'view_weather_impact', {
+                    'page_title': 'Weather Impact Analysis'
+                });
+            }
+        </script>
+    {% endif %}
+{% endblock %}
