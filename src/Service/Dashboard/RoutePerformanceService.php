@@ -12,11 +12,15 @@ use App\Repository\ArrivalLogRepository;
 use App\Repository\RealtimeRepository;
 use App\Repository\RoutePerformanceDailyRepository;
 use App\Repository\RouteRepository;
+use App\Repository\TripRepository;
 use App\ValueObject\Chart\Chart;
 use App\ValueObject\Chart\RoutePerformanceChartPreset;
 
-use function array_slice;
 use function count;
+use function mb_strlen;
+use function mb_substr;
+use function preg_replace;
+use function str_replace;
 use function usort;
 
 /**
@@ -29,6 +33,7 @@ final readonly class RoutePerformanceService
         private RoutePerformanceDailyRepository $performanceRepo,
         private RealtimeRepository $realtimeRepo,
         private ArrivalLogRepository $arrivalLogRepo,
+        private TripRepository $tripRepo,
     ) {
     }
 
@@ -149,12 +154,16 @@ final readonly class RoutePerformanceService
         $endDate   = new \DateTimeImmutable('today');
         $startDate = $endDate->modify('-30 days');
 
+        // Build stop reliability charts for both directions
+        $stopCharts = $this->buildStopReliabilityCharts($route, $startDate, $endDate);
+
         // Generate chart configurations
         return new RouteDetailDto(
             performanceTrendChart: $this->buildPerformanceTrendChart($route, $startDate, $endDate),
             weatherImpactChart: $this->buildWeatherImpactChart($route, $startDate, $endDate),
             timeOfDayHeatmap: $this->buildTimeOfDayHeatmap($route, $startDate, $endDate),
-            stopReliabilityChart: $this->buildStopReliabilityChart($route, $startDate, $endDate),
+            stopReliabilityChartDirection0: $stopCharts[0],
+            stopReliabilityChartDirection1: $stopCharts[1],
             stats: $this->buildStats($route, $startDate, $endDate),
         );
     }
@@ -236,41 +245,111 @@ final readonly class RoutePerformanceService
     }
 
     /**
-     * Build stop-level reliability chart showing which stops cause delays.
+     * Build stop-level reliability charts split by direction.
      *
-     * Returns null if no stop data available (< 10 arrivals per stop).
+     * Returns array with two charts (direction 0 and 1), each null if no data.
+     *
+     * @return array{0: Chart|null, 1: Chart|null}
      */
-    private function buildStopReliabilityChart(Route $route, \DateTimeImmutable $startDate, \DateTimeImmutable $endDate): ?Chart
+    private function buildStopReliabilityCharts(Route $route, \DateTimeImmutable $startDate, \DateTimeImmutable $endDate): array
     {
         $stopData = $this->arrivalLogRepo->findStopReliabilityData($route->getId(), $startDate, $endDate);
 
         if (count($stopData) === 0) {
-            return null;
+            return [0 => null, 1 => null];
         }
 
-        // Limit to top 15 worst-performing stops for readability
-        $topStops = array_slice($stopData, 0, 15);
-
-        $stopNames = [];
-        $delays    = [];
-        $colors    = [];
-
-        foreach ($topStops as $stop) {
-            $stopNames[] = $stop->stopName;
-            $delays[]    = $stop->avgDelaySec;
-
-            // Color based on delay severity
-            $colors[] = match (true) {
-                $stop->avgDelaySec <= -180 => '#3b82f6',  // Blue (very early)
-                $stop->avgDelaySec < -60   => '#60a5fa',  // Light blue (early)
-                $stop->avgDelaySec <= 60   => '#10b981',  // Green (on-time)
-                $stop->avgDelaySec <= 180  => '#f59e0b',  // Yellow (slightly late)
-                $stop->avgDelaySec <= 300  => '#ef4444',  // Red (late)
-                default                    => '#dc2626',  // Dark red (very late)
-            };
+        // Group stops by direction
+        $stopsByDirection = [0 => [], 1 => []];
+        foreach ($stopData as $stop) {
+            $stopsByDirection[$stop->direction][] = $stop;
         }
 
-        return RoutePerformanceChartPreset::stopReliability($stopNames, $delays, $colors);
+        // Build a chart for each direction
+        $charts = [];
+        foreach ([0, 1] as $direction) {
+            $stops = $stopsByDirection[$direction] ?? [];
+
+            if (count($stops) === 0) {
+                $charts[$direction] = null;
+                continue;
+            }
+
+            // Get direction label from headsign
+            $directionLabel = $this->getHeadsignForDirection($route, $direction);
+
+            $stopNames = [];
+            $delays    = [];
+            $colors    = [];
+
+            foreach ($stops as $stop) {
+                $stopNames[] = $this->shortenStopName($stop->stopName);
+                $delays[]    = $stop->avgDelaySec;
+
+                // Color based on delay severity
+                $colors[] = match (true) {
+                    $stop->avgDelaySec <= -180 => '#3b82f6',  // Blue (very early)
+                    $stop->avgDelaySec < -60   => '#60a5fa',  // Light blue (early)
+                    $stop->avgDelaySec <= 60   => '#10b981',  // Green (on-time)
+                    $stop->avgDelaySec <= 180  => '#f59e0b',  // Yellow (slightly late)
+                    $stop->avgDelaySec <= 300  => '#ef4444',  // Red (late)
+                    default                    => '#dc2626',  // Dark red (very late)
+                };
+            }
+
+            $charts[$direction] = RoutePerformanceChartPreset::stopReliability(
+                $stopNames,
+                $delays,
+                $colors,
+                $directionLabel,
+                $direction
+            );
+        }
+
+        return $charts;
+    }
+
+    /**
+     * Get headsign for a specific direction, with fallback to stop-based label.
+     */
+    private function getHeadsignForDirection(Route $route, int $direction): string
+    {
+        // Try to get headsign from a trip for this route + direction
+        $trip = $this->tripRepo->findOneBy([
+            'route'     => $route,
+            'direction' => $direction,
+        ]);
+
+        if ($trip !== null && $trip->getHeadsign() !== null && $trip->getHeadsign() !== '') {
+            return $trip->getHeadsign();
+        }
+
+        // Fallback: Use direction number
+        return $direction === 0 ? 'Outbound' : 'Inbound';
+    }
+
+    /**
+     * Shorten stop name for chart readability.
+     *
+     * Removes common prefixes/suffixes and truncates long names.
+     */
+    private function shortenStopName(string $stopName): string
+    {
+        // Remove common prefixes
+        $shortened = preg_replace('/^(Stop|Station|Platform)\s+/i', '', $stopName);
+
+        // Remove directional suffixes like "NB", "SB", "EB", "WB"
+        $shortened = preg_replace('/\s+(NB|SB|EB|WB|Northbound|Southbound|Eastbound|Westbound)$/i', '', $shortened);
+
+        // Remove "at" connectors
+        $shortened = str_replace(' at ', ' / ', $shortened);
+
+        // Truncate if too long
+        if (mb_strlen($shortened) > 30) {
+            $shortened = mb_substr($shortened, 0, 27).'...';
+        }
+
+        return $shortened;
     }
 
     /**

@@ -137,14 +137,21 @@ final class RoutePerformanceChartPreset
     /**
      * Create stop-level reliability chart showing which stops cause delays.
      *
-     * Horizontal bar chart sorted by average delay (worst stops first).
+     * Horizontal bar chart sorted by route order showing delay accumulation.
      *
-     * @param array<string> $stopNames Stop name labels
-     * @param array<int>    $delays    Average delay in seconds for each stop
-     * @param array<string> $colors    Bar colors indicating delay severity
+     * @param array<string> $stopNames      Stop name labels
+     * @param array<int>    $delays         Average delay in seconds for each stop
+     * @param array<string> $colors         Bar colors indicating delay severity
+     * @param string        $directionLabel Direction headsign label (e.g., "City Centre")
+     * @param int           $direction      Direction number (0 or 1)
      */
-    public static function stopReliability(array $stopNames, array $delays, array $colors): Chart
-    {
+    public static function stopReliability(
+        array $stopNames,
+        array $delays,
+        array $colors,
+        string $directionLabel,
+        int $direction,
+    ): Chart {
         // Convert delays to minutes for readability
         $delaysInMinutes = array_map(fn ($delay) => round($delay / 60, 1), $delays);
 
@@ -154,8 +161,11 @@ final class RoutePerformanceChartPreset
             $colors
         );
 
+        // Direction arrow (↓ for direction 0 / outbound, ↑ for direction 1 / inbound)
+        $arrow = $direction === 0 ? '↓' : '↑';
+
         return ChartBuilder::bar()
-            ->title('Stop-Level Reliability (Worst Delays First)')
+            ->title("Stop-Level Reliability: {$directionLabel} {$arrow}")
             ->custom('yAxis', [
                 'type' => 'category',
                 'data' => $stopNames,

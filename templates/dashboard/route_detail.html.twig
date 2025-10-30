@@ -187,20 +187,36 @@
             </div>
         </div>
 
-        <!-- Stop-Level Reliability Chart -->
-        {% if routeDetail.stopReliabilityChart %}
+        <!-- Stop-Level Reliability Charts (Direction Split) -->
+        {% if routeDetail.stopReliabilityChartDirection0 or routeDetail.stopReliabilityChartDirection1 %}
             <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-6 mb-8">
                 <div class="mb-4 px-3">
-                    <h2 class="text-base sm:text-lg font-semibold text-gray-900 mb-2">Stop-Level Reliability</h2>
+                    <h2 class="text-base sm:text-lg font-semibold text-gray-900 mb-2">Stop-Level Reliability by Direction</h2>
                     <p class="text-xs sm:text-sm text-gray-600">
-                        Identifies which stops consistently cause delays. Red bars indicate bottleneck locations where buses fall behind schedule.
+                        Shows how delays accumulate along each route direction. Stops are ordered from start to end of the route.
+                        Arrows indicate direction of travel (↓ outbound, ↑ inbound).
                     </p>
                 </div>
-                <div
-                    data-controller="chart"
-                    data-chart-options-value="{{ routeDetail.stopReliabilityChart|json_encode|e('html_attr') }}"
-                    style="width: 100%; height: 500px; min-height: 500px; position: relative; z-index: 1;"
-                    class="sm:!h-[400px] sm:!min-h-[400px]">
+
+                <!-- Grid layout: 2 columns on desktop, 1 column on mobile -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                    {% if routeDetail.stopReliabilityChartDirection0 %}
+                        <div
+                            data-controller="chart"
+                            data-chart-options-value="{{ routeDetail.stopReliabilityChartDirection0|json_encode|e('html_attr') }}"
+                            style="width: 100%; height: 500px; min-height: 500px; position: relative; z-index: 1;"
+                            class="sm:!h-[400px] sm:!min-h-[400px]">
+                        </div>
+                    {% endif %}
+
+                    {% if routeDetail.stopReliabilityChartDirection1 %}
+                        <div
+                            data-controller="chart"
+                            data-chart-options-value="{{ routeDetail.stopReliabilityChartDirection1|json_encode|e('html_attr') }}"
+                            style="width: 100%; height: 500px; min-height: 500px; position: relative; z-index: 1;"
+                            class="sm:!h-[400px] sm:!min-h-[400px]">
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         {% endif %}
