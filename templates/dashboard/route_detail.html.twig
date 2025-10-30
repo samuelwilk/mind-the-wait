@@ -96,7 +96,7 @@
 
         <!-- Schedule Realism Card -->
         {% if routeDetail.stats.scheduleRealismGrade.value != 'insufficient_data' %}
-            <div class="bg-white rounded-lg shadow-sm border-l-4 {{ routeDetail.stats.scheduleRealismGrade.value == 'severely_under_scheduled' ? 'border-danger-500' : (routeDetail.stats.scheduleRealismGrade.value == 'under_scheduled' ? 'border-warning-500' : 'border-success-500') }} p-4 sm:p-6 mb-8">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 {{ routeDetail.stats.scheduleRealismGrade.value == 'severely_under_scheduled' ? 'border-danger-500' : (routeDetail.stats.scheduleRealismGrade.value == 'under_scheduled' ? 'border-warning-500' : 'border-success-500') }} p-4 sm:p-6 mb-8">
                 <div class="flex items-start">
                     <div class="flex-shrink-0 text-3xl sm:text-4xl">
                         {{ routeDetail.stats.scheduleRealismGrade.icon }}
@@ -178,23 +178,6 @@
             </div>
         {% endif %}
 
-        <!-- Stop-Level Reliability Chart -->
-        {% if routeDetail.stopReliabilityChart %}
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-6 mb-8">
-                <div class="mb-4 px-3">
-                    <h2 class="text-lg font-semibold text-gray-900 mb-2">Stop-Level Reliability</h2>
-                    <p class="text-sm text-gray-600">
-                        Identifies which stops consistently cause delays. Red bars indicate bottleneck locations where buses fall behind schedule.
-                    </p>
-                </div>
-                <div
-                    data-controller="chart"
-                    data-chart-options-value="{{ routeDetail.stopReliabilityChart|json_encode|e('html_attr') }}"
-                    style="width: 100%; height: 400px; min-height: 400px; position: relative; z-index: 1;">
-                </div>
-            </div>
-        {% endif %}
-
         <!-- Performance Trend Chart -->
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-6 mb-8">
             <div
@@ -203,6 +186,24 @@
                 style="width: 100%; height: 300px; min-height: 300px; position: relative; z-index: 1;">
             </div>
         </div>
+
+        <!-- Stop-Level Reliability Chart -->
+        {% if routeDetail.stopReliabilityChart %}
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-6 mb-8">
+                <div class="mb-4 px-3">
+                    <h2 class="text-base sm:text-lg font-semibold text-gray-900 mb-2">Stop-Level Reliability</h2>
+                    <p class="text-xs sm:text-sm text-gray-600">
+                        Identifies which stops consistently cause delays. Red bars indicate bottleneck locations where buses fall behind schedule.
+                    </p>
+                </div>
+                <div
+                    data-controller="chart"
+                    data-chart-options-value="{{ routeDetail.stopReliabilityChart|json_encode|e('html_attr') }}"
+                    style="width: 100%; height: 500px; min-height: 500px; position: relative; z-index: 1;"
+                    class="sm:!h-[400px] sm:!min-h-[400px]">
+                </div>
+            </div>
+        {% endif %}
 
         <!-- Weather Impact and Time-of-Day Charts -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8 mb-8">

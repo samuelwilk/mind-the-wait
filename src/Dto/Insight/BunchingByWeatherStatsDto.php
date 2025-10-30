@@ -14,11 +14,11 @@ final readonly class BunchingByWeatherStatsDto implements \JsonSerializable
     public function __construct(
         public bool $hasData,
         public float $snowRate,
-        public int $snowHours,
+        public float $snowHours,
         public float $rainRate,
-        public int $rainHours,
+        public float $rainHours,
         public float $clearRate,
-        public int $clearHours,
+        public float $clearHours,
         public float $multiplier,
     ) {
     }

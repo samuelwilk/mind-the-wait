@@ -85,18 +85,102 @@ export default class extends Controller {
             }
         }
 
+        // Apply mobile optimizations for stop-level reliability chart
+        if (options.title?.text?.includes('Stop-Level Reliability')) {
+            this.applyMobileOptimizations(options);
+        }
+
         // Set the options from PHP
         this.chart.setOption(options);
 
         // Handle resize
         this.resizeObserver = new ResizeObserver(() => {
             if (this.chart) {
+                // Reapply mobile optimizations on resize for stop-level chart
+                if (options.title?.text?.includes('Stop-Level Reliability')) {
+                    this.applyMobileOptimizations(options);
+                    this.chart.setOption(options, true);
+                }
                 this.chart.resize();
             }
         });
         this.resizeObserver.observe(this.element);
 
-        window.addEventListener('resize', () => this.chart.resize());
+        window.addEventListener('resize', () => {
+            if (options.title?.text?.includes('Stop-Level Reliability')) {
+                this.applyMobileOptimizations(options);
+                this.chart.setOption(options, true);
+            }
+            this.chart.resize();
+        });
+    }
+
+    applyMobileOptimizations(options) {
+        const isMobile = window.innerWidth < 768;
+        const isSmallMobile = window.innerWidth < 480;
+
+        if (isMobile) {
+            // Adjust grid for mobile to give more space for stop names
+            options.grid = {
+                left: isSmallMobile ? '60%' : '50%',
+                right: '10%',
+                top: '60',
+                bottom: '5%',
+                containLabel: false,
+            };
+
+            // Reduce font sizes for mobile
+            if (options.yAxis && options.yAxis.axisLabel) {
+                options.yAxis.axisLabel.fontSize = isSmallMobile ? 10 : 11;
+            } else if (options.yAxis) {
+                options.yAxis.axisLabel = {
+                    fontSize: isSmallMobile ? 10 : 11,
+                };
+            }
+
+            if (options.xAxis && options.xAxis.axisLabel) {
+                options.xAxis.axisLabel.fontSize = isSmallMobile ? 10 : 11;
+            } else if (options.xAxis) {
+                options.xAxis.axisLabel = {
+                    fontSize: isSmallMobile ? 10 : 11,
+                };
+            }
+
+            if (options.xAxis && options.xAxis.nameTextStyle) {
+                options.xAxis.nameTextStyle.fontSize = isSmallMobile ? 11 : 12;
+            } else if (options.xAxis) {
+                options.xAxis.nameTextStyle = {
+                    fontSize: isSmallMobile ? 11 : 12,
+                };
+            }
+
+            // Adjust title font size
+            if (options.title) {
+                options.title.textStyle = {
+                    fontSize: isSmallMobile ? 12 : 14,
+                };
+                // Shorten title on mobile
+                if (isSmallMobile) {
+                    options.title.text = 'Stop-Level Reliability';
+                }
+            }
+
+            // Adjust series label font size
+            if (options.series && options.series[0] && options.series[0].label) {
+                options.series[0].label.fontSize = isSmallMobile ? 9 : 10;
+            }
+
+            // Truncate long stop names on y-axis
+            if (options.yAxis) {
+                options.yAxis.axisLabel = {
+                    ...options.yAxis.axisLabel,
+                    fontSize: isSmallMobile ? 10 : 11,
+                    width: isSmallMobile ? 120 : 150,
+                    overflow: 'truncate',
+                    ellipsis: '...',
+                };
+            }
+        }
     }
 
     disconnect() {
