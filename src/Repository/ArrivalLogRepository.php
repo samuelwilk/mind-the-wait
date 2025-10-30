@@ -338,15 +338,15 @@ final class ArrivalLogRepository extends BaseRepository
                 t.direction as direction
             FROM arrival_log a
             INNER JOIN stop s ON s.id = a.stop_id
-            INNER JOIN stop_time st ON st.stop_id = s.id AND st.route_id = a.route_id
-            INNER JOIN trip t ON t.id = st.trip_id
+            INNER JOIN stop_time st ON st.stop_id = s.id
+            INNER JOIN trip t ON t.id = st.trip_id AND t.route_id = a.route_id
             WHERE a.route_id = :route_id
               AND a.predicted_at >= :start_date
               AND a.predicted_at < :end_date
               AND a.delay_sec IS NOT NULL
             GROUP BY s.id, s.name, t.direction
             HAVING COUNT(*) >= 10
-            ORDER BY MIN(st.stop_sequence) ASC
+            ORDER BY MIN(st.stop_sequence) ASC, t.direction ASC
         SQL;
 
         $connection = $this->getEntityManager()->getConnection();
