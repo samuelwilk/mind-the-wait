@@ -66,68 +66,21 @@ Last Updated: October 29, 2025
 4. Value: `G-LRK992JPE0`
 5. Click "Add secret"
 
-### 2. Update Terraform/ECS Configuration
+### 2. Update Terraform/ECS Configuration ✅ COMPLETED
 
-**Option A: AWS Systems Manager Parameter Store** (Recommended)
+**Status:** GA4_MEASUREMENT_ID has been added to Terraform configuration.
 
-```bash
-# Add GA4 measurement ID to Parameter Store
-aws ssm put-parameter \
-  --name "/mindthewait/prod/ga4_measurement_id" \
-  --value "G-LRK992JPE0" \
-  --type "SecureString" \
-  --description "Google Analytics 4 Measurement ID" \
-  --overwrite
+**Changes made:**
+- ✅ Added `ga4_measurement_id` variable to `terraform/environments/prod/variables.tf`
+- ✅ Added GA4_MEASUREMENT_ID to PHP service environment variables
+- ✅ Added GA4_MEASUREMENT_ID to scheduler-high-freq service environment variables
+- ✅ Added GA4_MEASUREMENT_ID to scheduler-low-freq service environment variables
+- ✅ Added value to `terraform/environments/prod/terraform.tfvars`
 
-# Verify it was created
-aws ssm get-parameter \
-  --name "/mindthewait/prod/ga4_measurement_id" \
-  --with-decryption
-```
-
-Then update ECS task definition to inject from Parameter Store:
-
-```json
-"secrets": [
-  {
-    "name": "GA4_MEASUREMENT_ID",
-    "valueFrom": "/mindthewait/prod/ga4_measurement_id"
-  }
-]
-```
-
-**Option B: Terraform Variables**
-
-```hcl
-# terraform/variables.tf
-variable "ga4_measurement_id" {
-  description = "Google Analytics 4 Measurement ID"
-  type        = string
-  sensitive   = true
-}
-
-# terraform/ecs.tf
-resource "aws_ecs_task_definition" "app" {
-  # ... existing config ...
-
-  container_definitions = jsonencode([{
-    name  = "app"
-    # ... existing config ...
-    environment = [
-      # ... existing environment variables ...
-      {
-        name  = "GA4_MEASUREMENT_ID"
-        value = var.ga4_measurement_id
-      }
-    ]
-  }])
-}
-```
-
-Then pass via terraform command:
-```bash
-terraform apply -var="ga4_measurement_id=G-LRK992JPE0"
-```
+**Files modified:**
+- `terraform/environments/prod/main.tf` (lines 157, 255, 309)
+- `terraform/environments/prod/variables.tf` (lines 142-146)
+- `terraform/environments/prod/terraform.tfvars` (line 62)
 
 ### 3. Deploy to Production
 

@@ -139,6 +139,12 @@ variable "openai_api_key" {
   sensitive   = true
 }
 
+variable "ga4_measurement_id" {
+  description = "Google Analytics 4 Measurement ID (format: G-XXXXXXXXXX)"
+  type        = string
+  sensitive   = true
+}
+
 variable "gtfs_static_url" {
   description = "GTFS static feed URL"
   type        = string
