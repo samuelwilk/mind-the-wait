@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0](https://github.com/samuelwilk/mind-the-wait/compare/v0.9.0...v0.10.0) (2025-10-30)
+
+
+### Features
+
+* add feed health monitoring with outage banner ([8975ddc](https://github.com/samuelwilk/mind-the-wait/commit/8975ddc64f4d52f96d58e11829cb108357940db7))
+* implement Reliability Context Panel (Feature 5) ([c03568b](https://github.com/samuelwilk/mind-the-wait/commit/c03568bfacb9f7460d2f6000a195129553b2cfcb))
+* implement Schedule Realism Index (Feature 3) ([23b1499](https://github.com/samuelwilk/mind-the-wait/commit/23b1499d551cf105cfcaaf91f8402dec78c119b9))
+* implement Stop-Level Reliability Map (Feature 1) ([a0822eb](https://github.com/samuelwilk/mind-the-wait/commit/a0822eb1de1a39cc580fa569921843f639b5dd68))
+
+
+### Bug Fixes
+
+* implement Bayesian adjustment for small sample size bias ([5197fdf](https://github.com/samuelwilk/mind-the-wait/commit/5197fdf8754ff72b599a64134030d4ef525fdb2d))
+* improve stop-level reliability chart mobile responsiveness and DTO type safety ([3267716](https://github.com/samuelwilk/mind-the-wait/commit/3267716524b3d4b768b01005d2bad5d92148bc60))
+
+
+### Documentation
+
+* update code quality audit to reflect completed refactors ([4dfe15f](https://github.com/samuelwilk/mind-the-wait/commit/4dfe15f1c439b273d2272629099e668125b184c8))
+
+
+### Code Refactoring
+
+* complete high-priority code quality improvements ([9a31327](https://github.com/samuelwilk/mind-the-wait/commit/9a31327f0ca9554a830e7220908a1f411affa7f2))
+* implement medium-priority refactors (WeatherService + InsightGenerator) ([5685f5f](https://github.com/samuelwilk/mind-the-wait/commit/5685f5f95066a1daf33e8c26880bad1cf8fdd57c))
+* move PerformanceAggregator calculations to repository layer ([8bdcce4](https://github.com/samuelwilk/mind-the-wait/commit/8bdcce44c121b8656737967e647c4137f0fc88b6))
+
 ## [0.9.0](https://github.com/samuelwilk/mind-the-wait/compare/v0.8.2...v0.9.0) (2025-10-22)
 
 
