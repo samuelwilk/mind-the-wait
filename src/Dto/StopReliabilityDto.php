@@ -21,6 +21,8 @@ final readonly class StopReliabilityDto
         public float $onTimePercentage,
         public int $sampleSize,
         public string $confidenceLevel,
+        public int $stopSequence,
+        public int $direction,
     ) {
     }
 

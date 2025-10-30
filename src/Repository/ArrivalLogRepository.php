@@ -313,18 +313,19 @@ final class ArrivalLogRepository extends BaseRepository
     }
 
     /**
-     * Find stop-level reliability data for a route.
+     * Find stop-level reliability data for a route and direction.
      *
      * Returns average delay and on-time percentage for each stop on the route,
-     * helping identify bottleneck locations causing chronic delays.
+     * sorted by stop sequence, helping identify where delays accumulate.
      *
-     * @param int                $routeId Route entity ID
-     * @param \DateTimeInterface $start   Start of date range
-     * @param \DateTimeInterface $end     End of date range
+     * @param int                $routeId   Route entity ID
+     * @param \DateTimeInterface $start     Start of date range
+     * @param \DateTimeInterface $end       End of date range
+     * @param int                $direction Direction (0 or 1)
      *
      * @return list<StopReliabilityDto>
      */
-    public function findStopReliabilityData(int $routeId, \DateTimeInterface $start, \DateTimeInterface $end): array
+    public function findStopReliabilityData(int $routeId, \DateTimeInterface $start, \DateTimeInterface $end, int $direction): array
     {
         $sql = <<<'SQL'
             SELECT
@@ -332,16 +333,21 @@ final class ArrivalLogRepository extends BaseRepository
                 s.name as stop_name,
                 AVG(a.delay_sec) as avg_delay_sec,
                 COUNT(*) as sample_size,
-                SUM(CASE WHEN a.delay_sec BETWEEN -180 AND 180 THEN 1 ELSE 0 END) as on_time_count
+                SUM(CASE WHEN a.delay_sec BETWEEN -180 AND 180 THEN 1 ELSE 0 END) as on_time_count,
+                MIN(st.stop_sequence) as stop_sequence,
+                t.direction as direction
             FROM arrival_log a
             INNER JOIN stop s ON s.id = a.stop_id
+            INNER JOIN stop_time st ON st.stop_id = s.id AND st.route_id = a.route_id
+            INNER JOIN trip t ON t.id = st.trip_id
             WHERE a.route_id = :route_id
               AND a.predicted_at >= :start_date
               AND a.predicted_at < :end_date
               AND a.delay_sec IS NOT NULL
-            GROUP BY s.id, s.name
+              AND t.direction = :direction
+            GROUP BY s.id, s.name, t.direction
             HAVING COUNT(*) >= 10
-            ORDER BY AVG(a.delay_sec) DESC
+            ORDER BY MIN(st.stop_sequence) ASC
         SQL;
 
         $connection = $this->getEntityManager()->getConnection();
@@ -351,11 +357,13 @@ final class ArrivalLogRepository extends BaseRepository
                 'route_id'   => $routeId,
                 'start_date' => $start->format('Y-m-d H:i:s'),
                 'end_date'   => $end->format('Y-m-d H:i:s'),
+                'direction'  => $direction,
             ],
             [
                 'route_id'   => Types::INTEGER,
                 'start_date' => Types::STRING,
                 'end_date'   => Types::STRING,
+                'direction'  => Types::INTEGER,
             ],
         )->fetchAllAssociative();
 
@@ -379,6 +387,8 @@ final class ArrivalLogRepository extends BaseRepository
                 onTimePercentage: $onTimePercentage,
                 sampleSize: $sampleSize,
                 confidenceLevel: $confidenceLevel,
+                stopSequence: (int) $row['stop_sequence'],
+                direction: (int) $row['direction'],
             );
         }
 
