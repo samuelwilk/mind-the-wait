@@ -313,19 +313,19 @@ final class ArrivalLogRepository extends BaseRepository
     }
 
     /**
-     * Find stop-level reliability data for a route and direction.
+     * Find stop-level reliability data for a route.
      *
      * Returns average delay and on-time percentage for each stop on the route,
      * sorted by stop sequence, helping identify where delays accumulate.
+     * Includes direction field for future direction-split implementation.
      *
-     * @param int                $routeId   Route entity ID
-     * @param \DateTimeInterface $start     Start of date range
-     * @param \DateTimeInterface $end       End of date range
-     * @param int                $direction Direction (0 or 1)
+     * @param int                $routeId Route entity ID
+     * @param \DateTimeInterface $start   Start of date range
+     * @param \DateTimeInterface $end     End of date range
      *
      * @return list<StopReliabilityDto>
      */
-    public function findStopReliabilityData(int $routeId, \DateTimeInterface $start, \DateTimeInterface $end, int $direction): array
+    public function findStopReliabilityData(int $routeId, \DateTimeInterface $start, \DateTimeInterface $end): array
     {
         $sql = <<<'SQL'
             SELECT
@@ -344,7 +344,6 @@ final class ArrivalLogRepository extends BaseRepository
               AND a.predicted_at >= :start_date
               AND a.predicted_at < :end_date
               AND a.delay_sec IS NOT NULL
-              AND t.direction = :direction
             GROUP BY s.id, s.name, t.direction
             HAVING COUNT(*) >= 10
             ORDER BY MIN(st.stop_sequence) ASC
@@ -357,13 +356,11 @@ final class ArrivalLogRepository extends BaseRepository
                 'route_id'   => $routeId,
                 'start_date' => $start->format('Y-m-d H:i:s'),
                 'end_date'   => $end->format('Y-m-d H:i:s'),
-                'direction'  => $direction,
             ],
             [
                 'route_id'   => Types::INTEGER,
                 'start_date' => Types::STRING,
                 'end_date'   => Types::STRING,
-                'direction'  => Types::INTEGER,
             ],
         )->fetchAllAssociative();
 
