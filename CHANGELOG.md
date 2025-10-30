@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0](https://github.com/samuelwilk/mind-the-wait/compare/v0.10.0...v0.11.0) (2025-10-30)
+
+
+### Features
+
+* add Google Analytics 4 with privacy-friendly cookie consent ([fcb0ed8](https://github.com/samuelwilk/mind-the-wait/commit/fcb0ed8702657ae88c0ac430951a1f621753cedb))
+
+
+### Documentation
+
+* add deployment checklist for Reddit launch with GA4 setup ([23c1444](https://github.com/samuelwilk/mind-the-wait/commit/23c14447ab0ff38e5686865f1679ca8b647b8be3))
+
+
+### Code Refactoring
+
+* prepare stop-level reliability for direction-split charts (WIP) ([d448c92](https://github.com/samuelwilk/mind-the-wait/commit/d448c9286c826d169d3c7ec3ef3efe78b716a89f))
+
 ## [0.10.0](https://github.com/samuelwilk/mind-the-wait/compare/v0.9.0...v0.10.0) (2025-10-30)
 
 
