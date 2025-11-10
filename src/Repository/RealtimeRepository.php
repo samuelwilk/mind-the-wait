@@ -9,6 +9,8 @@ use App\Dto\VehicleDto;
 use App\Dto\VehicleFeedbackDto;
 use App\Dto\VehicleSnapshotDto;
 use Predis\ClientInterface;
+use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 
 use function is_array;
 use function sprintf;
@@ -18,12 +20,20 @@ use const JSON_UNESCAPED_UNICODE;
 
 final readonly class RealtimeRepository
 {
-    public function __construct(private ClientInterface $redis, private readonly TripRepository $tripRepository)
-    {
+    private const CACHE_TTL = 5; // Cache for 5 seconds to avoid N+1 JSON decoding
+
+    public function __construct(
+        private ClientInterface $redis,
+        private TripRepository $tripRepository,
+        private CacheInterface $cache,
+    ) {
     }
 
     /**
      * Return a stable payload for the API.
+     *
+     * Cached for 5 seconds to prevent N+1 issues when called in loops
+     * (e.g., ArrivalPredictor calls this for every vehicle/stop combination).
      *
      * @param string $citySlug City slug for Redis namespace (e.g., 'saskatoon', 'regina')
      *
@@ -31,22 +41,28 @@ final readonly class RealtimeRepository
      */
     public function snapshot(string $citySlug = 'saskatoon'): array
     {
-        $veh = $this->redis->hgetall($this->getKey('vehicles', $citySlug)) ?: [];
-        $tri = $this->redis->hgetall($this->getKey('trips', $citySlug)) ?: [];
-        $alt = $this->redis->hgetall($this->getKey('alerts', $citySlug)) ?: [];
+        $cacheKey = "realtime_repo_snapshot_{$citySlug}";
 
-        $vehicles = $this->safeJsonDecode($veh['json'] ?? '[]');
-        $trips    = $this->safeJsonDecode($tri['json'] ?? '[]');
-        $alerts   = $this->safeJsonDecode($alt['json'] ?? '[]');
+        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($citySlug) {
+            $item->expiresAfter(self::CACHE_TTL);
 
-        $ts = max((int) ($veh['ts'] ?? 0), (int) ($tri['ts'] ?? 0), (int) ($alt['ts'] ?? 0));
+            $veh = $this->redis->hgetall($this->getKey('vehicles', $citySlug)) ?: [];
+            $tri = $this->redis->hgetall($this->getKey('trips', $citySlug)) ?: [];
+            $alt = $this->redis->hgetall($this->getKey('alerts', $citySlug)) ?: [];
 
-        return [
-            'ts'       => $ts,
-            'vehicles' => is_array($vehicles) ? $vehicles : [],
-            'trips'    => is_array($trips) ? $trips : [],
-            'alerts'   => is_array($alerts) ? $alerts : [],
-        ];
+            $vehicles = $this->safeJsonDecode($veh['json'] ?? '[]');
+            $trips    = $this->safeJsonDecode($tri['json'] ?? '[]');
+            $alerts   = $this->safeJsonDecode($alt['json'] ?? '[]');
+
+            $ts = max((int) ($veh['ts'] ?? 0), (int) ($tri['ts'] ?? 0), (int) ($alt['ts'] ?? 0));
+
+            return [
+                'ts'       => $ts,
+                'vehicles' => is_array($vehicles) ? $vehicles : [],
+                'trips'    => is_array($trips) ? $trips : [],
+                'alerts'   => is_array($alerts) ? $alerts : [],
+            ];
+        });
     }
 
     /**

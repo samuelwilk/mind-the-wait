@@ -7,14 +7,20 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
+use Psr\Cache\CacheItemPoolInterface;
 
 /**
  * @extends BaseRepository<StopTime>
  */
 class StopTimeRepository extends BaseRepository
 {
-    public function __construct(EntityManagerInterface $em, ManagerRegistry $registry)
-    {
+    private const CACHE_TTL = 3600; // Cache for 1 hour (static schedule data)
+
+    public function __construct(
+        EntityManagerInterface $em,
+        ManagerRegistry $registry,
+        private readonly CacheItemPoolInterface $cache,
+    ) {
         parent::__construct($em, $registry, StopTime::class);
     }
 
@@ -43,12 +49,27 @@ class StopTimeRepository extends BaseRepository
     /**
      * Get stop times for a trip in array format (for arrival prediction).
      *
+     * Cached to prevent N+1 queries when called in loops (e.g., RouteTrackingService).
+     * Static schedule data changes rarely (only on GTFS reload), so 1-hour cache is safe.
+     *
      * @return list<array{stop_id: string, seq: int, arr: int|null, dep: int|null}>|null
      */
     public function getStopTimesForTrip(string $gtfsTripId): ?array
     {
+        $cacheKey = "stop_times_trip_{$gtfsTripId}";
+        $item     = $this->cache->getItem($cacheKey);
+
+        if ($item->isHit()) {
+            return $item->get();
+        }
+
         $stopTimes = $this->findByTripGtfsId($gtfsTripId);
         if (empty($stopTimes)) {
+            // Cache null results with shorter TTL to avoid hammering DB for non-existent trips
+            $item->set(null);
+            $item->expiresAfter(60); // 1 minute for null results
+            $this->cache->save($item);
+
             return null;
         }
 
@@ -61,6 +82,10 @@ class StopTimeRepository extends BaseRepository
                 'dep'     => $st->getDepartureTime(),
             ];
         }
+
+        $item->set($result);
+        $item->expiresAfter(self::CACHE_TTL);
+        $this->cache->save($item);
 
         return $result;
     }
