@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0](https://github.com/samuelwilk/mind-the-wait/compare/v0.13.0...v0.14.0) (2025-11-10)
+
+
+### Features
+
+* implement Mercure live tracking with production optimizations ([1527f1f](https://github.com/samuelwilk/mind-the-wait/commit/1527f1f3a913164211a93d18c9075805419b77fe))
+
+
+### Bug Fixes
+
+* use TagAwareCacheInterface for stop sequence caching ([b2a59e8](https://github.com/samuelwilk/mind-the-wait/commit/b2a59e833b2a47afae8b8eab28c7df044d0f2d50))
+
 ## [0.13.0](https://github.com/samuelwilk/mind-the-wait/compare/v0.12.0...v0.13.0) (2025-10-30)
 
 
