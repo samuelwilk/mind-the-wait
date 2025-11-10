@@ -30,6 +30,7 @@ final class EnhancedArrivalPredictionTest extends TestCase
             routeId: '14536', // Matched route ID (Route 27: Silverspring / University)
             tripId: 'trip-route27-1',
             stopId: '3734',
+            stopName: null,
             headsign: 'University',
             arrivalAt: $now + 420, // 7 minutes
             confidence: PredictionConfidence::HIGH,
@@ -54,6 +55,7 @@ final class EnhancedArrivalPredictionTest extends TestCase
             routeId: '14551', // Route 43 matched ID
             tripId: 'trip-route43-morning',
             stopId: '3734', // Primrose / Lenore
+            stopName: null,
             headsign: 'City Centre',
             arrivalAt: $now + 180, // 3 minutes
             confidence: PredictionConfidence::HIGH,
@@ -81,6 +83,7 @@ final class EnhancedArrivalPredictionTest extends TestCase
             routeId: '14514',
             tripId: 'trip-1',
             stopId: 'STOP1',
+            stopName: null,
             headsign: 'Downtown',
             arrivalAt: $now + $arrivalOffset,
             confidence: PredictionConfidence::MEDIUM
@@ -113,6 +116,7 @@ final class EnhancedArrivalPredictionTest extends TestCase
             routeId: '14536',
             tripId: 'trip-1',
             stopId: 'STOP1',
+            stopName: null,
             headsign: 'University',
             arrivalAt: $now + 300,
             confidence: PredictionConfidence::HIGH,
@@ -155,6 +159,7 @@ final class EnhancedArrivalPredictionTest extends TestCase
             routeId: '14536', // Matched
             tripId: 'trip-1',
             stopId: 'STOP1',
+            stopName: null,
             headsign: 'University',
             arrivalAt: $now + 300,
             confidence: PredictionConfidence::HIGH
@@ -166,6 +171,7 @@ final class EnhancedArrivalPredictionTest extends TestCase
             routeId: '13915', // Old ID (mismatched)
             tripId: 'trip-1',
             stopId: 'STOP1',
+            stopName: null,
             headsign: 'University',
             arrivalAt: $now + 300,
             confidence: PredictionConfidence::MEDIUM
@@ -177,6 +183,7 @@ final class EnhancedArrivalPredictionTest extends TestCase
             routeId: '14536',
             tripId: 'trip-1',
             stopId: 'STOP1',
+            stopName: null,
             headsign: 'University',
             arrivalAt: $now + 300,
             confidence: PredictionConfidence::LOW
@@ -199,6 +206,7 @@ final class EnhancedArrivalPredictionTest extends TestCase
                 routeId: '14536',
                 tripId: 'trip-3',
                 stopId: 'STOP1',
+                stopName: null,
                 headsign: 'University',
                 arrivalAt: $now + 900, // 15 min
                 confidence: PredictionConfidence::HIGH
@@ -208,6 +216,7 @@ final class EnhancedArrivalPredictionTest extends TestCase
                 routeId: '14536',
                 tripId: 'trip-1',
                 stopId: 'STOP1',
+                stopName: null,
                 headsign: 'University',
                 arrivalAt: $now + 180, // 3 min (soonest)
                 confidence: PredictionConfidence::HIGH
@@ -217,6 +226,7 @@ final class EnhancedArrivalPredictionTest extends TestCase
                 routeId: '14536',
                 tripId: 'trip-2',
                 stopId: 'STOP1',
+                stopName: null,
                 headsign: 'University',
                 arrivalAt: $now + 540, // 9 min
                 confidence: PredictionConfidence::MEDIUM
@@ -244,6 +254,7 @@ final class EnhancedArrivalPredictionTest extends TestCase
                 routeId: '14526', // Route 14
                 tripId: 'trip-route14-1',
                 stopId: '3734',
+                stopName: null,
                 headsign: 'North Industrial',
                 arrivalAt: $now + 240,
                 confidence: PredictionConfidence::HIGH,
@@ -254,6 +265,7 @@ final class EnhancedArrivalPredictionTest extends TestCase
                 routeId: '14526', // Route 14
                 tripId: 'trip-route14-2',
                 stopId: '3734',
+                stopName: null,
                 headsign: 'North Industrial',
                 arrivalAt: $now + 720,
                 confidence: PredictionConfidence::HIGH,
@@ -285,6 +297,7 @@ final class EnhancedArrivalPredictionTest extends TestCase
             routeId: '14551',
             tripId: 'trip-1',
             stopId: 'STOP1',
+            stopName: null,
             headsign: 'City Centre',
             arrivalAt: $now + 300,
             confidence: PredictionConfidence::HIGH,
@@ -318,6 +331,7 @@ final class EnhancedArrivalPredictionTest extends TestCase
             routeId: '14536',
             tripId: 'trip-1',
             stopId: '3734',
+            stopName: null,
             headsign: 'University',
             arrivalAt: $now + 420,
             confidence: PredictionConfidence::HIGH,

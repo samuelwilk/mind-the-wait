@@ -35,6 +35,7 @@ final class ArrivalPredictorTest extends TestCase
             routeId: '10',
             tripId: 'trip-1',
             stopId: 'STOP1',
+            stopName: 'Test Stop',
             headsign: 'Downtown',
             arrivalAt: $arrivalAt,
             confidence: PredictionConfidence::HIGH
@@ -52,6 +53,7 @@ final class ArrivalPredictorTest extends TestCase
             routeId: '10',
             tripId: 'trip-1',
             stopId: 'STOP1',
+            stopName: 'Test Stop',
             headsign: 'University',
             arrivalAt: $now + 240,
             confidence: PredictionConfidence::MEDIUM,
