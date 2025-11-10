@@ -10,8 +10,8 @@ use App\Entity\Route;
 use App\Entity\Stop;
 use App\Repository\StopTimeRepository;
 use App\Service\Prediction\ArrivalPredictor;
-use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
+use Symfony\Contracts\Cache\TagAwareCacheInterface;
 
 use function array_filter;
 use function array_values;
@@ -27,7 +27,7 @@ final readonly class StopSequenceService
     public function __construct(
         private StopTimeRepository $stopTimeRepo,
         private ArrivalPredictor $arrivalPredictor,
-        private CacheInterface $cache,
+        private TagAwareCacheInterface $cache,
     ) {
     }
 
