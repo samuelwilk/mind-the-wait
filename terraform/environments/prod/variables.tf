@@ -139,6 +139,12 @@ variable "openai_api_key" {
   sensitive   = true
 }
 
+variable "mercure_jwt_secret" {
+  description = "JWT secret for Mercure Hub authentication (generate with: openssl rand -base64 32)"
+  type        = string
+  sensitive   = true
+}
+
 variable "ga4_measurement_id" {
   description = "Google Analytics 4 Measurement ID (format: G-XXXXXXXXXX)"
   type        = string

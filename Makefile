@@ -102,25 +102,29 @@ mailpit-delete-all-mail: ## Delete all mail from Mailpit
 setup: ## Complete application setup - builds, installs deps, creates databases, loads GTFS data
 	@echo "🚀 Starting complete mind-the-wait setup..."
 	@echo ""
-	@echo "📦 Step 1/7: Building and starting Docker containers..."
+	@echo "📦 Step 1/8: Building and starting Docker containers..."
 	@make docker-build
 	@echo ""
-	@echo "📚 Step 2/7: Installing Composer dependencies..."
+	@echo "📚 Step 2/8: Installing Composer dependencies..."
 	@make composer-install
 	@echo ""
-	@echo "🗄️  Step 3/7: Setting up development database..."
+	@echo "🎨 Step 3/8: Compiling frontend assets (Tailwind CSS + AssetMapper)..."
+	@docker compose -f docker/compose.yaml exec php bin/console tailwind:build --minify
+	@docker compose -f docker/compose.yaml exec php bin/console asset-map:compile
+	@echo ""
+	@echo "🗄️  Step 4/8: Setting up development database..."
 	@make database
 	@echo ""
-	@echo "🧪 Step 4/7: Setting up test database..."
+	@echo "🧪 Step 5/8: Setting up test database..."
 	@make database-test
 	@echo ""
-	@echo "🚍 Step 5/7: Loading GTFS static data..."
+	@echo "🚍 Step 6/8: Loading GTFS static data..."
 	@make gtfs-load
 	@echo ""
-	@echo "🌤️  Step 6/7: Collecting initial weather data..."
+	@echo "🌤️  Step 7/8: Collecting initial weather data..."
 	@make weather-collect
 	@echo ""
-	@echo "📊 Step 7/7: Running initial score calculation..."
+	@echo "📊 Step 8/8: Running initial score calculation..."
 	@make score-tick
 	@echo ""
 	@echo "✅ Setup complete! Application is ready to use."

@@ -83,7 +83,7 @@ services:
       - ../:/var/www/app:cached
     # No explicit environment vars - Symfony will load from .env files in mounted volume
 
-  # High-frequency scheduler: handles score_tick (every 30s) and arrival_logging (every 2min)
+  # High-frequency scheduler: handles score_tick (every 30s), mercure_route_broadcast (every 5s), and arrival_logging (every 2min)
   scheduler-high-freq:
     build:
       context: ..
@@ -92,11 +92,15 @@ services:
       - php
       - redis
       - database
+      - mercure
     working_dir: /var/www/app
-    command: php bin/console messenger:consume scheduler_score_tick scheduler_arrival_logging -vv
+    command: php bin/console messenger:consume scheduler_score_tick scheduler_mercure_route_broadcast scheduler_arrival_logging -vv
     volumes:
       - ../:/var/www/app:cached
-    # No explicit environment vars - Symfony will load from .env files in mounted volume
+    environment:
+      MERCURE_URL: http://mercure/.well-known/mercure
+      MERCURE_PUBLIC_URL: http://localhost:3000/.well-known/mercure
+      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET}
 
   # Low-frequency scheduler: handles weather (hourly), aggregation (daily), insights (daily), bunching (daily)
   scheduler-low-freq:
@@ -112,6 +116,25 @@ services:
     volumes:
       - ../:/var/www/app:cached
     # No explicit environment vars - Symfony will load from .env files in mounted volume
+
+  ###> symfony/mercure-bundle ###
+  mercure:
+    image: dunglas/mercure:v0.16
+    restart: unless-stopped
+    environment:
+      # Use env var for JWT secret (set in .env or .env.local)
+      SERVER_NAME: ':80'
+      MERCURE_PUBLISHER_JWT_KEY: ${MERCURE_JWT_SECRET}
+      MERCURE_SUBSCRIBER_JWT_KEY: ${MERCURE_JWT_SECRET}
+      # Allow anonymous subscribers and CORS for development
+      MERCURE_EXTRA_DIRECTIVES: >
+        anonymous
+        cors_origins https://mind-the-wait.local http://localhost:8080 https://localhost
+    ports:
+      - "3000:80"
+    # Uncomment for production (requires proper domain + TLS setup)
+    # command: /usr/bin/caddy run --config /etc/caddy/Caddyfile.dev
+  ###< symfony/mercure-bundle ###
 
 volumes:
   ###> doctrine/doctrine-bundle ###

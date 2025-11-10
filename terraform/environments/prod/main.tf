@@ -244,7 +244,7 @@ module "ecs_service_scheduler_high_freq" {
     image     = "${module.ecr.repository_urls["php"]}:latest"
     essential = true
 
-    command = ["php", "bin/console", "messenger:consume", "scheduler_score_tick", "scheduler_arrival_logging", "-vv"]
+    command = ["php", "bin/console", "messenger:consume", "scheduler_score_tick", "scheduler_mercure_route_broadcast", "scheduler_arrival_logging", "-vv"]
 
     environment = [
       { name = "APP_ENV", value = "prod" },
@@ -252,6 +252,9 @@ module "ecs_service_scheduler_high_freq" {
       { name = "DATABASE_URL", value = local.database_url },
       { name = "REDIS_URL", value = local.redis_url },
       { name = "MESSENGER_TRANSPORT_DSN", value = local.messenger_transport_dsn },
+      { name = "MERCURE_URL", value = "http://mercure/.well-known/mercure" },
+      { name = "MERCURE_PUBLIC_URL", value = "https://${var.domain_name}/.well-known/mercure" },
+      { name = "MERCURE_JWT_SECRET", value = var.mercure_jwt_secret },
       { name = "GA4_MEASUREMENT_ID", value = var.ga4_measurement_id },
       { name = "MTW_GTFS_STATIC_URL", value = var.gtfs_static_url },
       { name = "MTW_ARCGIS_ROUTE", value = var.arcgis_routes_url },
@@ -320,6 +323,56 @@ module "ecs_service_scheduler_low_freq" {
         "awslogs-group"         = module.ecs_cluster.log_group_name
         "awslogs-region"        = var.aws_region
         "awslogs-stream-prefix" = "scheduler-low-freq"
+      }
+    }
+  }])
+
+  tags = local.common_tags
+}
+
+# ECS Service: Mercure Hub (Server-Sent Events for Live Tracking)
+module "ecs_service_mercure" {
+  source = "../../modules/ecs-service"
+
+  project_name             = local.project_name
+  environment              = local.environment
+  service_name             = "mercure"
+  cluster_id               = module.ecs_cluster.cluster_id
+  cluster_name             = module.ecs_cluster.cluster_name
+  task_execution_role_arn  = module.ecs_cluster.task_execution_role_arn
+  task_role_arn            = module.ecs_cluster.task_role_arn
+  task_security_group_id   = module.networking.ecs_tasks_security_group_id
+  subnet_ids               = module.networking.public_subnet_ids
+  cpu                      = 256
+  memory                   = 512
+  desired_count            = 1
+
+  # NO spot instances for Mercure - WebSocket/SSE connections need stable hosts
+  use_spot = false
+
+  container_definitions = jsonencode([{
+    name      = "mercure"
+    image     = "dunglas/mercure:v0.16"
+    essential = true
+
+    portMappings = [{
+      containerPort = 80
+      protocol      = "tcp"
+    }]
+
+    environment = [
+      { name = "SERVER_NAME", value = ":80" },
+      { name = "MERCURE_PUBLISHER_JWT_KEY", value = var.mercure_jwt_secret },
+      { name = "MERCURE_SUBSCRIBER_JWT_KEY", value = var.mercure_jwt_secret },
+      { name = "MERCURE_EXTRA_DIRECTIVES", value = "anonymous\ncors_origins https://${var.domain_name}" }
+    ]
+
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = module.ecs_cluster.log_group_name
+        "awslogs-region"        = var.aws_region
+        "awslogs-stream-prefix" = "mercure"
       }
     }
   }])

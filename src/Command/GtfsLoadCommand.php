@@ -27,6 +27,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Contracts\Cache\TagAwareCacheInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use ZipArchive;
 
@@ -46,6 +47,7 @@ final class GtfsLoadCommand extends Command
         private readonly StopTimeRepository $stopTimes,
         private readonly HttpClientInterface $http,
         private readonly GtfsConfigFactory $configFactory,
+        private readonly TagAwareCacheInterface $cache,
     ) {
         parent::__construct();
     }
@@ -173,6 +175,10 @@ final class GtfsLoadCommand extends Command
             $this->loadStops("$dir/stops.txt", $io);
             $this->loadTrips("$dir/trips.txt", $io);
             $this->loadStopTimes("$dir/stop_times.txt", $io);
+
+            // Invalidate cached stop sequences (GTFS static data changed)
+            $io->writeln('Invalidating stop sequence cache...');
+            $this->cache->invalidateTags(['gtfs_static', 'route_stops']);
 
             $io->success('GTFS static loaded');
 
@@ -314,6 +320,10 @@ final class GtfsLoadCommand extends Command
         if ($skippedStopTimes > 0) {
             $io->writeln("  skipped (missing trip or stop): $skippedStopTimes");
         }
+
+        // Invalidate cached stop sequences (GTFS static data changed)
+        $io->writeln('Invalidating stop sequence cache...');
+        $this->cache->invalidateTags(['gtfs_static', 'route_stops']);
 
         $io->success('GTFS static loaded (ArcGIS)');
 

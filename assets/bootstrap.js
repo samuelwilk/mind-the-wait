@@ -1,4 +1,5 @@
 import { startStimulusApp } from '@symfony/stimulus-bundle';
+import * as Turbo from '@hotwired/turbo';
 
 const app = startStimulusApp();
 // register any custom, 3rd party controllers here

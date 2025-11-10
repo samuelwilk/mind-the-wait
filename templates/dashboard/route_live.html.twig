@@ -1,0 +1,150 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Live Tracking - Route {{ route.shortName|default('') }} - {{ route.longName|default('') }} - Saskatoon Transit{% endblock %}
+
+{% block body %}
+    {# Host for Stimulus controllers (removed data-turbo-permanent to allow Mercure updates) #}
+    <div
+        id="live-root"
+        class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+        data-controller="vehicle-freshness"
+        data-vehicle-freshness-mercure-url-value="{{ mercure('route/' ~ route.gtfsId)|e('html_attr') }}"
+    >
+
+    <!-- Breadcrumb -->
+        <nav class="mb-6" aria-label="Breadcrumb">
+            <ol class="flex items-center space-x-2 text-sm text-gray-500">
+                <li><a href="{{ path('app_dashboard') }}" class="hover:text-primary-500">Dashboard</a></li>
+                <li><span class="mx-2">/</span></li>
+                <li><a href="{{ path('app_routes_list') }}" class="hover:text-primary-500">Routes</a></li>
+                <li><span class="mx-2">/</span></li>
+                <li>
+                    <a href="{{ path('app_routes_show', { gtfsId: route.gtfsId }) }}" class="hover:text-primary-500">
+                        Route {{ route.shortName|default('') }}
+                    </a>
+                </li>
+                <li><span class="mx-2">/</span></li>
+                <li class="text-gray-900 font-medium">Live Tracking</li>
+            </ol>
+        </nav>
+
+        <!-- Route Header -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 mb-6">
+            <!-- Mobile -->
+            <div class="sm:hidden">
+                <div class="flex items-center mb-3">
+                    {% include 'components/RouteBadge.html.twig' with {
+                        shortName: route.shortName,
+                        colour: route.colour,
+                        size: 'lg'
+                    } %}
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-900 mb-1">
+                        {% if routeDirection %}
+                            Route {{ route.shortName }} · {{ routeDirection }}
+                        {% else %}
+                            {{ route.longName }}
+                        {% endif %}
+                    </h1>
+                    <p class="text-sm text-gray-600">Live Tracking</p>
+                </div>
+            </div>
+
+            <!-- Desktop -->
+            <div class="hidden sm:flex flex-row items-center gap-4">
+                <div class="flex items-start gap-4 flex-1 min-w-0">
+                    {% include 'components/RouteBadge.html.twig' with {
+                        shortName: route.shortName,
+                        colour: route.colour,
+                        size: 'lg'
+                    } %}
+                    <div class="flex-1 min-w-0">
+                        <h1 class="text-3xl font-bold text-gray-900">
+                            {% if routeDirection %}
+                                Route {{ route.shortName }} · {{ routeDirection }}
+                            {% else %}
+                                {{ route.longName }}
+                            {% endif %}
+                        </h1>
+                        <p class="text-gray-600">Live Tracking</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="mb-8">
+            <div class="border-b border-gray-200">
+                <nav class="-mb-px flex gap-6" aria-label="Tabs">
+                    <a href="{{ path('app_routes_show', { gtfsId: route.gtfsId }) }}"
+                       class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-2 border-b-2 font-medium">
+                        Performance History
+                    </a>
+                    <a href="{{ path('app_routes_live', { gtfsId: route.gtfsId }) }}"
+                       class="border-primary-500 text-primary-600 whitespace-nowrap py-4 px-2 border-b-2 font-medium"
+                       aria-current="page">
+                        Live Tracking
+                    </a>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Connection Status Indicator -->
+        <div class="flex items-center gap-2 mb-4">
+            <span class="w-2 h-2 rounded-full bg-gray-400" data-vehicle-freshness-target="connectionDot"></span>
+            <span class="text-xs font-medium text-gray-600" data-vehicle-freshness-target="connectionStatus">Connecting...</span>
+            <span class="text-xs text-gray-500">• Updates every 5 seconds</span>
+        </div>
+
+        <!-- Stale banner -->
+        {% if snapshot.isFeedStale() %}
+            <div class="bg-warning-50 border border-warning-300 rounded-lg p-4 mb-6">
+                <div class="flex items-start">
+                    <svg class="w-5 h-5 text-warning-600 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    <div>
+                        <h3 class="text-sm font-medium text-warning-800">Feed data is stale</h3>
+                        <p class="text-sm text-warning-700 mt-1">
+                            Last update was {{ snapshot.getAgeSeconds() }} seconds ago. Live tracking data may be outdated.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Live Content -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+                {# IMPORTANT: No wrapper div - component has id="route-header" #}
+                <div class="mb-6">
+                    {{ component('Route:Header', { headway: snapshot.headway, counts: snapshot.counts }) }}
+                </div>
+
+                {# IMPORTANT: No wrapper div - component has id="route-timeline" #}
+                {{ component('Route:Timeline', { stops: snapshot.stops }) }}
+            </div>
+
+            {# IMPORTANT: No wrapper div - component has id="route-vehicles" #}
+            {{ component('Route:VehicleList', { vehicles: snapshot.vehicles, snapshotUpdatedAt: snapshot.updatedAt }) }}
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-8 flex items-center justify-center gap-6 text-sm text-gray-600">
+            <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Last updated: {{ snapshot.updatedAt|date('g:i:s A') }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-success-500"></span>
+                </span>
+                <span class="text-success-600 font-medium">Live</span>
+            </div>
+        </div>
+    </div>
+{% endblock %}

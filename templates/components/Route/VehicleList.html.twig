@@ -1,0 +1,118 @@
+{# NOTE: No data-controller on this streamed fragment #}
+{# templates/components/Route/VehicleList.html.twig #}
+
+{# Precompute "now" once per render to avoid tiny per-card drift #}
+{% set nowTs = 'now'|date('U') %}
+
+<div id="route-vehicles" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-6">
+    <h2 class="text-sm font-semibold text-gray-600 mb-4">Active Vehicles ({{ vehicles|length }})</h2>
+
+    {% if vehicles is empty %}
+        <div class="text-center py-12">
+            <p class="text-gray-500 text-sm">No vehicles currently active</p>
+        </div>
+    {% else %}
+        <div class="space-y-3">
+            {% for vehicle in this.getSortedVehicles() %}
+                {% set statusColor = vehicle.status.color.value %}
+                {% set etaMinutes = vehicle.getEtaMinutes() %}
+                {% set speedKmh = vehicle.getSpeedKmh() %}
+                {% set delaySec = vehicle.status.deviationSec %}
+                {% set delayMin = (delaySec / 60)|round %}
+
+                {# Choose your freshness policy: A) true telemetry, or B) snapshot reset #}
+                {% set freshnessTs = vehicle.vehicle.timestamp %}
+                {# Buskatoon variant (always shows recent "Seen" values):
+                   {% set snapshotTs = snapshotUpdatedAt|date('U') %}
+                   {% set vehicleTs = vehicle.vehicle.timestamp %}
+                   {% set freshnessTs = vehicleTs > snapshotTs ? vehicleTs : snapshotTs %}
+                #}
+
+                {# Optional niceties:
+                   - Prefill "Seen" with server-side age so no flash
+                   - Fallback to em-dash if no timestamp
+                   - Add a small min-width to avoid layout jiggle
+                #}
+                {% if freshnessTs is defined and freshnessTs is not null %}
+                    {% set initialAge = nowTs - freshnessTs %}
+                    {% set initialAge = initialAge < 0 ? 0 : initialAge %}
+                    {% set initialSeenText = initialAge ~ 's ago' %}
+                    {% set initialSeenClass = initialAge < 60
+                        ? 'text-success-600'
+                        : (initialAge < 120 ? 'text-warning-600' : 'text-danger-600')
+                    %}
+                {% else %}
+                    {% set initialSeenText = '—' %}
+                    {% set initialSeenClass = 'text-gray-500' %}
+                {% endif %}
+
+                <div class="p-3 border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all"
+                     data-vehicle-id="{{ vehicle.vehicleId }}"
+                     data-vehicle-timestamp="{{ freshnessTs }}">
+                    <!-- Vehicle Header -->
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full {% if statusColor == 'green' %}bg-success-500{% elseif statusColor == 'blue' %}bg-info-500{% elseif statusColor == 'yellow' %}bg-warning-500{% elseif statusColor == 'orange' %}bg-warning-600{% elseif statusColor == 'red' %}bg-danger-500{% elseif statusColor == 'purple' %}bg-purple-500{% else %}bg-gray-400{% endif %}"></span>
+                            <span class="font-semibold text-gray-900 text-sm">{{ vehicle.getDisplayId() }}</span>
+                            <span class="text-xs text-gray-500">{{ vehicle.status.severity }}</span>
+                        </div>
+                        {% if etaMinutes is not null %}
+                            <span class="text-sm font-semibold {% if etaMinutes <= 2 %}text-danger-600{% elseif etaMinutes <= 5 %}text-warning-600{% else %}text-success-600{% endif %}">
+                                {{ etaMinutes }} min
+                            </span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Next Stop -->
+                    <div class="text-xs text-gray-600 mb-2">
+                        {% if vehicle.nextArrival is not null %}
+                            <span class="text-gray-500">→</span> {{ vehicle.getNextStopName() }}
+                        {% else %}
+                            <span class="text-gray-500 italic">In Transit</span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Vehicle Stats -->
+                    <div class="flex items-center gap-4 text-xs text-gray-600">
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-500">Speed:</span>
+                            <span class="font-medium">
+                                {% if speedKmh is not null %}
+                                    {{ speedKmh }} km/h
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-500">Delay:</span>
+                            <span class="font-medium {% if delaySec|abs <= 60 %}text-success-600{% elseif delaySec < 0 %}text-info-600{% else %}text-danger-600{% endif %}">
+                                {% if delayMin == 0 %}
+                                    On time
+                                {% elseif delayMin < 0 %}
+                                    {{ delayMin|abs }} min early
+                                {% else %}
+                                    +{{ delayMin }} min
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-500">Seen:</span>
+                            <span
+                                class="font-medium inline-block min-w-[4ch] {{ initialSeenClass }}"
+                                data-vehicle-freshness-target="display"
+                                aria-label="Last seen"
+                            >{{ initialSeenText }}</span>
+                        </div>
+                    </div>
+
+                    {% if vehicle.status.reason %}
+                        <div class="mt-2 pt-2 border-t border-gray-100">
+                            <p class="text-xs text-gray-600 italic">{{ vehicle.status.reason }}</p>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>

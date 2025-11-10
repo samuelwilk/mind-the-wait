@@ -1,0 +1,35 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Mercure Test{% endblock %}
+
+{% block body %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold mb-6">Mercure Test Page</h1>
+
+    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+        <h2 class="font-semibold mb-2">Instructions:</h2>
+        <ol class="list-decimal list-inside space-y-1 text-sm">
+            <li>Open terminal and run: <code class="bg-gray-200 px-2 py-1 rounded">docker compose -f docker/compose.yaml exec php bin/console app:mercure:test</code></li>
+            <li>Watch the box below - it should update every 5 seconds</li>
+            <li>If it updates, Mercure is working correctly</li>
+        </ol>
+    </div>
+
+    {# Mercure subscription #}
+    <turbo-stream-source src="{{ mercure('test')|e('html_attr') }}"></turbo-stream-source>
+
+    {# Test target div #}
+    <div id="mercure-test" class="p-4 bg-gray-100 rounded border-2 border-dashed border-gray-400">
+        <strong>Waiting for Mercure updates...</strong><br>
+        Initial load time: {{ "now"|date('H:i:s') }}
+    </div>
+
+    <div class="mt-6 text-sm text-gray-600">
+        <p><strong>Debug info:</strong></p>
+        <ul class="list-disc list-inside">
+            <li>Mercure URL: <code class="bg-gray-200 px-1 rounded">{{ mercure('test') }}</code></li>
+            <li>Current time: {{ "now"|date('H:i:s') }}</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

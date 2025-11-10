@@ -286,15 +286,25 @@ final readonly class ArrivalPredictor implements ArrivalPredictorInterface
                 continue;
             }
 
-            $arrivalTime = $stop['arr'] ?? $stop['dep'] ?? null;
-            if ($arrivalTime === null) {
+            $gtfsTimeSec = $stop['arr'] ?? $stop['dep'] ?? null;
+            if ($gtfsTimeSec === null) {
                 continue;
+            }
+
+            // Convert GTFS time (seconds-since-midnight) to Unix timestamp
+            $todayMidnight = strtotime('today');
+            $arrivalAt     = $todayMidnight + $gtfsTimeSec;
+
+            // Handle trips that run after midnight (e.g., 25:30:00 = 1:30 AM next day)
+            // If arrival is more than 12 hours in the past, assume it's tomorrow
+            if ($arrivalAt < time() - 43200) {
+                $arrivalAt += 86400; // Add 24 hours
             }
 
             return $this->buildPrediction(
                 vehicle: $vehicle,
                 stopId: $stopId,
-                arrivalAt: $arrivalTime,
+                arrivalAt: $arrivalAt,
                 confidence: PredictionConfidence::LOW
             );
         }
@@ -311,6 +321,10 @@ final readonly class ArrivalPredictor implements ArrivalPredictorInterface
         // Get trip headsign
         $trip     = $this->tripRepo->findOneByGtfsId($vehicle->tripId ?? '');
         $headsign = $trip?->getHeadsign();
+
+        // Get stop name
+        $stop     = $this->stopRepo->findOneByGtfsId($stopId);
+        $stopName = $stop?->getName();
 
         // Get vehicle status
         $snapshot = $this->realtimeRepo->snapshot();
@@ -341,6 +355,7 @@ final readonly class ArrivalPredictor implements ArrivalPredictorInterface
             routeId: $vehicle->routeId,
             tripId: $vehicle->tripId ?? '',
             stopId: $stopId,
+            stopName: $stopName,
             headsign: $headsign,
             arrivalAt: $arrivalAt,
             confidence: $confidence,

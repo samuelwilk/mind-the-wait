@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Tell Tailwind to scan Flowbite vendor files for utility classes */
+@source "../../assets/vendor/flowbite";
+
 /* Custom Theme Configuration */
 @theme {
   /* Color Palette - Prairie & Sky */
@@ -16,15 +19,24 @@
   --color-primary-950: #082f49;
 
   --color-success-50: #f0fdf4;
+  --color-success-100: #dcfce7;
+  --color-success-300: #86efac;
   --color-success-500: #22c55e;
+  --color-success-600: #16a34a;
   --color-success-700: #15803d;
 
   --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-300: #fcd34d;
   --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
   --color-warning-700: #b45309;
 
   --color-danger-50: #fef2f2;
+  --color-danger-100: #fee2e2;
+  --color-danger-300: #fca5a5;
   --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
   --color-danger-700: #b91c1c;
 
   /* Status Colors for Vehicle Punctuality */

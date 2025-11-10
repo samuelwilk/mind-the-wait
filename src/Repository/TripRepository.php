@@ -73,4 +73,39 @@ class TripRepository extends BaseRepository
 
         return $map;
     }
+
+    /**
+     * Get headsigns for both directions of a route.
+     *
+     * Returns array like: [0 => 'University (Hub)', 1 => 'Depot']
+     * or null if no trips found.
+     *
+     * @return array<int, string>|null
+     */
+    public function getRouteDirectionHeadsigns(string $routeGtfsId): ?array
+    {
+        $results = $this->createQueryBuilder('t')
+            ->select('t.direction, t.headsign')
+            ->innerJoin('t.route', 'r')
+            ->where('r.gtfsId = :routeGtfsId')
+            ->andWhere('t.headsign IS NOT NULL')
+            ->setParameter('routeGtfsId', $routeGtfsId)
+            ->groupBy('t.direction, t.headsign')
+            ->orderBy('t.direction', 'ASC')
+            ->setMaxResults(2)
+            ->getQuery()
+            ->getArrayResult();
+
+        if (empty($results)) {
+            return null;
+        }
+
+        $headsigns = [];
+        foreach ($results as $row) {
+            $direction             = $row['direction']->value;
+            $headsigns[$direction] = $row['headsign'];
+        }
+
+        return $headsigns;
+    }
 }

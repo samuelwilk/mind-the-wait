@@ -13,6 +13,7 @@ final readonly class ArrivalPredictionDto
         public string $routeId,
         public string $tripId,
         public string $stopId,
+        public ?string $stopName,
         public ?string $headsign,
         public int $arrivalAt,              // Unix timestamp
         public PredictionConfidence $confidence,
@@ -37,6 +38,7 @@ final readonly class ArrivalPredictionDto
             'route_id'         => $this->routeId,
             'trip_id'          => $this->tripId,
             'stop_id'          => $this->stopId,
+            'stop_name'        => $this->stopName,
             'headsign'         => $this->headsign,
             'arrival_in_sec'   => $this->arrivalInSec($now),
             'arrival_at'       => $this->arrivalAt,

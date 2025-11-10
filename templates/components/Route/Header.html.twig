@@ -1,0 +1,15 @@
+<div id="route-header" class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+    <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-gray-600">Live Service Status</h2>
+        <div class="flex items-center gap-6 text-sm">
+            <div class="flex items-center gap-2">
+                <span class="text-gray-600">Headway ~</span>
+                <span class="font-bold text-gray-900">{{ headway.getDisplayRange() }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="font-bold text-success-600">{{ counts.vehiclesOnline }}</span>
+                <span class="text-gray-600">vehicles online</span>
+            </div>
+        </div>
+    </div>
+</div>

@@ -41,3 +41,4 @@ framework:
             App\Scheduler\ArrivalLoggingMessage: async                # arrival predictions every 2min
             App\Scheduler\BunchingDetectionMessage: async             # bunching detection
             App\Scheduler\PerformanceAggregationMessage: async        # daily performance aggregation at 1 AM
+            App\Scheduler\MercureRouteBroadcastMessage: async         # Mercure live updates every 5s
