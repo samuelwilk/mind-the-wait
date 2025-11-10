@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.1](https://github.com/samuelwilk/mind-the-wait/compare/v0.14.0...v0.14.1) (2025-11-10)
+
+
+### Bug Fixes
+
+* add Mercure env vars to PHP service ([a8f265e](https://github.com/samuelwilk/mind-the-wait/commit/a8f265e79d101f3c8ac03009d20dd7edcb62244c))
+
+
+### Performance Improvements
+
+* add 5-second cache to RealtimeSnapshotService to fix timeout ([0e1d62e](https://github.com/samuelwilk/mind-the-wait/commit/0e1d62e88280debd5c403b4ba5469d817b959d1b))
+* fix critical N+1 queries causing 60s timeouts on live tracking ([4c1a357](https://github.com/samuelwilk/mind-the-wait/commit/4c1a357c9c1bb97eae7ae83c65a1e960b4c5c35e))
+
 ## [0.14.0](https://github.com/samuelwilk/mind-the-wait/compare/v0.13.0...v0.14.0) (2025-11-10)
 
 
