@@ -18,6 +18,11 @@ output "target_group_arn" {
   value       = aws_lb_target_group.php.arn
 }
 
+output "mercure_target_group_arn" {
+  description = "Target group ARN for Mercure service"
+  value       = aws_lb_target_group.mercure.arn
+}
+
 # output "https_listener_arn" {
 #   description = "HTTPS listener ARN"
 #   value       = aws_lb_listener.https.arn

@@ -40,6 +40,39 @@ resource "aws_lb_target_group" "php" {
   })
 }
 
+# Target Group for Mercure service
+resource "aws_lb_target_group" "mercure" {
+  name        = "${var.project_name}-${var.environment}-mercure-tg"
+  port        = 80
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+    timeout             = 5
+    interval            = 30
+    path                = "/.well-known/mercure"
+    matcher             = "200,400"  # 400 is expected for Mercure without SSE params
+  }
+
+  # Longer timeout for SSE connections
+  deregistration_delay = 60
+
+  # Stickiness for SSE connections
+  stickiness {
+    type            = "lb_cookie"
+    enabled         = true
+    cookie_duration = 86400  # 24 hours
+  }
+
+  tags = merge(var.tags, {
+    Name = "${var.project_name}-${var.environment}-mercure-tg"
+  })
+}
+
 # HTTP Listener - Redirect to HTTPS
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.this.arn
@@ -67,5 +100,22 @@ resource "aws_lb_listener" "https" {
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.php.arn
+  }
+}
+
+# Listener Rule - Route Mercure traffic
+resource "aws_lb_listener_rule" "mercure" {
+  listener_arn = aws_lb_listener.https.arn
+  priority     = 100
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.mercure.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/.well-known/mercure*"]
+    }
   }
 }

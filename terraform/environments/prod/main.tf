@@ -89,7 +89,7 @@ module "alb" {
   subnet_ids        = module.networking.public_subnet_ids
   security_group_id = module.networking.alb_security_group_id
   certificate_arn   = module.dns.certificate_arn
-  health_check_path = "/api/realtime"
+  health_check_path = "/api/healthz"
 
   tags = local.common_tags
 }
@@ -352,6 +352,11 @@ module "ecs_service_mercure" {
 
   # NO spot instances for Mercure - WebSocket/SSE connections need stable hosts
   use_spot = false
+
+  # Attach to ALB for /.well-known/mercure routing
+  target_group_arn = module.alb.mercure_target_group_arn
+  container_name   = "mercure"
+  container_port   = 80
 
   container_definitions = jsonencode([{
     name      = "mercure"
