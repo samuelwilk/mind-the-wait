@@ -20,6 +20,7 @@ use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Contracts\Cache\CacheInterface;
 
 /**
  * Integration tests for CollectArrivalLogsCommand.
@@ -34,6 +35,7 @@ final class CollectArrivalLogsCommandTest extends KernelTestCase
 
     private EntityManagerInterface $em;
     private ClientInterface $redis;
+    private CacheInterface $cache;
     private CommandTester $commandTester;
     private City $testCity;
 
@@ -43,6 +45,7 @@ final class CollectArrivalLogsCommandTest extends KernelTestCase
 
         $this->em    = $this->getInjectable(EntityManagerInterface::class);
         $this->redis = $this->getInjectable(ClientInterface::class);
+        $this->cache = $this->getInjectable(CacheInterface::class);
 
         // Create test city for multi-city support
         $this->testCity = $this->createTestCity();
@@ -57,6 +60,10 @@ final class CollectArrivalLogsCommandTest extends KernelTestCase
         // Clean up Redis keys after each test (use saskatoon cityslug for compatibility)
         $this->redis->del('mtw:saskatoon:vehicles');
         $this->redis->del('mtw:saskatoon:trips');
+
+        // Clear cache to prevent stale data between tests
+        $this->cache->clear();
+
         parent::tearDown();
     }
 
