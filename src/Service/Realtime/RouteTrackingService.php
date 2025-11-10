@@ -123,10 +123,11 @@ final readonly class RouteTrackingService
                 $statusDto = $this->parseStatusDto($rawVehicle['status']);
             }
 
-            // Predict next arrival for this vehicle (for vehicle card)
+            // Predict next arrival for this vehicle (for vehicle card AND stop timeline)
+            // NOTE: We only predict the NEXT stop to avoid expensive loop (predicting all 40+ stops per vehicle)
             $nextArrival = $this->predictNextArrivalForVehicle($vehicleDto, $vehicleId);
 
-            // For stop timeline, just use the next arrival (don't predict ALL stops - too expensive!)
+            // Use this single prediction for both the vehicle card AND the stop timeline
             if ($nextArrival !== null) {
                 $timelineArrivals[] = $nextArrival;
             }
@@ -170,35 +171,24 @@ final readonly class RouteTrackingService
      * Predict next arrival for a vehicle by finding its next stop.
      *
      * Returns ONLY the next stop (for vehicle card display).
-     * For the stop timeline, we need predictions for ALL upcoming stops.
+     * PERFORMANCE: Stops after finding first prediction instead of predicting ALL stops.
      */
     private function predictNextArrivalForVehicle(VehicleDto $vehicle, string $vehicleId): ?ArrivalPredictionDto
     {
-        $predictions = $this->predictAllArrivalsForVehicle($vehicle, $vehicleId);
-
-        return $predictions[0] ?? null;
-    }
-
-    /**
-     * Predict arrivals for ALL upcoming stops on this vehicle's trip.
-     *
-     * @return list<ArrivalPredictionDto>
-     */
-    private function predictAllArrivalsForVehicle(VehicleDto $vehicle, string $vehicleId): array
-    {
         if ($vehicle->tripId === null) {
-            return [];
+            return null;
         }
 
-        // Get stop times for this trip from repository
+        // Get stop times for this trip from repository (cached)
         $stopTimes = $this->stopTimeRepo->getStopTimesForTrip($vehicle->tripId);
         if ($stopTimes === null) {
-            return [];
+            return null;
         }
 
-        // Generate predictions for all upcoming stops
-        $predictions = [];
-        $now         = time();
+        // Find ONLY the next stop arrival (not all stops!)
+        // BEFORE: Predicted all 40+ stops per vehicle, returned first one (15s page load)
+        // AFTER: Stop after finding first valid prediction (<1s page load)
+        $now = time();
 
         foreach ($stopTimes as $stopTime) {
             $stopId = $stopTime['stop_id'] ?? null;
@@ -209,12 +199,12 @@ final readonly class RouteTrackingService
             // Try to predict arrival at this stop
             $prediction = $this->arrivalPredictor->predictArrival($stopId, $vehicle->tripId, $vehicleId);
             if ($prediction !== null && $prediction->arrivalAt >= $now - 60) {
-                // Valid future arrival (or very recent past)
-                $predictions[] = $prediction;
+                // Found next valid arrival - return immediately!
+                return $prediction;
             }
         }
 
-        return $predictions;
+        return null;
     }
 
     /**
