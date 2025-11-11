@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.2](https://github.com/samuelwilk/mind-the-wait/compare/v0.14.1...v0.14.2) (2025-11-11)
+
+
+### Performance Improvements
+
+* stop after finding first arrival prediction (15s → &lt;1s) ([d64e49e](https://github.com/samuelwilk/mind-the-wait/commit/d64e49ef31c1905533ab2db9d5cfee9d42db6cb2))
+
 ## [0.14.1](https://github.com/samuelwilk/mind-the-wait/compare/v0.14.0...v0.14.1) (2025-11-10)
 
 
