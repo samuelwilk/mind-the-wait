@@ -39,7 +39,8 @@ final class RouteController extends AbstractController
     }
 
     /**
-     * Route detail page with performance charts and live vehicle indicators.
+     * Route detail page with performance charts.
+     * Vehicle indicators load asynchronously via Turbo Frame.
      */
     #[Route('/{gtfsId}', name: 'show', methods: ['GET'])]
     public function show(string $gtfsId): Response
@@ -54,13 +55,31 @@ final class RouteController extends AbstractController
         // Get comprehensive route performance data
         $routeDetail = $this->performanceService->getRouteDetail($route);
 
-        // Get real-time tracking snapshot for vehicle indicators
-        $snapshot = $this->trackingService->snapshot($gtfsId);
-
         return $this->render('dashboard/route_detail.html.twig', [
             'route'       => $route,
             'routeDetail' => $routeDetail,
-            'snapshot'    => $snapshot,
+        ]);
+    }
+
+    /**
+     * Vehicle indicators fragment for Turbo Frame loading.
+     */
+    #[Route('/{gtfsId}/indicators', name: 'indicators', methods: ['GET'])]
+    public function indicators(string $gtfsId): Response
+    {
+        // Get route entity
+        $route = $this->routeRepo->findOneBy(['gtfsId' => $gtfsId]);
+
+        if ($route === null) {
+            throw $this->createNotFoundException('Route not found');
+        }
+
+        // Get real-time tracking snapshot
+        $snapshot = $this->trackingService->snapshot($gtfsId);
+
+        return $this->render('dashboard/_vehicle_indicators.html.twig', [
+            'route'    => $route,
+            'snapshot' => $snapshot,
         ]);
     }
 }

@@ -30,7 +30,7 @@ use function is_array;
  */
 final readonly class RouteTrackingService
 {
-    private const CACHE_TTL = 0; // No cache - fresh data on every SSE update
+    private const CACHE_TTL = 5; // 5 second cache for faster page loads
 
     public function __construct(
         private RouteRepository $routeRepo,

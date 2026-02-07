@@ -1,0 +1,7 @@
+<turbo-frame id="vehicle-indicators-frame">
+    {% include 'components/VehicleIndicators.html.twig' with {
+        routeId: route.gtfsId,
+        vehicles: snapshot.vehicles,
+        mercureUrl: mercure('route/' ~ route.gtfsId)
+    } %}
+</turbo-frame>

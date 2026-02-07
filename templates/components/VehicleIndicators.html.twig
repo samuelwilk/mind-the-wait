@@ -35,7 +35,7 @@
                               data-vehicle-id="{{ vehicle.vehicleId }}">
                             <span class="font-semibold">{{ displayId }}</span>
                             <span class="text-success-500">·</span>
-                            At {{ vehicle.getNextStopName()|length > 20 ? vehicle.getNextStopName()|slice(0, 20) ~ '...' : vehicle.getNextStopName() }}
+                            At {{ vehicle.getNextStopName() }}
                         </span>
                     {% elseif etaMinutes is not null %}
                         {# Approaching - blue #}
@@ -43,7 +43,7 @@
                               data-vehicle-id="{{ vehicle.vehicleId }}">
                             <span class="font-semibold">{{ displayId }}</span>
                             <span class="text-primary-400">·</span>
-                            {{ etaMinutes }} min to {{ vehicle.getNextStopName()|length > 15 ? vehicle.getNextStopName()|slice(0, 15) ~ '...' : vehicle.getNextStopName() }}
+                            {{ etaMinutes }} min to {{ vehicle.getNextStopName() }}
                         </span>
                     {% else %}
                         {# No prediction - gray #}

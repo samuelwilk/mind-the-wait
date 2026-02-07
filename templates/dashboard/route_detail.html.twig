@@ -59,12 +59,15 @@
             </div>
         </div>
 
-        <!-- Live Vehicle Indicators -->
-        {% include 'components/VehicleIndicators.html.twig' with {
-            routeId: route.gtfsId,
-            vehicles: snapshot.vehicles,
-            mercureUrl: mercure('route/' ~ route.gtfsId)|e('html_attr')
-        } %}
+        <!-- Live Vehicle Indicators (loads asynchronously) -->
+        <turbo-frame id="vehicle-indicators-frame" src="{{ path('app_routes_indicators', {gtfsId: route.gtfsId}) }}" loading="lazy">
+            <div class="mb-8">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="w-2 h-2 rounded-full bg-gray-400 animate-pulse"></span>
+                    <span class="text-xs font-medium text-gray-500">Loading vehicles...</span>
+                </div>
+            </div>
+        </turbo-frame>
 
         <!-- Summary Statistics Grid -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 mb-8">
