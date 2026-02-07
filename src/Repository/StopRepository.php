@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Entity\City;
 use App\Entity\Stop;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManagerInterface;
@@ -42,7 +43,7 @@ class StopRepository extends BaseRepository
         return $map;
     }
 
-    public function upsert(string $gtfsId, string $name, float $lat, float $long): Stop
+    public function upsert(string $gtfsId, string $name, float $lat, float $long, City $city): Stop
     {
         $stop = $this->findOneByGtfsId($gtfsId) ?? new Stop();
 
@@ -50,6 +51,7 @@ class StopRepository extends BaseRepository
         $stop->setName($name);
         $stop->setLat($lat);
         $stop->setLong($long);
+        $stop->setCity($city);
         $this->save($stop, false);
 
         return $stop;

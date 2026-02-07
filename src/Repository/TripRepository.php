@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Entity\City;
 use App\Entity\Route;
 use App\Entity\Trip;
 use App\Enum\DirectionEnum;
@@ -24,7 +25,7 @@ class TripRepository extends BaseRepository
         return $this->findOneBy(['gtfsId' => $gtfsId]);
     }
 
-    public function upsert(string $gtfsId, Route $route, ?string $serviceId, DirectionEnum $direction, ?string $headsign): Trip
+    public function upsert(string $gtfsId, Route $route, ?string $serviceId, DirectionEnum $direction, ?string $headsign, City $city): Trip
     {
         $trip = $this->findOneByGtfsId($gtfsId) ?? new Trip();
 
@@ -33,6 +34,7 @@ class TripRepository extends BaseRepository
         $trip->setServiceId($serviceId);
         $trip->setDirection($direction);
         $trip->setHeadsign($headsign);
+        $trip->setCity($city);
 
         $this->save($trip, false);
 

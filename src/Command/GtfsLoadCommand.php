@@ -3,6 +3,7 @@
 namespace App\Command;
 
 use App\Config\GtfsConfig;
+use App\Entity\City;
 use App\Entity\Route;
 use App\Entity\Stop;
 use App\Entity\StopTime;
@@ -11,6 +12,7 @@ use App\Enum\DirectionEnum;
 use App\Enum\GtfsSourceEnum;
 use App\Enum\RouteTypeEnum;
 use App\Factory\GtfsConfigFactory;
+use App\Repository\CityRepository;
 use App\Repository\RouteRepository;
 use App\Repository\StopRepository;
 use App\Repository\StopTimeRepository;
@@ -41,6 +43,7 @@ final class GtfsLoadCommand extends Command
     private const int ARCGIS_MAX_PAGES = 2000;
 
     public function __construct(
+        private readonly CityRepository $cities,
         private readonly RouteRepository $routes,
         private readonly StopRepository $stops,
         private readonly TripRepository $trips,
@@ -170,10 +173,13 @@ final class GtfsLoadCommand extends Command
                 }
             }
 
+            $city = $this->getOrCreateDefaultCity();
+            $io->writeln("Using city: {$city->getName()} ({$city->getSlug()})");
+
             $this->truncateAll($io);
-            $this->loadRoutes("$dir/routes.txt", $io);
-            $this->loadStops("$dir/stops.txt", $io);
-            $this->loadTrips("$dir/trips.txt", $io);
+            $this->loadRoutes("$dir/routes.txt", $io, $city);
+            $this->loadStops("$dir/stops.txt", $io, $city);
+            $this->loadTrips("$dir/trips.txt", $io, $city);
             $this->loadStopTimes("$dir/stop_times.txt", $io);
 
             // Invalidate cached stop sequences (GTFS static data changed)
@@ -202,6 +208,9 @@ final class GtfsLoadCommand extends Command
     {
         $io->title('Loading GTFS from ArcGIS FeatureServer');
 
+        $city = $this->getOrCreateDefaultCity();
+        $io->writeln("Using city: {$city->getName()} ({$city->getSlug()})");
+
         $this->truncateAll($io);
 
         // Routes
@@ -216,7 +225,8 @@ final class GtfsLoadCommand extends Command
                 $adapter->routeShortName(),
                 $adapter->routeLongName(),
                 $adapter->routeColor(),
-                $type
+                $type,
+                $city
             );
 
             $this->flushEvery(++$routesIterated, 1000, fn () => $this->routes->flush());
@@ -235,7 +245,8 @@ final class GtfsLoadCommand extends Command
                 $adapter->stopId(),
                 $adapter->stopName(),
                 $lat,
-                $lon
+                $lon,
+                $city
             );
 
             $this->flushEvery(++$stopsIterated, 1000, fn () => $this->stops->flush());
@@ -262,7 +273,8 @@ final class GtfsLoadCommand extends Command
                 $route,
                 $adapter->serviceId(),
                 DirectionEnum::from($adapter->directionId()),
-                $adapter->tripHeadsign()
+                $adapter->tripHeadsign(),
+                $city
             );
 
             $this->flushEvery(++$tripsIterated, 2000, fn () => $this->trips->flush());
@@ -408,7 +420,7 @@ final class GtfsLoadCommand extends Command
      * @throws UnavailableStream
      * @throws \League\Csv\Exception
      */
-    private function loadRoutes(string $path, SymfonyStyle $io): void
+    private function loadRoutes(string $path, SymfonyStyle $io, City $city): void
     {
         $io->section('routes');
         if (!is_file($path)) {
@@ -429,7 +441,8 @@ final class GtfsLoadCommand extends Command
                 $r['route_short_name'] ?? null,
                 $r['route_long_name']  ?? null,
                 $r['route_color']      ?? null,
-                $type
+                $type,
+                $city
             );
             $this->flushEvery(++$routesInserted, 1000, fn () => $this->routes->flush());
         }
@@ -441,7 +454,7 @@ final class GtfsLoadCommand extends Command
      * @throws UnavailableStream
      * @throws \League\Csv\Exception
      */
-    private function loadStops(string $path, SymfonyStyle $io): void
+    private function loadStops(string $path, SymfonyStyle $io, City $city): void
     {
         $io->section('stops');
         if (!is_file($path)) {
@@ -458,7 +471,8 @@ final class GtfsLoadCommand extends Command
                 $r['stop_id'],
                 $r['stop_name'],
                 (float) $r['stop_lat'],
-                (float) $r['stop_lon']
+                (float) $r['stop_lon'],
+                $city
             );
             $this->flushEvery(++$stopsInserted, 2000, fn () => $this->stops->flush());
         }
@@ -470,7 +484,7 @@ final class GtfsLoadCommand extends Command
      * @throws UnavailableStream
      * @throws \League\Csv\Exception
      */
-    private function loadTrips(string $path, SymfonyStyle $io): void
+    private function loadTrips(string $path, SymfonyStyle $io, City $city): void
     {
         $io->section('trips');
         if (!is_file($path)) {
@@ -495,7 +509,8 @@ final class GtfsLoadCommand extends Command
                 $route,
                 $r['service_id'] ?? null,
                 DirectionEnum::from((int) ($r['direction_id'] ?? 0)),
-                $r['trip_headsign'] ?? null
+                $r['trip_headsign'] ?? null,
+                $city
             );
             $this->flushEvery(++$tripsInserted, 1000, fn () => $this->trips->flush());
         }
@@ -558,5 +573,29 @@ final class GtfsLoadCommand extends Command
         if ($count % $threshold === 0) {
             $flusher();
         }
+    }
+
+    /**
+     * Get the default city (Saskatoon) or create it if it doesn't exist.
+     */
+    private function getOrCreateDefaultCity(): City
+    {
+        $city = $this->cities->findBySlug('saskatoon');
+
+        if (!$city) {
+            $city = new City();
+            $city->setName('Saskatoon');
+            $city->setSlug('saskatoon');
+            $city->setCountry('CA');
+            $city->setCenterLat('52.1332');
+            $city->setCenterLon('-106.6700');
+            $city->setZoomLevel(12);
+            $city->setActive(true);
+
+            $this->stopTimes->getEntityManager()->persist($city);
+            $this->stopTimes->getEntityManager()->flush();
+        }
+
+        return $city;
     }
 }

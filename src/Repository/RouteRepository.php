@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Entity\City;
 use App\Entity\Route;
 use App\Enum\RouteTypeEnum;
 use Doctrine\ORM\EntityManagerInterface;
@@ -35,7 +36,7 @@ class RouteRepository extends BaseRepository
         return $map;
     }
 
-    public function upsert(string $gtfsId, ?string $shortName, ?string $longName, ?string $colour, ?RouteTypeEnum $type): Route
+    public function upsert(string $gtfsId, ?string $shortName, ?string $longName, ?string $colour, ?RouteTypeEnum $type, City $city): Route
     {
         $route = $this->findOneByGtfsId($gtfsId) ?? new Route();
 
@@ -44,6 +45,7 @@ class RouteRepository extends BaseRepository
         $route->setLongName($longName ?: null);
         $route->setColour($colour ?: null);
         $route->setRouteType($type);
+        $route->setCity($city);
         $this->save($route, false);
 
         return $route;
