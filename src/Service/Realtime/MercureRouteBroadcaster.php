@@ -25,38 +25,36 @@ final readonly class MercureRouteBroadcaster
 {
     public function __construct(
         private HubInterface $hub,
-        private RouteTrackingService $trackingService,
+        private VehicleEnricherService $vehicleEnricher,
         private Environment $twig,
         private LoggerInterface $logger,
     ) {
     }
 
     /**
-     * Broadcast live updates for a specific route.
+     * Broadcast live updates for a specific route with pre-filtered vehicles.
      *
-     * @param Route $route Route to broadcast updates for
-     *
-     * @throws \Throwable If rendering or publishing fails
+     * @param Route $route    Route to broadcast updates for
+     * @param array $vehicles Raw vehicle data already filtered for this route
      */
-    public function broadcastRoute(Route $route): void
+    public function broadcastRouteWithVehicles(Route $route, array $vehicles): void
     {
         try {
-            // Get fresh snapshot
-            $snapshot = $this->trackingService->snapshot($route->getGtfsId());
+            // Enrich vehicles with arrival predictions (lightweight operation)
+            $enrichedVehicles = $this->vehicleEnricher->enrichVehicles($vehicles);
 
-            // Render vehicle indicators component
-            $indicatorsHtml = $this->twig->render('components/VehicleIndicators.html.twig', [
-                'routeId'    => $route->getGtfsId(),
-                'vehicles'   => $snapshot->vehicles,
-                'mercureUrl' => '', // Not needed for Mercure updates (already connected)
+            // Render just the pills container
+            $pillsHtml = $this->twig->render('components/_vehicle_pills.html.twig', [
+                'routeId'  => $route->getGtfsId(),
+                'vehicles' => $enrichedVehicles,
             ]);
 
-            // Publish Turbo Stream update to Mercure
-            $this->publishTurboStream($route, 'vehicle-indicators', $indicatorsHtml);
+            // Publish Turbo Stream update
+            $this->publishTurboStream($route, sprintf('vehicle-pills-%s', $route->getGtfsId()), $pillsHtml);
 
             $this->logger->info('Broadcasted route updates via Mercure', [
                 'route'    => $route->getGtfsId(),
-                'vehicles' => count($snapshot->vehicles),
+                'vehicles' => count($enrichedVehicles),
             ]);
         } catch (\Throwable $e) {
             $this->logger->error('Failed to broadcast route updates', [
