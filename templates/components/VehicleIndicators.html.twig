@@ -1,0 +1,65 @@
+{# Vehicle indicators - horizontally scrollable pills showing active vehicles #}
+{# Updates in real-time via Mercure #}
+
+{% set nowTs = 'now'|date('U') %}
+
+<div id="vehicle-indicators"
+     class="mb-8"
+     data-controller="vehicle-indicators"
+     data-vehicle-indicators-route-id-value="{{ routeId }}"
+     data-vehicle-indicators-mercure-url-value="{{ mercureUrl }}">
+
+    {# Connection status indicator #}
+    <div class="flex items-center gap-2 mb-3">
+        <span class="w-2 h-2 rounded-full bg-gray-400 transition-colors"
+              data-vehicle-indicators-target="connectionDot"></span>
+        <span class="text-xs font-medium text-gray-500"
+              data-vehicle-indicators-target="connectionStatus">Connecting...</span>
+    </div>
+
+    {# Vehicle pills container #}
+    <div class="relative" data-vehicle-indicators-target="container">
+        {% if vehicles is empty %}
+            <p class="text-sm text-gray-500 italic">No active vehicles</p>
+        {% else %}
+            <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
+                 data-vehicle-indicators-target="pillsContainer">
+                {% for vehicle in vehicles %}
+                    {% set etaSeconds = vehicle.nextArrival ? vehicle.nextArrival.arrivalInSec(nowTs) : null %}
+                    {% set etaMinutes = vehicle.getEtaMinutes() %}
+                    {% set displayId = vehicle.getDisplayId()|replace({'Bus ': ''}) %}
+
+                    {% if etaSeconds is not null and etaSeconds <= 30 %}
+                        {# At stop - green #}
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-success-700 bg-success-100 border border-success-200 rounded-full whitespace-nowrap flex-shrink-0"
+                              data-vehicle-id="{{ vehicle.vehicleId }}">
+                            <span class="font-semibold">{{ displayId }}</span>
+                            <span class="text-success-500">·</span>
+                            At {{ vehicle.getNextStopName()|length > 20 ? vehicle.getNextStopName()|slice(0, 20) ~ '...' : vehicle.getNextStopName() }}
+                        </span>
+                    {% elseif etaMinutes is not null %}
+                        {# Approaching - blue #}
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-full whitespace-nowrap flex-shrink-0"
+                              data-vehicle-id="{{ vehicle.vehicleId }}">
+                            <span class="font-semibold">{{ displayId }}</span>
+                            <span class="text-primary-400">·</span>
+                            {{ etaMinutes }} min to {{ vehicle.getNextStopName()|length > 15 ? vehicle.getNextStopName()|slice(0, 15) ~ '...' : vehicle.getNextStopName() }}
+                        </span>
+                    {% else %}
+                        {# No prediction - gray #}
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 border border-gray-200 rounded-full whitespace-nowrap flex-shrink-0"
+                              data-vehicle-id="{{ vehicle.vehicleId }}">
+                            <span class="font-semibold">{{ displayId }}</span>
+                            <span class="text-gray-400">·</span>
+                            In transit
+                        </span>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            {# Scroll fade indicators #}
+            <div class="absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none"
+                 data-vehicle-indicators-target="fadeRight"></div>
+        {% endif %}
+    </div>
+</div>

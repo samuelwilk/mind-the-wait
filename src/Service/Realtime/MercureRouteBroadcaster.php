@@ -44,32 +44,15 @@ final readonly class MercureRouteBroadcaster
             // Get fresh snapshot
             $snapshot = $this->trackingService->snapshot($route->getGtfsId());
 
-            // Render updated components
-            $headerHtml = $this->twig->render('components/Route/Header.html.twig', [
-                'headway' => $snapshot->headway,
-                'counts'  => $snapshot->counts,
-                'this'    => null, // Twig components expect 'this'
+            // Render vehicle indicators component
+            $indicatorsHtml = $this->twig->render('components/VehicleIndicators.html.twig', [
+                'routeId'    => $route->getGtfsId(),
+                'vehicles'   => $snapshot->vehicles,
+                'mercureUrl' => '', // Not needed for Mercure updates (already connected)
             ]);
 
-            $timelineHtml = $this->twig->render('components/Route/Timeline.html.twig', [
-                'stops' => $snapshot->stops,
-                'this'  => null,
-            ]);
-
-            // For VehicleList, instantiate component to use getSortedVehicles()
-            $vehicleListComponent           = new \App\Twig\Components\Route\VehicleList();
-            $vehicleListComponent->vehicles = $snapshot->vehicles;
-
-            $vehicleListHtml = $this->twig->render('components/Route/VehicleList.html.twig', [
-                'vehicles'          => $snapshot->vehicles,
-                'snapshotUpdatedAt' => $snapshot->updatedAt,
-                'this'              => $vehicleListComponent,
-            ]);
-
-            // Publish Turbo Stream updates to Mercure
-            $this->publishTurboStream($route, 'route-header', $headerHtml);
-            $this->publishTurboStream($route, 'route-timeline', $timelineHtml);
-            $this->publishTurboStream($route, 'route-vehicles', $vehicleListHtml);
+            // Publish Turbo Stream update to Mercure
+            $this->publishTurboStream($route, 'vehicle-indicators', $indicatorsHtml);
 
             $this->logger->info('Broadcasted route updates via Mercure', [
                 'route'    => $route->getGtfsId(),
