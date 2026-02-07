@@ -1,0 +1,39 @@
+# Production Caddyfile for mind-the-wait.ca
+
+{
+	email admin@mind-the-wait.ca
+}
+
+mind-the-wait.ca, www.mind-the-wait.ca {
+	# Redirect www to non-www
+	@www host www.mind-the-wait.ca
+	redir @www https://mind-the-wait.ca{uri} permanent
+
+	# Health check endpoint
+	respond /health 200
+
+	# Mercure hub
+	handle /.well-known/mercure* {
+		reverse_proxy mercure:80
+	}
+
+	# PHP application
+	handle {
+		reverse_proxy php:8080
+	}
+
+	# Security headers
+	header {
+		X-Frame-Options "SAMEORIGIN"
+		X-Content-Type-Options "nosniff"
+		X-XSS-Protection "1; mode=block"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Logging
+	log {
+		output stdout
+		format json
+	}
+}
