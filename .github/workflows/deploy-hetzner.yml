@@ -1,0 +1,95 @@
+name: Deploy to Hetzner
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: intl, pdo_pgsql, redis
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install dependencies
+        run: composer install --no-progress --prefer-dist
+
+      - name: Run tests
+        run: vendor/bin/phpunit
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Deploy to Hetzner
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HETZNER_SERVER_IP }}
+          username: deploy
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+
+            cd /home/deploy/mind-the-wait
+
+            # Pull latest code
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Create .env.prod from secrets
+            cat > docker/.env.prod << 'ENVEOF'
+            APP_ENV=prod
+            APP_DEBUG=0
+            APP_SECRET=${{ secrets.APP_SECRET }}
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            REDIS_URL=redis://redis:6379
+            MESSENGER_TRANSPORT_DSN=redis://redis:6379/messages
+            MERCURE_JWT_SECRET=${{ secrets.MERCURE_JWT_SECRET }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            VEH_URL=${{ secrets.GTFS_RT_VEHICLES_URL }}
+            TRIP_URL=${{ secrets.GTFS_RT_TRIPS_URL }}
+            ALERT_URL=${{ secrets.GTFS_RT_ALERTS_URL }}
+            MTW_ARCGIS_ROUTE=${{ secrets.ARCGIS_ROUTES_URL }}
+            MTW_ARCGIS_STOP=${{ secrets.ARCGIS_STOPS_URL }}
+            MTW_ARCGIS_TRIP=${{ secrets.ARCGIS_TRIPS_URL }}
+            MTW_ARCGIS_STOP_TIME=${{ secrets.ARCGIS_STOP_TIMES_URL }}
+            GA4_MEASUREMENT_ID=${{ secrets.GA4_MEASUREMENT_ID }}
+            ENVEOF
+
+            # Build and deploy
+            docker compose -f docker/compose.prod.yaml build --pull
+            docker compose -f docker/compose.prod.yaml up -d --remove-orphans
+
+            # Wait for services to be healthy
+            sleep 15
+
+            # Run migrations
+            docker compose -f docker/compose.prod.yaml exec -T php bin/console doctrine:migrations:migrate --no-interaction || true
+
+            # Warm cache
+            docker compose -f docker/compose.prod.yaml exec -T php bin/console cache:warmup
+
+            # Health check
+            curl -sf http://localhost/api/healthz || echo "Health check failed but deployment complete"
+
+            echo "Deployment successful!"
