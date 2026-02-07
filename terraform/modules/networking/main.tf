@@ -130,6 +130,18 @@ resource "aws_security_group" "rds" {
   }
 }
 
+# Allow RDS access from Hetzner VPS (when migrating to Hetzner)
+resource "aws_security_group_rule" "rds_from_hetzner" {
+  count             = var.hetzner_vps_ip != "" ? 1 : 0
+  type              = "ingress"
+  from_port         = 5432
+  to_port           = 5432
+  protocol          = "tcp"
+  cidr_blocks       = ["${var.hetzner_vps_ip}/32"]
+  security_group_id = aws_security_group.rds.id
+  description       = "PostgreSQL from Hetzner VPS"
+}
+
 # Security Group for ElastiCache Redis
 resource "aws_security_group" "redis" {
   name_prefix = "${var.project_name}-${var.environment}-redis-"

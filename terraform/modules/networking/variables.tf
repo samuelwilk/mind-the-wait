@@ -28,6 +28,12 @@ variable "private_subnets" {
   type        = list(string)
 }
 
+variable "hetzner_vps_ip" {
+  description = "Hetzner VPS IP address for RDS access (optional)"
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   description = "Tags to apply to resources"
   type        = map(string)

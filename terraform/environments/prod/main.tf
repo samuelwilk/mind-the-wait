@@ -21,6 +21,7 @@ module "networking" {
   availability_zones = var.availability_zones
   public_subnets     = var.public_subnets
   private_subnets    = var.private_subnets
+  hetzner_vps_ip     = var.hetzner_vps_ip
 
   tags = local.common_tags
 }
@@ -48,6 +49,7 @@ module "rds" {
   master_username         = var.database_username
   master_password         = var.database_password
   multi_az                = var.rds_multi_az
+  publicly_accessible     = var.rds_publicly_accessible
   backup_retention_period = 7
   subnet_ids              = module.networking.private_subnet_ids
   security_group_id       = module.networking.rds_security_group_id

@@ -47,6 +47,19 @@ variable "rds_multi_az" {
   type        = bool
 }
 
+variable "rds_publicly_accessible" {
+  description = "Make RDS publicly accessible (for Hetzner migration)"
+  type        = bool
+  default     = false
+}
+
+# Hetzner Migration
+variable "hetzner_vps_ip" {
+  description = "Hetzner VPS IP address for RDS access (set when migrating)"
+  type        = string
+  default     = ""
+}
+
 variable "database_name" {
   description = "Database name"
   type        = string
