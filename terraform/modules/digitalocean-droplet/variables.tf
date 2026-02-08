@@ -9,16 +9,16 @@ variable "environment" {
   default     = "production"
 }
 
-variable "server_type" {
-  description = "Hetzner server type"
+variable "droplet_size" {
+  description = "DigitalOcean droplet size slug"
   type        = string
-  default     = "cx22"
+  default     = "s-1vcpu-2gb" # $12/mo - 1 vCPU, 2GB RAM, 50GB SSD
 }
 
-variable "location" {
-  description = "Hetzner datacenter location"
+variable "region" {
+  description = "DigitalOcean region"
   type        = string
-  default     = "nbg1"
+  default     = "tor1" # Toronto
 }
 
 variable "ssh_public_key" {

@@ -1,0 +1,24 @@
+# DigitalOcean API token
+# Get from: https://cloud.digitalocean.com/account/api/tokens
+digitalocean_token = "dop_v1_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# Cloudflare API token (reuse existing)
+cloudflare_api_token = "your-cloudflare-api-token"
+
+# Domain name
+domain_name = "mind-the-wait.ca"
+
+# Droplet size (https://slugs.do-api.dev/)
+# s-1vcpu-1gb    = $6/mo  (1 vCPU, 1GB RAM, 25GB SSD)
+# s-1vcpu-2gb    = $12/mo (1 vCPU, 2GB RAM, 50GB SSD) <- Recommended
+# s-2vcpu-4gb    = $24/mo (2 vCPU, 4GB RAM, 80GB SSD)
+droplet_size = "s-1vcpu-2gb"
+
+# Region (https://docs.digitalocean.com/platform/regional-availability/)
+# tor1 = Toronto (closest to Saskatoon)
+# nyc1/nyc3 = New York
+# sfo3 = San Francisco
+region = "tor1"
+
+# SSH public key for deploy user
+ssh_public_key = "ssh-ed25519 AAAA..."

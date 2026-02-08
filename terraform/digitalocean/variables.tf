@@ -1,5 +1,5 @@
-variable "hetzner_token" {
-  description = "Hetzner Cloud API token"
+variable "digitalocean_token" {
+  description = "DigitalOcean API token"
   type        = string
   sensitive   = true
 }
@@ -11,21 +11,21 @@ variable "cloudflare_api_token" {
 }
 
 variable "domain_name" {
-  description = "Domain name"
+  description = "Domain name for DNS"
   type        = string
   default     = "mind-the-wait.ca"
 }
 
-variable "server_type" {
-  description = "Hetzner server type"
+variable "droplet_size" {
+  description = "DigitalOcean droplet size"
   type        = string
-  default     = "cx23"
+  default     = "s-1vcpu-2gb" # $12/mo - 1 vCPU, 2GB RAM, 50GB SSD
 }
 
-variable "location" {
-  description = "Hetzner datacenter"
+variable "region" {
+  description = "DigitalOcean region"
   type        = string
-  default     = "nbg1" # Nuremberg
+  default     = "tor1" # Toronto - closest to Saskatoon
 }
 
 variable "ssh_public_key" {
