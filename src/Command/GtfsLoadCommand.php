@@ -229,9 +229,14 @@ final class GtfsLoadCommand extends Command
                 $city
             );
 
-            $this->flushEvery(++$routesIterated, 1000, fn () => $this->routes->flush());
+            if (++$routesIterated % 1000 === 0) {
+                $this->routes->flush();
+                $this->routes->getEntityManager()->clear();
+                $io->writeln("  processed: $routesIterated");
+            }
         }
         $this->routes->flush();
+        $this->routes->getEntityManager()->clear();
         $io->writeln("  upserted: $routesIterated");
 
         // Stops
@@ -249,9 +254,14 @@ final class GtfsLoadCommand extends Command
                 $city
             );
 
-            $this->flushEvery(++$stopsIterated, 1000, fn () => $this->stops->flush());
+            if (++$stopsIterated % 1000 === 0) {
+                $this->stops->flush();
+                $this->stops->getEntityManager()->clear();
+                $io->writeln("  processed: $stopsIterated");
+            }
         }
         $this->stops->flush();
+        $this->stops->getEntityManager()->clear();
         $io->writeln("  upserted: $stopsIterated");
 
         // Trips
@@ -277,9 +287,16 @@ final class GtfsLoadCommand extends Command
                 $city
             );
 
-            $this->flushEvery(++$tripsIterated, 2000, fn () => $this->trips->flush());
+            if (++$tripsIterated % 1000 === 0) {
+                $this->trips->flush();
+                $this->trips->getEntityManager()->clear();
+                // Reload routes map after clear (entities were detached)
+                $routesByGtfs = $this->routes->mapByGtfsId();
+                $io->writeln("  processed: $tripsIterated");
+            }
         }
         $this->trips->flush();
+        $this->trips->getEntityManager()->clear();
         $io->writeln("  upserted: $tripsIterated");
         if ($skippedTrips > 0) {
             $io->writeln("  skipped (missing route): $skippedTrips");

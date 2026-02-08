@@ -93,6 +93,13 @@ resource "digitalocean_droplet" "web" {
       - git
 
     runcmd:
+      # Create 2GB swap file (needed for GTFS loading)
+      - fallocate -l 2G /swapfile
+      - chmod 600 /swapfile
+      - mkswap /swapfile
+      - swapon /swapfile
+      - echo '/swapfile none swap sw 0 0' >> /etc/fstab
+      # Docker setup
       - systemctl enable docker
       - systemctl start docker
       - usermod -aG docker deploy
