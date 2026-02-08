@@ -51,7 +51,7 @@ module "rds" {
   multi_az                = var.rds_multi_az
   publicly_accessible     = var.rds_publicly_accessible
   backup_retention_period = 7
-  subnet_ids              = module.networking.private_subnet_ids
+  subnet_ids              = var.rds_publicly_accessible ? module.networking.public_subnet_ids : module.networking.private_subnet_ids
   security_group_id       = module.networking.rds_security_group_id
 
   tags = local.common_tags
