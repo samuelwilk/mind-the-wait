@@ -595,6 +595,42 @@ final class RoutePerformanceDailyRepository extends BaseRepository
     }
 
     /**
+     * Calculate system-wide trend comparing today vs yesterday in a single query.
+     *
+     * @return float Percentage point change (positive = improvement, negative = decline)
+     */
+    public function calculateSystemTrendVsYesterday(): float
+    {
+        $today     = new \DateTimeImmutable('today');
+        $yesterday = $today->modify('-1 day');
+        $tomorrow  = $today->modify('+1 day');
+
+        $conn = $this->getEntityManager()->getConnection();
+
+        $sql = '
+            SELECT
+                AVG(CASE WHEN p.date >= :today AND p.date < :tomorrow THEN p.on_time_percentage END) as today_avg,
+                AVG(CASE WHEN p.date >= :yesterday AND p.date < :today THEN p.on_time_percentage END) as yesterday_avg
+            FROM route_performance_daily p
+            WHERE p.on_time_percentage IS NOT NULL
+                AND p.date >= :yesterday
+                AND p.date < :tomorrow
+        ';
+
+        $result = $conn->executeQuery($sql, [
+            'today'     => $today->format('Y-m-d'),
+            'tomorrow'  => $tomorrow->format('Y-m-d'),
+            'yesterday' => $yesterday->format('Y-m-d'),
+        ])->fetchAssociative();
+
+        if ($result === false || $result['today_avg'] === null || $result['yesterday_avg'] === null) {
+            return 0.0;
+        }
+
+        return round((float) $result['today_avg'] - (float) $result['yesterday_avg'], 1);
+    }
+
+    /**
      * Convert on-time percentage to letter grade.
      */
     private function onTimePercentageToGrade(float $onTimePercentage): string

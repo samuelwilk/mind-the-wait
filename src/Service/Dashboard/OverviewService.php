@@ -161,42 +161,13 @@ final readonly class OverviewService
     /**
      * Calculate trend vs yesterday's performance.
      *
+     * Uses a single optimized query to avoid N+1 query problem.
+     *
      * @return float Percentage change (positive = improvement, negative = decline)
      */
     private function calculateTrendVsYesterday(): float
     {
-        $today     = new \DateTimeImmutable('today');
-        $yesterday = $today->modify('-1 day');
-
-        // Get all routes
-        $routes = $this->routeRepo->findAll();
-        if (count($routes) === 0) {
-            return 0.0;
-        }
-
-        $todayTotal     = 0.0;
-        $yesterdayTotal = 0.0;
-        $count          = 0;
-
-        foreach ($routes as $route) {
-            $todayPerf     = $this->performanceRepo->findByRouteAndDateRange($route->getId(), $today, $today->modify('+1 day'));
-            $yesterdayPerf = $this->performanceRepo->findByRouteAndDateRange($route->getId(), $yesterday, $today);
-
-            if (count($todayPerf) > 0 && count($yesterdayPerf) > 0) {
-                $todayTotal     += $todayPerf[0]->getOnTimePercentage()     ?? 0.0;
-                $yesterdayTotal += $yesterdayPerf[0]->getOnTimePercentage() ?? 0.0;
-                ++$count;
-            }
-        }
-
-        if ($count === 0 || $yesterdayTotal === 0.0) {
-            return 0.0;
-        }
-
-        $todayAvg     = $todayTotal     / $count;
-        $yesterdayAvg = $yesterdayTotal / $count;
-
-        return round($todayAvg - $yesterdayAvg, 1);
+        return $this->performanceRepo->calculateSystemTrendVsYesterday();
     }
 
     /**
