@@ -74,6 +74,18 @@ variable "publicly_accessible" {
   default     = false
 }
 
+variable "snapshot_identifier" {
+  description = "Snapshot to restore from (if provided, creates instance from snapshot)"
+  type        = string
+  default     = null
+}
+
+variable "identifier_suffix" {
+  description = "Optional suffix for the RDS identifier (e.g., 'hetzner')"
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   description = "Tags to apply to resources"
   type        = map(string)

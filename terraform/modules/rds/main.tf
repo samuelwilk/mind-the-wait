@@ -1,30 +1,36 @@
 # RDS Module - PostgreSQL Database
 
+locals {
+  name_suffix = var.identifier_suffix != "" ? "-${var.identifier_suffix}" : ""
+  base_name   = "${var.project_name}-${var.environment}${local.name_suffix}"
+}
+
 resource "aws_db_subnet_group" "this" {
-  name       = "${var.project_name}-${var.environment}-db-subnet-group"
+  name       = "${local.base_name}-db-subnet-group"
   subnet_ids = var.subnet_ids
 
   tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-db-subnet-group"
+    Name = "${local.base_name}-db-subnet-group"
   })
 }
 
 resource "aws_db_instance" "this" {
-  identifier = "${var.project_name}-${var.environment}"
+  identifier = local.base_name
 
-  engine               = "postgres"
-  engine_version       = var.engine_version
-  instance_class       = var.instance_class
+  # When restoring from snapshot, these are inherited from the snapshot
+  snapshot_identifier = var.snapshot_identifier
+  engine              = var.snapshot_identifier == null ? "postgres" : null
+  engine_version      = var.snapshot_identifier == null ? var.engine_version : null
+  allocated_storage   = var.snapshot_identifier == null ? var.allocated_storage : null
+  db_name             = var.snapshot_identifier == null ? var.database_name : null
+  username            = var.snapshot_identifier == null ? var.master_username : null
+  password            = var.snapshot_identifier == null ? var.master_password : null
 
-  allocated_storage     = var.allocated_storage
+  instance_class        = var.instance_class
   max_allocated_storage = var.max_allocated_storage
   storage_type          = "gp3"
-  storage_encrypted     = true
 
-  db_name  = var.database_name
-  username = var.master_username
-  password = var.master_password
-  port     = 5432
+  port = 5432
 
   multi_az               = var.multi_az
   db_subnet_group_name   = aws_db_subnet_group.this.name
@@ -39,15 +45,16 @@ resource "aws_db_instance" "this" {
 
   deletion_protection       = true
   skip_final_snapshot       = false
-  final_snapshot_identifier = "${var.project_name}-${var.environment}-final-snapshot-${formatdate("YYYY-MM-DD-hhmm", timestamp())}"
+  final_snapshot_identifier = "${local.base_name}-final-snapshot-${formatdate("YYYY-MM-DD-hhmm", timestamp())}"
 
   tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-db"
+    Name = "${local.base_name}-db"
   })
 
   lifecycle {
     ignore_changes = [
-      final_snapshot_identifier
+      final_snapshot_identifier,
+      snapshot_identifier
     ]
   }
 }

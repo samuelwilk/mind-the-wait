@@ -50,7 +50,7 @@ jobs:
           script: |
             set -e
 
-            cd /home/deploy/mind-the-wait
+            cd /home/deploy/app
 
             # Pull latest code
             git fetch origin main
@@ -65,6 +65,8 @@ jobs:
             REDIS_URL=redis://redis:6379
             MESSENGER_TRANSPORT_DSN=redis://redis:6379/messages
             MERCURE_JWT_SECRET=${{ secrets.MERCURE_JWT_SECRET }}
+            MERCURE_PUBLISHER_JWT_KEY=${{ secrets.MERCURE_JWT_SECRET }}
+            MERCURE_SUBSCRIBER_JWT_KEY=${{ secrets.MERCURE_JWT_SECRET }}
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
             VEH_URL=${{ secrets.GTFS_RT_VEHICLES_URL }}
             TRIP_URL=${{ secrets.GTFS_RT_TRIPS_URL }}
