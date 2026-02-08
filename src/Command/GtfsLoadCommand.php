@@ -232,11 +232,13 @@ final class GtfsLoadCommand extends Command
             if (++$routesIterated % 1000 === 0) {
                 $this->routes->flush();
                 $this->routes->getEntityManager()->clear();
+                $city = $this->getOrCreateDefaultCity(); // Re-fetch city after clear
                 $io->writeln("  processed: $routesIterated");
             }
         }
         $this->routes->flush();
         $this->routes->getEntityManager()->clear();
+        $city = $this->getOrCreateDefaultCity(); // Re-fetch city after clear
         $io->writeln("  upserted: $routesIterated");
 
         // Stops
@@ -257,11 +259,13 @@ final class GtfsLoadCommand extends Command
             if (++$stopsIterated % 1000 === 0) {
                 $this->stops->flush();
                 $this->stops->getEntityManager()->clear();
+                $city = $this->getOrCreateDefaultCity(); // Re-fetch city after clear
                 $io->writeln("  processed: $stopsIterated");
             }
         }
         $this->stops->flush();
         $this->stops->getEntityManager()->clear();
+        $city = $this->getOrCreateDefaultCity(); // Re-fetch city after clear
         $io->writeln("  upserted: $stopsIterated");
 
         // Trips
@@ -290,8 +294,9 @@ final class GtfsLoadCommand extends Command
             if (++$tripsIterated % 1000 === 0) {
                 $this->trips->flush();
                 $this->trips->getEntityManager()->clear();
-                // Reload routes map after clear (entities were detached)
+                // Reload entities after clear (they were detached)
                 $routesByGtfs = $this->routes->mapByGtfsId();
+                $city         = $this->getOrCreateDefaultCity();
                 $io->writeln("  processed: $tripsIterated");
             }
         }
