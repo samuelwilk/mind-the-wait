@@ -19,7 +19,7 @@ variable "domain_name" {
 variable "server_type" {
   description = "Hetzner server type"
   type        = string
-  default     = "cx22" # 2 vCPU, 4GB RAM - ~€4.51/mo
+  default     = "cx23"
 }
 
 variable "location" {
