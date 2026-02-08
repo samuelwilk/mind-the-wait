@@ -1,4 +1,4 @@
-name: Deploy to Hetzner
+name: Deploy to DigitalOcean
 
 on:
   push:
@@ -41,10 +41,10 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     steps:
-      - name: Deploy to Hetzner
+      - name: Deploy to DigitalOcean
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.HETZNER_SERVER_IP }}
+          host: ${{ secrets.SERVER_IP }}
           username: deploy
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
