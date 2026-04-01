@@ -431,8 +431,11 @@ final class GtfsLoadCommand extends Command
         $tStop     = $em->getClassMetadata(Stop::class)->getTableName();
         $tRoute    = $em->getClassMetadata(Route::class)->getTableName();
 
+        // Truncate in FK-safe order (children first) WITHOUT CASCADE
+        // so that analytics tables (route_performance_daily, arrival_log,
+        // bunching_incident) that reference route are preserved.
         foreach ([$tStopTime, $tTrip, $tStop, $tRoute] as $t) {
-            $conn->executeStatement(sprintf('TRUNCATE %s RESTART IDENTITY CASCADE', $t));
+            $conn->executeStatement(sprintf('TRUNCATE ONLY %s RESTART IDENTITY', $t));
         }
     }
 
