@@ -1,0 +1,332 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Analytics - Saskatoon Transit{% endblock %}
+
+{% block body %}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Page Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
+            <p class="mt-2 text-gray-600">Comprehensive historical analysis and performance trends</p>
+        </div>
+
+        <!-- Date Range Selector -->
+        <div class="mb-8 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <form method="get" action="{{ path('app_analysis') }}" class="flex flex-wrap items-end gap-4">
+                <!-- Preset Selector -->
+                <div class="flex-1 min-w-[200px]">
+                    <label for="preset" class="block text-sm font-medium text-gray-700 mb-1">Time Period</label>
+                    <select name="preset" id="preset" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" onchange="this.form.submit()">
+                        {% for value, label in presets %}
+                            <option value="{{ value }}" {{ currentPreset == value ? 'selected' : '' }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Custom Date Range -->
+                <div class="flex gap-2 items-end">
+                    <div>
+                        <label for="start" class="block text-sm font-medium text-gray-700 mb-1">From</label>
+                        <input type="date" name="start" id="start" value="{{ pageData.dateRange.startDate|date('Y-m-d') }}" class="block rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="end" class="block text-sm font-medium text-gray-700 mb-1">To</label>
+                        <input type="date" name="end" id="end" value="{{ pageData.dateRange.endDate|date_modify('-1 day')|date('Y-m-d') }}" class="block rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+                    </div>
+                    <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors text-sm font-medium">
+                        Apply
+                    </button>
+                </div>
+            </form>
+
+            <!-- Current Range Display -->
+            <div class="mt-3 text-sm text-gray-500">
+                Showing data from <strong>{{ pageData.dateRange.startDate|date('M j, Y') }}</strong> to <strong>{{ pageData.dateRange.endDate|date_modify('-1 day')|date('M j, Y') }}</strong>
+                ({{ pageData.dateRange.dayCount }} days)
+            </div>
+
+            {% if pageData.dataGapNote %}
+                <div class="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
+                    {{ pageData.dataGapNote }}
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <!-- Total Predictions -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <div class="text-sm font-medium text-gray-500">Total Predictions</div>
+                <div class="mt-1 text-2xl font-bold text-gray-900">{{ pageData.summary.formattedPredictions }}</div>
+                <div class="text-xs text-gray-400">{{ pageData.summary.daysWithData }} days of data</div>
+            </div>
+
+            <!-- Average On-Time -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <div class="text-sm font-medium text-gray-500">Avg On-Time</div>
+                <div class="mt-1 text-2xl font-bold {{ pageData.summary.avgOnTimePercentage >= 80 ? 'text-green-600' : (pageData.summary.avgOnTimePercentage >= 60 ? 'text-yellow-600' : 'text-red-600') }}">
+                    {{ pageData.summary.avgOnTimePercentage|number_format(1) }}%
+                </div>
+                <div class="text-xs text-gray-400">Grade: {{ pageData.summary.grade }}</div>
+            </div>
+
+            <!-- Routes Tracked -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <div class="text-sm font-medium text-gray-500">Routes Tracked</div>
+                <div class="mt-1 text-2xl font-bold text-gray-900">{{ pageData.summary.routesTracked }}</div>
+                <div class="text-xs text-gray-400">{{ pageData.summary.vehiclesTracked }} vehicles</div>
+            </div>
+
+            <!-- Bunching Incidents -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <div class="text-sm font-medium text-gray-500">Bunching Incidents</div>
+                <div class="mt-1 text-2xl font-bold text-gray-900">{{ pageData.summary.bunchingIncidents ?? 0 }}</div>
+                <div class="text-xs text-gray-400">vehicles arriving too close</div>
+            </div>
+        </div>
+
+        <!-- Route Comparison Section -->
+        <div class="mb-12">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Route Comparison</h2>
+
+            <!-- Route Selector Form -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+                <form method="get" action="{{ path('app_analysis') }}" class="flex flex-wrap items-end gap-4">
+                    <input type="hidden" name="preset" value="{{ currentPreset }}">
+                    <input type="hidden" name="start" value="{{ pageData.dateRange.startDate|date('Y-m-d') }}">
+                    <input type="hidden" name="end" value="{{ pageData.dateRange.endDate|date_modify('-1 day')|date('Y-m-d') }}">
+
+                    <div class="flex-1 min-w-[300px]">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Select Routes to Compare (2-5)</label>
+                        <select name="routes[]" multiple size="5" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+                            {% for route in availableRoutes %}
+                                <option value="{{ route.id }}" {{ route.id in selectedRouteIds ? 'selected' : '' }}>
+                                    Route {{ route.short_name }} - {{ route.long_name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500">Hold Ctrl/Cmd to select multiple routes</p>
+                    </div>
+
+                    <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors text-sm font-medium">
+                        Compare Routes
+                    </button>
+                </form>
+            </div>
+
+            {% if pageData.routeComparisons|length > 0 %}
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Chart -->
+                    {% if pageData.routeComparisonChart %}
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                            <div
+                                data-controller="chart"
+                                data-chart-options-value="{{ pageData.routeComparisonChart|json_encode|e('html_attr') }}"
+                                style="width: 100%; min-height: 400px;">
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <!-- Comparison Table -->
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Route</th>
+                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">On-Time %</th>
+                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Avg Delay</th>
+                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Best Day</th>
+                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Worst Day</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                {% for route in pageData.routeComparisons %}
+                                    <tr>
+                                        <td class="px-4 py-3 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-sm font-medium" style="background-color: {{ route.colour ?? '#3B82F6' }}20; color: {{ route.colour ?? '#3B82F6' }}">
+                                                    {{ route.shortName }}
+                                                </span>
+                                                <span class="ml-2 text-sm text-gray-500 truncate max-w-[150px]">{{ route.longName }}</span>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-3 text-right whitespace-nowrap">
+                                            <span class="font-semibold {{ route.avgOnTimePercentage >= 80 ? 'text-green-600' : (route.avgOnTimePercentage >= 60 ? 'text-yellow-600' : 'text-red-600') }}">
+                                                {{ route.avgOnTimePercentage|number_format(1) }}%
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-3 text-right text-sm text-gray-500">
+                                            {{ route.avgDelaySec >= 0 ? '+' : '' }}{{ (route.avgDelaySec / 60)|number_format(1) }}m
+                                        </td>
+                                        <td class="px-4 py-3 text-right text-sm text-green-600">
+                                            {% if route.bestDay %}
+                                                {{ route.bestDayPercentage|number_format(1) }}%
+                                                <span class="text-gray-400 text-xs">({{ route.bestDay|date('M j') }})</span>
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td class="px-4 py-3 text-right text-sm text-red-600">
+                                            {% if route.worstDay %}
+                                                {{ route.worstDayPercentage|number_format(1) }}%
+                                                <span class="text-gray-400 text-xs">({{ route.worstDay|date('M j') }})</span>
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% else %}
+                <div class="bg-gray-50 rounded-lg p-8 text-center">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    <p class="mt-2 text-gray-500">Select 2-5 routes above to compare their performance</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Vehicle Performance Leaderboards -->
+        <div class="mb-12">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Vehicle Performance</h2>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Top Performers -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="px-4 py-3 bg-green-50 border-b border-green-200">
+                        <h3 class="text-lg font-semibold text-green-800">Top 10 Most Reliable</h3>
+                    </div>
+                    {% if pageData.topVehicles|length > 0 %}
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Vehicle</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">On-Time</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Routes</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                {% for i, vehicle in pageData.topVehicles %}
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm text-gray-500">{{ i + 1 }}</td>
+                                        <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ vehicle.vehicleId }}</td>
+                                        <td class="px-4 py-2 text-right text-sm font-semibold text-green-600">{{ vehicle.onTimePercentage|number_format(1) }}%</td>
+                                        <td class="px-4 py-2 text-right text-sm text-gray-500">{{ vehicle.routesServed }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <div class="p-8 text-center text-gray-500">No vehicle data available for this period</div>
+                    {% endif %}
+                </div>
+
+                <!-- Worst Performers -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="px-4 py-3 bg-red-50 border-b border-red-200">
+                        <h3 class="text-lg font-semibold text-red-800">Bottom 10 Least Reliable</h3>
+                    </div>
+                    {% if pageData.worstVehicles|length > 0 %}
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Vehicle</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">On-Time</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Avg Delay</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                {% for i, vehicle in pageData.worstVehicles %}
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm text-gray-500">{{ i + 1 }}</td>
+                                        <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ vehicle.vehicleId }}</td>
+                                        <td class="px-4 py-2 text-right text-sm font-semibold text-red-600">{{ vehicle.onTimePercentage|number_format(1) }}%</td>
+                                        <td class="px-4 py-2 text-right text-sm text-gray-500">{{ vehicle.formattedDelay }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <div class="p-8 text-center text-gray-500">No vehicle data available for this period</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Time-Based Trends -->
+        <div class="mb-12">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Time-Based Trends</h2>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <!-- Day of Week Chart -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Performance by Day of Week</h3>
+                    {% if pageData.dayOfWeekChart %}
+                        <div
+                            data-controller="chart"
+                            data-chart-options-value="{{ pageData.dayOfWeekChart|json_encode|e('html_attr') }}"
+                            style="width: 100%; min-height: 300px;">
+                        </div>
+                    {% else %}
+                        <div class="h-[300px] flex items-center justify-center text-gray-500">No data available</div>
+                    {% endif %}
+                </div>
+
+                <!-- Hourly Chart -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Performance by Hour of Day</h3>
+                    {% if pageData.hourlyChart %}
+                        <div
+                            data-controller="chart"
+                            data-chart-options-value="{{ pageData.hourlyChart|json_encode|e('html_attr') }}"
+                            style="width: 100%; min-height: 300px;">
+                        </div>
+                    {% else %}
+                        <div class="h-[300px] flex items-center justify-center text-gray-500">No data available</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Monthly Trend Chart (full width) -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Monthly Performance Trend</h3>
+                {% if pageData.monthlyChart %}
+                    <div
+                        data-controller="chart"
+                        data-chart-options-value="{{ pageData.monthlyChart|json_encode|e('html_attr') }}"
+                        style="width: 100%; min-height: 350px;">
+                    </div>
+                {% else %}
+                    <div class="h-[350px] flex items-center justify-center text-gray-500">No monthly data available</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Historical Data Highlight -->
+        {% if pageData.hasHistoricalData %}
+            <div class="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-6">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <svg class="h-8 w-8 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-lg font-semibold text-indigo-900">Historical Data Available</h3>
+                        <div class="mt-1 text-sm text-indigo-800">
+                            <p>This analysis includes historical data from <strong>October 15, 2025</strong> to <strong>January 4, 2026</strong>.</p>
+                            <p class="mt-2">During this period, we collected over 14.8 million arrival predictions covering 51 bus routes and 40+ vehicles.</p>
+                            <p class="mt-2 text-indigo-600">Use the "Historical (Oct-Jan)" preset above to focus specifically on this period.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

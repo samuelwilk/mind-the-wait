@@ -63,6 +63,21 @@ final class BunchingIncidentRepository extends ServiceEntityRepository
     }
 
     /**
+     * Count bunching incidents within a date range.
+     */
+    public function countByDateRange(\DateTimeInterface $startDate, \DateTimeInterface $endDate): int
+    {
+        return (int) $this->createQueryBuilder('b')
+            ->select('COUNT(b.id)')
+            ->where('b.detectedAt >= :start')
+            ->andWhere('b.detectedAt < :end')
+            ->setParameter('start', $startDate)
+            ->setParameter('end', $endDate)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
      * Get bunching incidents grouped by weather condition.
      *
      * @return list<\App\Dto\BunchingCountDto>
