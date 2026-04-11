@@ -1,4 +1,14 @@
 
+COMPOSE_BASE ?= docker compose -f docker/compose.yaml --env-file .env.local
+
+# Auto-detect zu-local-proxy: include proxy overlay when the zu-proxy network exists
+ZU_PROXY_NETWORK := $(shell docker network ls --filter name=^zu-proxy$$ --format '{{.Name}}' 2>/dev/null)
+ifneq ($(ZU_PROXY_NETWORK),)
+  COMPOSE_BASE := $(COMPOSE_BASE) -f docker/compose.proxy.yaml
+endif
+
+COMPOSE ?= $(COMPOSE_BASE)
+
 ##@ Help
 
 ## Source - https://www.thapaliya.com/en/writings/well-documented-makefiles/
@@ -8,36 +18,36 @@ help:  ## Display this help
 ##@ Docker
 docker-build: ## Build the docker containers
 	@echo "Building and Starting Docker containers detached..."
-	@INSTALL_DEPENDENCIES=true docker compose -f docker/compose.yaml --env-file .env.local up --build -d
+	@INSTALL_DEPENDENCIES=true $(COMPOSE) up --build -d
 
 docker-up: ## Start the docker containers, without building them first.
 	@echo "Starting main Docker containers detached..."
-	@docker compose -f docker/compose.yaml --env-file .env.local up -d
+	@$(COMPOSE) up -d
 
 docker-up-with-logs: ## Start the docker containers, without building them first.
 	@echo "Starting main Docker containers with log..."
-	@docker compose -f docker/compose.yaml --env-file .env.local up
+	@$(COMPOSE) up
 
 docker-down: ## Close down docker containers.
 	@echo "Closing down Docker containers..."
-	@docker compose -f docker/compose.yaml down
+	@$(COMPOSE) down
 
 docker-prune: ## Close down docker containers and remove volumes.
 	@echo "Closing down Docker containers..."
-	@docker compose -f docker/compose.yaml down -v
+	@$(COMPOSE) down -v
 
 docker-php: ## Opens an interactive shell into the PHP Docker container
-	@docker compose -f docker/compose.yaml exec php bash
+	@$(COMPOSE) exec php bash
 
 ##@ Symfony
 
 cc: ## Clears the symfony cache
-	@docker compose -f docker/compose.yaml exec php bin/console cache:clear
+	@$(COMPOSE) exec php bin/console cache:clear
 
 ##@ Composer
 
 composer-install: ## Installs vendor files via composer
-	@docker compose -f docker/compose.yaml exec php composer install
+	@$(COMPOSE) exec php composer install
 
 ##@ Database
 
@@ -47,14 +57,14 @@ database: ## Sets up the dev database
 #	@make database-fixtures
 
 database-create: ## Creates the database
-	@docker compose -f docker/compose.yaml exec php bin/console doctrine:database:drop --if-exists --force
-	@docker compose -f docker/compose.yaml exec php bin/console doctrine:database:create
+	@$(COMPOSE) exec php bin/console doctrine:database:drop --if-exists --force
+	@$(COMPOSE) exec php bin/console doctrine:database:create
 
 database-fixtures: ## Runs the dev fixtures
-	@docker compose -f docker/compose.yaml exec php bin/console doctrine:fixtures:load -n --group=dev -e dev
+	@$(COMPOSE) exec php bin/console doctrine:fixtures:load -n --group=dev -e dev
 
 database-migrations-execute: ## Runs the current set of migrations against the DB
-	@docker compose -f docker/compose.yaml exec php bin/console doctrine:migrations:migrate --no-interaction
+	@$(COMPOSE) exec php bin/console doctrine:migrations:migrate --no-interaction
 
 database-test: ## Sets up the test database
 	@make database-create-test
@@ -62,36 +72,36 @@ database-test: ## Sets up the test database
 #	@make database-fixtures-test  # Optional: add if you create test fixtures
 
 database-create-test: ## Creates the database
-	@docker compose -f docker/compose.yaml exec -e APP_ENV=test php bin/console doctrine:database:drop --if-exists --force
-	@docker compose -f docker/compose.yaml exec -e APP_ENV=test php bin/console doctrine:database:create
+	@$(COMPOSE) exec -e APP_ENV=test php bin/console doctrine:database:drop --if-exists --force
+	@$(COMPOSE) exec -e APP_ENV=test php bin/console doctrine:database:create
 
 database-fixtures-test: ## Runs the test fixtures
-	@docker compose -f docker/compose.yaml exec -e APP_ENV=test  php bin/console doctrine:fixtures:load -n --group=test -e test
+	@$(COMPOSE) exec -e APP_ENV=test  php bin/console doctrine:fixtures:load -n --group=test -e test
 
 database-migrations-execute-test: ## Runs the current set of migrations against the DB
-	@docker compose -f docker/compose.yaml exec -e APP_ENV=test  php bin/console doctrine:migrations:migrate --no-interaction
+	@$(COMPOSE) exec -e APP_ENV=test  php bin/console doctrine:migrations:migrate --no-interaction
 
 database-migrations-generate: ## Generates a new set of migrations
-	@docker compose -f docker/compose.yaml exec php bin/console doctrine:migrations:diff
+	@$(COMPOSE) exec php bin/console doctrine:migrations:diff
 
 
 ##@ Linting
 
 cs-dry-run: ## Dry run of the PHP Code Standards checker
-	@docker compose -f docker/compose.yaml exec php vendor/bin/php-cs-fixer --config=.php-cs-fixer.dist.php fix -v --diff --dry-run
+	@$(COMPOSE) exec php vendor/bin/php-cs-fixer --config=.php-cs-fixer.dist.php fix -v --diff --dry-run
 
 cs-fix: ## Automatically apply fixes from php-cs-fixer
-	@docker compose -f docker/compose.yaml exec php vendor/bin/php-cs-fixer --config=.php-cs-fixer.dist.php fix -v --diff
+	@$(COMPOSE) exec php vendor/bin/php-cs-fixer --config=.php-cs-fixer.dist.php fix -v --diff
 
 ##@ Tests
 
 test-phpunit: database-test ## Runs PHPUnit (resets test database first)
-	@docker compose -f docker/compose.yaml exec php vendor/bin/phpunit --configuration phpunit.dist.xml
+	@$(COMPOSE) exec php vendor/bin/phpunit --configuration phpunit.dist.xml
 
 ##@ Application
 
 score-tick: ## Runs the headway scoring cycle once
-	@docker compose -f docker/compose.yaml exec php bin/console app:score:tick
+	@$(COMPOSE) exec php bin/console app:score:tick
 
 ##@ Mailpit
 mailpit-delete-all-mail: ## Delete all mail from Mailpit
@@ -109,8 +119,8 @@ setup: ## Complete application setup - builds, installs deps, creates databases,
 	@make composer-install
 	@echo ""
 	@echo "🎨 Step 3/8: Compiling frontend assets (Tailwind CSS + AssetMapper)..."
-	@docker compose -f docker/compose.yaml exec php bin/console tailwind:build --minify
-	@docker compose -f docker/compose.yaml exec php bin/console asset-map:compile
+	@$(COMPOSE) exec php bin/console tailwind:build --minify
+	@$(COMPOSE) exec php bin/console asset-map:compile
 	@echo ""
 	@echo "🗄️  Step 4/8: Setting up development database..."
 	@make database
@@ -135,16 +145,16 @@ setup: ## Complete application setup - builds, installs deps, creates databases,
 	@echo ""
 	@echo "💡 Next steps:"
 	@echo "  - Check realtime data: curl -sk https://localhost/api/realtime | jq"
-	@echo "  - View scheduler logs: docker compose -f docker/compose.yaml --env-file .env.local logs -f scheduler"
+	@echo "  - View scheduler logs: $(COMPOSE) logs -f scheduler"
 	@echo "  - Run tests: make test-phpunit"
 
 gtfs-load: ## Load GTFS static data (uses ArcGIS by default, or set MTW_GTFS_STATIC_URL for ZIP)
 	@echo "Loading GTFS static data (this may take 1-5 minutes)..."
-	@docker compose -f docker/compose.yaml exec php bin/console app:gtfs:load --mode=arcgis || \
-		docker compose -f docker/compose.yaml exec php bin/console app:gtfs:load
+	@$(COMPOSE) exec php bin/console app:gtfs:load --mode=arcgis || \
+		$(COMPOSE) exec php bin/console app:gtfs:load
 
 weather-collect: ## Collect current weather data
-	@docker compose -f docker/compose.yaml exec php bin/console app:collect:weather
+	@$(COMPOSE) exec php bin/console app:collect:weather
 
 ##@ Certificates
 update-cert: ## Generate mind-the-wait.local TLS cert and fullchain (requires mkcert)

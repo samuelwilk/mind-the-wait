@@ -56,36 +56,38 @@
   --color-chart-6: #6366f1;
 }
 
-/* Base Styles */
-body {
-  @apply bg-gray-50 text-gray-900 antialiased;
-}
+/* Base Styles — wrapped in @layer base so utility classes can override */
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
 
-/* Typography */
-h1 {
-  @apply text-4xl font-bold text-gray-900;
-}
+  /* Typography */
+  h1 {
+    @apply text-4xl font-bold text-gray-900;
+  }
 
-h2 {
-  @apply text-3xl font-semibold text-gray-800;
-}
+  h2 {
+    @apply text-3xl font-semibold text-gray-800;
+  }
 
-h3 {
-  @apply text-2xl font-semibold text-gray-800;
-}
+  h3 {
+    @apply text-2xl font-semibold text-gray-800;
+  }
 
-h4 {
-  @apply text-xl font-medium text-gray-700;
+  h4 {
+    @apply text-xl font-medium text-gray-700;
+  }
+
+  /* Link Styles */
+  a {
+    @apply text-primary-600 hover:text-primary-700 transition-colors duration-150;
+  }
 }
 
 /* Card Shadows */
 .card-shadow {
   @apply shadow-sm hover:shadow-md transition-shadow duration-200;
-}
-
-/* Link Styles */
-a {
-  @apply text-primary-600 hover:text-primary-700 transition-colors duration-150;
 }
 
 /* Button Base - Using standard Tailwind utilities */

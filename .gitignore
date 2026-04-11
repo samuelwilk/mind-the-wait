@@ -90,3 +90,4 @@ IMPLEMENTATION_NOTES.md
 # IAM and infrastructure files with account-specific info
 IAM_MIGRATION_COMPLETE.md
 terraform-policy*.json
+.playwright-mcp/
