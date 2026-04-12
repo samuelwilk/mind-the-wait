@@ -9,9 +9,12 @@ use App\Dto\RoutePerformanceHeatmapBucketDto;
 use App\Dto\RoutePerformanceMetricsDto;
 use App\Dto\StopReliabilityDto;
 use App\Entity\ArrivalLog;
+use Doctrine\DBAL\Cache\QueryCacheProfile;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
+use Psr\Cache\CacheItemPoolInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 use function round;
 use function sprintf;
@@ -21,8 +24,14 @@ use function sprintf;
  */
 final class ArrivalLogRepository extends BaseRepository
 {
-    public function __construct(EntityManagerInterface $em, ManagerRegistry $registry)
-    {
+    private const ANALYTICS_CACHE_TTL = 3600;
+
+    public function __construct(
+        EntityManagerInterface $em,
+        ManagerRegistry $registry,
+        #[Autowire(service: 'doctrine.result_cache_pool')]
+        private readonly CacheItemPoolInterface $resultCache,
+    ) {
         parent::__construct($em, $registry, ArrivalLog::class);
     }
 
@@ -568,11 +577,18 @@ final class ArrivalLogRepository extends BaseRepository
             LIMIT :limit
         ', $order);
 
-        $rows = $conn->executeQuery($sql, [
+        $params = [
             'start' => $start->format('Y-m-d H:i:s'),
             'end'   => $end->format('Y-m-d H:i:s'),
             'limit' => $limit,
-        ])->fetchAllAssociative();
+        ];
+
+        $rows = $conn->executeQuery(
+            $sql,
+            $params,
+            [],
+            new QueryCacheProfile(self::ANALYTICS_CACHE_TTL, 'vehicle_perf_'.md5(serialize($params).$order), $this->resultCache),
+        )->fetchAllAssociative();
 
         $results = [];
         foreach ($rows as $row) {
@@ -613,10 +629,17 @@ final class ArrivalLogRepository extends BaseRepository
             ORDER BY hour
         ';
 
-        $rows = $conn->executeQuery($sql, [
+        $params = [
             'start' => $start->format('Y-m-d H:i:s'),
             'end'   => $end->format('Y-m-d H:i:s'),
-        ])->fetchAllAssociative();
+        ];
+
+        $rows = $conn->executeQuery(
+            $sql,
+            $params,
+            [],
+            new QueryCacheProfile(self::ANALYTICS_CACHE_TTL, 'hourly_trends_'.md5(serialize($params)), $this->resultCache),
+        )->fetchAllAssociative();
 
         $results = [];
         foreach ($rows as $row) {
@@ -651,10 +674,17 @@ final class ArrivalLogRepository extends BaseRepository
                 AND predicted_at < :end
         ';
 
-        $result = $conn->executeQuery($sql, [
+        $params = [
             'start' => $start->format('Y-m-d H:i:s'),
             'end'   => $end->format('Y-m-d H:i:s'),
-        ])->fetchAssociative();
+        ];
+
+        $result = $conn->executeQuery(
+            $sql,
+            $params,
+            [],
+            new QueryCacheProfile(self::ANALYTICS_CACHE_TTL, 'distinct_vehicles_'.md5(serialize($params)), $this->resultCache),
+        )->fetchAssociative();
 
         return (int) ($result['count'] ?? 0);
     }
