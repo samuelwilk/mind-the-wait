@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0](https://github.com/samuelwilk/mind-the-wait/compare/v0.14.2...v0.15.0) (2026-04-12)
+
+
+### Features
+
+* add prediction accuracy analytics and fix GPS interpolation ([#36](https://github.com/samuelwilk/mind-the-wait/issues/36)) ([dd2ce38](https://github.com/samuelwilk/mind-the-wait/commit/dd2ce38eb0b0fb28267089f26630cdddbdb33dde))
+* analytics dashboard with historical trends and route comparison ([#32](https://github.com/samuelwilk/mind-the-wait/issues/32)) ([7e53e7e](https://github.com/samuelwilk/mind-the-wait/commit/7e53e7e7a7f760219188da12b5fc0b759de6b651))
+* **ci:** add Hetzner deployment workflow ([f633e02](https://github.com/samuelwilk/mind-the-wait/commit/f633e020f5302df6ed89d3a8648a232d29e6fb3f))
+* **docker:** add production Docker Compose and Caddyfile ([e1a5db3](https://github.com/samuelwilk/mind-the-wait/commit/e1a5db30d76d28d539223f394659c636ceb0e81a))
+* **terraform:** add Hetzner VPS and Cloudflare DNS modules ([200633b](https://github.com/samuelwilk/mind-the-wait/commit/200633b115dad103cc99776b6798e9c6edcd64ba))
+* **terraform:** allow public RDS access from Hetzner VPS ([536d462](https://github.com/samuelwilk/mind-the-wait/commit/536d462299f83e277caec5398093d0c28de67ade))
+
+
+### Bug Fixes
+
+* add nginx proxy for Mercure to fix mixed-content ([7ff5ad2](https://github.com/samuelwilk/mind-the-wait/commit/7ff5ad23fca03b2a617a1e6bff458040d5cefea2))
+* **docker:** add env_file to mercure container for JWT secret ([a7dfb72](https://github.com/samuelwilk/mind-the-wait/commit/a7dfb7282f1ec74824466115ab9c5055dc3cbc95))
+* **docker:** use direct env vars for Mercure JWT keys instead of interpolation ([1454b24](https://github.com/samuelwilk/mind-the-wait/commit/1454b24c832851582c50226bb1c08e0bccea3a67))
+* improve vehicle indicators UX ([fe24721](https://github.com/samuelwilk/mind-the-wait/commit/fe247214e59e107908f4554801f258ad57ac6fa9))
+* make setup ([1d9c6e6](https://github.com/samuelwilk/mind-the-wait/commit/1d9c6e6aaddc793de14d6a5d9f8be1867a541579))
+* prevent OOM during GTFS ArcGIS load ([7c452f8](https://github.com/samuelwilk/mind-the-wait/commit/7c452f8b3a4ab0e48527598d57c86295839d2f6e))
+* re-fetch City entity after EntityManager clear to prevent detached entity error ([4da94d3](https://github.com/samuelwilk/mind-the-wait/commit/4da94d39031bdd5307e1ef575090741f77d03888))
+* remove CASCADE from GTFS truncate to preserve historical analytics data ([10ac8f1](https://github.com/samuelwilk/mind-the-wait/commit/10ac8f1fe6e49c3c2aa10e1d090c955dd0ed2bd3))
+* **terraform:** use cx23 server type for Hetzner ([09dc9d3](https://github.com/samuelwilk/mind-the-wait/commit/09dc9d33541ae4583bc73bea86aef6477f78ee93))
+* **terraform:** use public subnets for RDS when publicly_accessible is true ([c007193](https://github.com/samuelwilk/mind-the-wait/commit/c00719308ab2ea62ead7d66041b2b03ee6723e2b))
+
+
+### Performance Improvements
+
+* fix analytics page performance with Redis cache and query caching ([#35](https://github.com/samuelwilk/mind-the-wait/issues/35)) ([1ea7641](https://github.com/samuelwilk/mind-the-wait/commit/1ea7641c271ffbf9bb8d209aacc4db5dcb70ad34))
+* fix analytics page timeout on large datasets ([#34](https://github.com/samuelwilk/mind-the-wait/issues/34)) ([73f1c6a](https://github.com/samuelwilk/mind-the-wait/commit/73f1c6ab10d0d75e9f5865d540c0bd4bf5ac868a))
+* optimize Mercure broadcasts for 5-second updates ([3b0fe41](https://github.com/samuelwilk/mind-the-wait/commit/3b0fe41d9f8a953e8b54668fb18472b89a131be4))
+
+
+### Documentation
+
+* add Hetzner migration design ([1afa80f](https://github.com/samuelwilk/mind-the-wait/commit/1afa80f931a840b9e2e481beb400def824a0c983))
+* add Hetzner migration implementation plan ([d5f8c54](https://github.com/samuelwilk/mind-the-wait/commit/d5f8c54021bacc4b8ba0a4fa3b13991cf1a6f7dd))
+* add vehicle indicators design plan ([4fbb151](https://github.com/samuelwilk/mind-the-wait/commit/4fbb151ae3e77fd9c18f69940ddb536397165378))
+
+
+### Code Refactoring
+
+* **ci:** migrate deployment from Hetzner to DigitalOcean ([5c03d1b](https://github.com/samuelwilk/mind-the-wait/commit/5c03d1bebd524225ded1475d9857dbcb876cfa72))
+* remove AWS ECS infrastructure and fix N+1 query ([3121bb9](https://github.com/samuelwilk/mind-the-wait/commit/3121bb951aa42b52212b9ade4a533f865e511b71))
+* rename InsightCacheWarming to NightlyCacheWarming, bump TTL to 24h ([#37](https://github.com/samuelwilk/mind-the-wait/issues/37)) ([4ab0af0](https://github.com/samuelwilk/mind-the-wait/commit/4ab0af0831716fa2820cd847577f5533ff83b724))
+* replace route live tracking with compact vehicle indicators ([bd47991](https://github.com/samuelwilk/mind-the-wait/commit/bd47991c54c3f2c9ca6f0f9438e7accf094348d2))
+* **terraform:** migrate from Hetzner to DigitalOcean ([2e91863](https://github.com/samuelwilk/mind-the-wait/commit/2e91863c0d8e5a333cc52aaa1b056b49d560fa7d))
+* **terraform:** reorganize to terraform/hetzner and terraform/rds ([84cad80](https://github.com/samuelwilk/mind-the-wait/commit/84cad803e29720b544d2550490e11b6d749aec63))
+
 ## [0.14.2](https://github.com/samuelwilk/mind-the-wait/compare/v0.14.1...v0.14.2) (2025-11-11)
 
 
