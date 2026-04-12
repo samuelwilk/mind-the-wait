@@ -44,7 +44,6 @@ final class WarmAnalyticsCacheCommand extends Command
             DateRangeDto::PRESET_LAST_60_DAYS,
             DateRangeDto::PRESET_LAST_90_DAYS,
             DateRangeDto::PRESET_ALL_TIME,
-            DateRangeDto::PRESET_HISTORICAL,
         ];
 
         $warmed = 0;

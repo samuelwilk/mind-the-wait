@@ -104,16 +104,12 @@ final readonly class AnalyticsService
             ? $this->buildRouteComparisonChart($routeComparisons)
             : null;
 
-        // Check for historical data
-        $historicalStart   = new \DateTimeImmutable('2025-10-15');
-        $historicalEnd     = new \DateTimeImmutable('2026-01-05');
-        $hasHistoricalData = $dateRange->startDate <= $historicalEnd && $dateRange->endDate >= $historicalStart;
-
-        // Data gap note
-        $dataGapNote = null;
-        if ($hasHistoricalData) {
-            $dataGapNote = 'Note: Data collection was interrupted from Jan 5 - Feb 7, 2026.';
-        }
+        // Data gap note — show when range overlaps the collection interruption
+        $gapStart    = new \DateTimeImmutable('2026-01-05');
+        $gapEnd      = new \DateTimeImmutable('2026-02-07');
+        $dataGapNote = ($dateRange->startDate < $gapEnd && $dateRange->endDate > $gapStart)
+            ? 'Note: Data collection was interrupted from Jan 5 - Feb 7, 2026.'
+            : null;
 
         $result = new AnalyticsPageDto(
             dateRange: $dateRange,
@@ -128,7 +124,7 @@ final readonly class AnalyticsService
             hourlyChart: $hourlyChart,
             monthlyChart: $monthlyChart,
             routeComparisonChart: $routeComparisonChart,
-            hasHistoricalData: $hasHistoricalData,
+            hasHistoricalData: false,
             dataGapNote: $dataGapNote,
         );
 

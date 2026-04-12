@@ -18,7 +18,6 @@ final readonly class DateRangeDto
     public const PRESET_LAST_60_DAYS = 'last_60_days';
     public const PRESET_LAST_90_DAYS = 'last_90_days';
     public const PRESET_ALL_TIME     = 'all_time';
-    public const PRESET_HISTORICAL   = 'historical';
     public const PRESET_CUSTOM       = 'custom';
 
     public function __construct(
@@ -49,11 +48,6 @@ final readonly class DateRangeDto
             self::PRESET_LAST_90_DAYS => new self(
                 startDate: $today->modify('-90 days'),
                 endDate: $today->modify('+1 day'),
-                preset: $preset,
-            ),
-            self::PRESET_HISTORICAL => new self(
-                startDate: new \DateTimeImmutable('2025-10-15'),
-                endDate: new \DateTimeImmutable('2026-01-05'),
                 preset: $preset,
             ),
             self::PRESET_ALL_TIME => new self(
@@ -88,7 +82,6 @@ final readonly class DateRangeDto
             self::PRESET_LAST_30_DAYS => 'Last 30 Days',
             self::PRESET_LAST_60_DAYS => 'Last 60 Days',
             self::PRESET_LAST_90_DAYS => 'Last 90 Days',
-            self::PRESET_HISTORICAL   => 'Historical (Oct-Jan)',
             self::PRESET_ALL_TIME     => 'All Time',
         ];
     }
