@@ -55,7 +55,7 @@ final readonly class HourlyTrendDto
     public function getPeriodLabel(): string
     {
         return match (true) {
-            $this->hour >= 6  && $this->hour  < 10  => 'Morning Rush',
+            $this->hour >= 6  && $this->hour < 10 => 'Morning Rush',
             $this->hour >= 10 && $this->hour < 16 => 'Midday',
             $this->hour >= 16 && $this->hour < 20 => 'Evening Rush',
             default                               => 'Night',
