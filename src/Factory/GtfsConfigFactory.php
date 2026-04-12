@@ -15,6 +15,7 @@ final readonly class GtfsConfigFactory
         private string $arcgisStopsUrl,
         private string $arcgisTripsUrl,
         private string $arcgisStopTimesUrl,
+        private string $arcgisShapesUrl = '',
     ) {
     }
 
@@ -45,6 +46,7 @@ final readonly class GtfsConfigFactory
             stopsUrl: $stopsUrl,
             tripsUrl: $tripsUrl,
             stopTimesUrl: $stopTimesUrl,
+            shapesUrl: $this->arcgisShapesUrl ?: null,
         );
     }
 }

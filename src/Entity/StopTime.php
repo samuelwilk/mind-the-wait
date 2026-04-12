@@ -33,6 +33,10 @@ class StopTime
     #[ORM\Column(nullable: true)]
     private ?int $departureTime = null;
 
+    /** Cumulative distance along the trip shape at this stop (km or agency units). */
+    #[ORM\Column(type: 'float', nullable: true)]
+    private ?float $shapeDistTraveled = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -94,6 +98,18 @@ class StopTime
     public function setDepartureTime(?int $departureTime): static
     {
         $this->departureTime = $departureTime;
+
+        return $this;
+    }
+
+    public function getShapeDistTraveled(): ?float
+    {
+        return $this->shapeDistTraveled;
+    }
+
+    public function setShapeDistTraveled(?float $shapeDistTraveled): static
+    {
+        $this->shapeDistTraveled = $shapeDistTraveled;
 
         return $this;
     }

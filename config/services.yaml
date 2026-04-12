@@ -11,6 +11,7 @@ parameters:
     mtw_arcgis_stops_url: '%env(default::MTW_ARCGIS_STOP)%'
     mtw_arcgis_trips_url: '%env(default::MTW_ARCGIS_TRIP)%'
     mtw_arcgis_stop_times_url: '%env(default::MTW_ARCGIS_STOP_TIME)%'
+    mtw_arcgis_shapes_url: '%env(default::MTW_ARCGIS_SHAPE)%'
 
 services:
     # default configuration for services in *this* file
@@ -39,6 +40,7 @@ services:
             $arcgisStopsUrl: '%mtw_arcgis_stops_url%'
             $arcgisTripsUrl: '%mtw_arcgis_trips_url%'
             $arcgisStopTimesUrl: '%mtw_arcgis_stop_times_url%'
+            $arcgisShapesUrl: '%mtw_arcgis_shapes_url%'
 
     App\Service\Headway\CrossingTimeEstimatorInterface: '@App\Service\Headway\PositionInterpolator'
     App\Service\Headway\StopTimeProviderInterface: '@App\Service\Headway\CompositeStopTimeProvider'

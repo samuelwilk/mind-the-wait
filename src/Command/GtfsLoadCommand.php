@@ -286,7 +286,8 @@ final class GtfsLoadCommand extends Command
                 $adapter->serviceId(),
                 DirectionEnum::from($adapter->directionId()),
                 $adapter->tripHeadsign(),
-                $city
+                $city,
+                $adapter->tripShapeId(),
             );
 
             if (++$tripsIterated % 1000 === 0) {
@@ -331,12 +332,14 @@ final class GtfsLoadCommand extends Command
                 continue;
             }
 
+            $dist    = $adapter->shapeDistTraveled();
             $batch[] = [
                 'trip' => $trip,
                 'stop' => $stop,
                 'seq'  => $adapter->stopSequence(),
                 'arr'  => GtfsTimeUtils::timeToSeconds($adapter->arrivalTime()),
                 'dep'  => GtfsTimeUtils::timeToSeconds($adapter->departureTime()),
+                'dist' => $dist > 0 ? $dist : null,
             ];
 
             if (++$stopTimesIterated % $BATCH_SIZE === 0) {
@@ -351,6 +354,35 @@ final class GtfsLoadCommand extends Command
         $io->writeln("  total inserted: $stopTimesIterated");
         if ($skippedStopTimes > 0) {
             $io->writeln("  skipped (missing trip or stop): $skippedStopTimes");
+        }
+
+        // Shapes (optional — only if URL configured)
+        if ($config->shapesUrl) {
+            $io->section('shapes (ArcGIS)');
+            $conn = $this->stopTimes->getEntityManager()->getConnection();
+            $conn->executeStatement('TRUNCATE ONLY shape RESTART IDENTITY');
+            $shapeBatch     = [];
+            $shapesIterated = 0;
+            foreach ($this->fetchArcGisFeatures($config->shapesUrl) as $feat) {
+                $adapter      = new GtfsFeatureAdapter($feat);
+                $shapeBatch[] = [
+                    $adapter->shapeId(),
+                    $adapter->shapePtLat(),
+                    $adapter->shapePtLon(),
+                    $adapter->shapePtSequence(),
+                    $adapter->shapeDistTraveled(),
+                ];
+
+                if (++$shapesIterated % 1000 === 0) {
+                    $this->bulkInsertShapes($conn, $shapeBatch);
+                    $shapeBatch = [];
+                    $io->writeln("  inserted: $shapesIterated");
+                }
+            }
+            if ($shapeBatch) {
+                $this->bulkInsertShapes($conn, $shapeBatch);
+            }
+            $io->writeln("  total inserted: $shapesIterated");
         }
 
         // Invalidate cached stop sequences (GTFS static data changed)
@@ -621,5 +653,24 @@ final class GtfsLoadCommand extends Command
         }
 
         return $city;
+    }
+
+    /**
+     * @param list<array{0: string, 1: float, 2: float, 3: int, 4: float}> $rows
+     */
+    private function bulkInsertShapes(\Doctrine\DBAL\Connection $conn, array $rows): void
+    {
+        $sql  = 'INSERT INTO shape (shape_id, lat, lon, sequence, dist_traveled) VALUES (:sid, :lat, :lon, :seq, :dist)';
+        $stmt = $conn->prepare($sql);
+
+        foreach ($rows as [$shapeId, $lat, $lon, $seq, $dist]) {
+            $stmt->executeStatement([
+                'sid'  => (string) $shapeId,
+                'lat'  => (float) $lat,
+                'lon'  => (float) $lon,
+                'seq'  => (int) $seq,
+                'dist' => (float) $dist,
+            ]);
+        }
     }
 }

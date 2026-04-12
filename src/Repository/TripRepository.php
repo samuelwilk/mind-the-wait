@@ -25,7 +25,7 @@ class TripRepository extends BaseRepository
         return $this->findOneBy(['gtfsId' => $gtfsId]);
     }
 
-    public function upsert(string $gtfsId, Route $route, ?string $serviceId, DirectionEnum $direction, ?string $headsign, City $city): Trip
+    public function upsert(string $gtfsId, Route $route, ?string $serviceId, DirectionEnum $direction, ?string $headsign, City $city, ?string $shapeId = null): Trip
     {
         $trip = $this->findOneByGtfsId($gtfsId) ?? new Trip();
 
@@ -35,6 +35,7 @@ class TripRepository extends BaseRepository
         $trip->setDirection($direction);
         $trip->setHeadsign($headsign);
         $trip->setCity($city);
+        $trip->setShapeId($shapeId);
 
         $this->save($trip, false);
 
