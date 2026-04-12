@@ -1,0 +1,255 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Service\Dashboard;
+
+use App\Dto\Analytics\AnalyticsPageDto;
+use App\Dto\Analytics\AnalyticsSummaryDto;
+use App\Dto\Analytics\DateRangeDto;
+use App\Repository\ArrivalLogRepository;
+use App\Repository\BunchingIncidentRepository;
+use App\Repository\RoutePerformanceDailyRepository;
+use App\ValueObject\Chart\Chart;
+use App\ValueObject\Chart\ChartBuilder;
+
+use function count;
+
+/**
+ * Service for analytics dashboard data aggregation.
+ *
+ * Provides comprehensive analytics data including:
+ * - Route comparison metrics
+ * - Vehicle performance leaderboards
+ * - Time-based trends (hourly, daily, monthly)
+ * - Summary statistics
+ */
+final readonly class AnalyticsService
+{
+    public function __construct(
+        private RoutePerformanceDailyRepository $performanceRepo,
+        private ArrivalLogRepository $arrivalRepo,
+        private BunchingIncidentRepository $bunchingRepo,
+    ) {
+    }
+
+    /**
+     * Get complete analytics page data for a date range.
+     *
+     * @param DateRangeDto   $dateRange Date range for analysis
+     * @param list<int>|null $routeIds  Optional route IDs for comparison (null = all routes)
+     */
+    public function getAnalyticsPageData(
+        DateRangeDto $dateRange,
+        ?array $routeIds = null,
+    ): AnalyticsPageDto {
+        // Build summary
+        $summary = $this->buildSummary($dateRange);
+
+        // Get route comparisons (use top 10 by default if no specific routes selected)
+        $routeComparisons = [];
+        if ($routeIds !== null && count($routeIds) > 0) {
+            $routeComparisons = $this->performanceRepo->findRouteComparisonData(
+                $routeIds,
+                $dateRange->startDate,
+                $dateRange->endDate,
+            );
+        }
+
+        // Get vehicle performance leaderboards
+        $topVehicles = $this->arrivalRepo->findTopPerformingVehicles(
+            $dateRange->startDate,
+            $dateRange->endDate,
+            10,
+        );
+
+        $worstVehicles = $this->arrivalRepo->findWorstPerformingVehicles(
+            $dateRange->startDate,
+            $dateRange->endDate,
+            10,
+        );
+
+        // Get time-based trends
+        $dayOfWeekTrends = $this->performanceRepo->findDayOfWeekTrends(
+            $dateRange->startDate,
+            $dateRange->endDate,
+        );
+
+        $hourlyTrends = $this->arrivalRepo->findHourlyTrends(
+            $dateRange->startDate,
+            $dateRange->endDate,
+        );
+
+        $monthlyTrends = $this->performanceRepo->findMonthlyTrends(
+            $dateRange->startDate,
+            $dateRange->endDate,
+        );
+
+        // Build charts
+        $dayOfWeekChart       = $this->buildDayOfWeekChart($dayOfWeekTrends);
+        $hourlyChart          = $this->buildHourlyChart($hourlyTrends);
+        $monthlyChart         = $this->buildMonthlyChart($monthlyTrends);
+        $routeComparisonChart = count($routeComparisons) > 0
+            ? $this->buildRouteComparisonChart($routeComparisons)
+            : null;
+
+        // Check for historical data
+        $historicalStart   = new \DateTimeImmutable('2025-10-15');
+        $historicalEnd     = new \DateTimeImmutable('2026-01-05');
+        $hasHistoricalData = $dateRange->startDate <= $historicalEnd && $dateRange->endDate >= $historicalStart;
+
+        // Data gap note
+        $dataGapNote = null;
+        if ($hasHistoricalData) {
+            $dataGapNote = 'Note: Data collection was interrupted from Jan 5 - Feb 7, 2026.';
+        }
+
+        return new AnalyticsPageDto(
+            dateRange: $dateRange,
+            summary: $summary,
+            routeComparisons: $routeComparisons,
+            topVehicles: $topVehicles,
+            worstVehicles: $worstVehicles,
+            dayOfWeekTrends: $dayOfWeekTrends,
+            hourlyTrends: $hourlyTrends,
+            monthlyTrends: $monthlyTrends,
+            dayOfWeekChart: $dayOfWeekChart,
+            hourlyChart: $hourlyChart,
+            monthlyChart: $monthlyChart,
+            routeComparisonChart: $routeComparisonChart,
+            hasHistoricalData: $hasHistoricalData,
+            dataGapNote: $dataGapNote,
+        );
+    }
+
+    /**
+     * Get all routes that have performance data in the date range.
+     *
+     * @return list<array{id: int, short_name: string, long_name: string}>
+     */
+    public function getAvailableRoutes(DateRangeDto $dateRange): array
+    {
+        return $this->performanceRepo->findRoutesWithData(
+            $dateRange->startDate,
+            $dateRange->endDate,
+        );
+    }
+
+    /**
+     * Build summary statistics for the date range.
+     */
+    private function buildSummary(DateRangeDto $dateRange): AnalyticsSummaryDto
+    {
+        $stats = $this->performanceRepo->getAnalyticsSummary(
+            $dateRange->startDate,
+            $dateRange->endDate,
+        );
+
+        $vehiclesTracked = $this->arrivalRepo->countDistinctVehicles(
+            $dateRange->startDate,
+            $dateRange->endDate,
+        );
+
+        $bunchingIncidents = $this->bunchingRepo->countByDateRange(
+            $dateRange->startDate,
+            $dateRange->endDate,
+        );
+
+        return new AnalyticsSummaryDto(
+            totalPredictions: $stats['total_predictions'],
+            avgOnTimePercentage: $stats['avg_on_time'],
+            avgDelaySec: $stats['avg_delay'],
+            daysWithData: $stats['days_with_data'],
+            routesTracked: $stats['routes_tracked'],
+            vehiclesTracked: $vehiclesTracked,
+            bunchingIncidents: $bunchingIncidents,
+        );
+    }
+
+    /**
+     * Build day-of-week performance bar chart.
+     *
+     * @param list<\App\Dto\Analytics\DayOfWeekTrendDto> $trends
+     */
+    private function buildDayOfWeekChart(array $trends): ?Chart
+    {
+        if (count($trends) === 0) {
+            return null;
+        }
+
+        $days = array_map(fn ($t) => $t->getShortDayName(), $trends);
+        $data = array_map(fn ($t) => $t->avgOnTimePercentage, $trends);
+
+        // Color weekends differently
+        $colors = array_map(
+            fn ($t) => $t->isWeekend() ? '#9CA3AF' : '#3B82F6',
+            $trends
+        );
+
+        return ChartBuilder::bar()
+            ->categoryXAxis($days)
+            ->valueYAxis('On-Time %', min: 0, max: 100)
+            ->addSeries('On-Time %', $data, ['itemStyle' => ['color' => '#3B82F6']])
+            ->build();
+    }
+
+    /**
+     * Build hourly performance line chart.
+     *
+     * @param list<\App\Dto\Analytics\HourlyTrendDto> $trends
+     */
+    private function buildHourlyChart(array $trends): ?Chart
+    {
+        if (count($trends) === 0) {
+            return null;
+        }
+
+        $hours = array_map(fn ($t) => $t->getHourLabel(), $trends);
+        $data  = array_map(fn ($t) => $t->avgOnTimePercentage, $trends);
+
+        return ChartBuilder::line()
+            ->categoryXAxis($hours)
+            ->valueYAxis('On-Time %', min: 0, max: 100)
+            ->addSeries('On-Time %', $data, ['itemStyle' => ['color' => '#10B981'], 'smooth' => true, 'areaStyle' => []])
+            ->build();
+    }
+
+    /**
+     * Build monthly trend line chart.
+     *
+     * @param list<\App\Dto\Analytics\MonthlyTrendDto> $trends
+     */
+    private function buildMonthlyChart(array $trends): ?Chart
+    {
+        if (count($trends) === 0) {
+            return null;
+        }
+
+        $months = array_map(fn ($t) => $t->getMonthLabel(), $trends);
+        $data   = array_map(fn ($t) => $t->avgOnTimePercentage, $trends);
+
+        return ChartBuilder::line()
+            ->categoryXAxis($months)
+            ->valueYAxis('On-Time %', min: 0, max: 100)
+            ->addSeries('System Average', $data, ['itemStyle' => ['color' => '#6366F1'], 'smooth' => true, 'areaStyle' => []])
+            ->build();
+    }
+
+    /**
+     * Build route comparison bar chart.
+     *
+     * @param list<\App\Dto\Analytics\RouteComparisonDto> $comparisons
+     */
+    private function buildRouteComparisonChart(array $comparisons): Chart
+    {
+        $routes = array_map(fn ($c) => 'Route '.$c->shortName, $comparisons);
+        $data   = array_map(fn ($c) => $c->avgOnTimePercentage, $comparisons);
+        $colors = array_map(fn ($c) => $c->colour ?? '#3B82F6', $comparisons);
+
+        return ChartBuilder::bar()
+            ->categoryXAxis($routes)
+            ->valueYAxis('On-Time %', min: 0, max: 100)
+            ->addSeries('On-Time %', $data, ['itemStyle' => ['color' => '#3B82F6']])
+            ->build();
+    }
+}

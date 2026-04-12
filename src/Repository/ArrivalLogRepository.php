@@ -491,4 +491,171 @@ final class ArrivalLogRepository extends BaseRepository
             earlyPercentage: $earlyPercentage,
         );
     }
+
+    // ================== Analytics Methods ==================
+
+    /**
+     * Find top performing vehicles by on-time percentage.
+     *
+     * @param \DateTimeInterface $start Start date
+     * @param \DateTimeInterface $end   End date
+     * @param int                $limit Maximum vehicles to return
+     *
+     * @return list<\App\Dto\Analytics\VehiclePerformanceDto>
+     */
+    public function findTopPerformingVehicles(
+        \DateTimeInterface $start,
+        \DateTimeInterface $end,
+        int $limit = 10,
+    ): array {
+        return $this->findVehiclePerformance($start, $end, 'DESC', $limit);
+    }
+
+    /**
+     * Find worst performing vehicles by on-time percentage.
+     *
+     * @param \DateTimeInterface $start Start date
+     * @param \DateTimeInterface $end   End date
+     * @param int                $limit Maximum vehicles to return
+     *
+     * @return list<\App\Dto\Analytics\VehiclePerformanceDto>
+     */
+    public function findWorstPerformingVehicles(
+        \DateTimeInterface $start,
+        \DateTimeInterface $end,
+        int $limit = 10,
+    ): array {
+        return $this->findVehiclePerformance($start, $end, 'ASC', $limit);
+    }
+
+    /**
+     * Find vehicle performance metrics ordered by on-time percentage.
+     *
+     * @return list<\App\Dto\Analytics\VehiclePerformanceDto>
+     */
+    private function findVehiclePerformance(
+        \DateTimeInterface $start,
+        \DateTimeInterface $end,
+        string $order,
+        int $limit,
+    ): array {
+        $conn = $this->getEntityManager()->getConnection();
+
+        // Main query to get vehicle performance
+        $sql = sprintf('
+            WITH vehicle_stats AS (
+                SELECT
+                    a.vehicle_id,
+                    COUNT(*) as total_predictions,
+                    SUM(CASE WHEN a.delay_sec BETWEEN -180 AND 180 THEN 1 ELSE 0 END) as on_time_count,
+                    AVG(a.delay_sec) as avg_delay,
+                    COUNT(DISTINCT a.route_id) as routes_served
+                FROM arrival_log a
+                WHERE a.predicted_at >= :start
+                    AND a.predicted_at < :end
+                    AND a.delay_sec IS NOT NULL
+                GROUP BY a.vehicle_id
+                HAVING COUNT(*) >= 50
+            )
+            SELECT
+                vs.vehicle_id,
+                vs.total_predictions,
+                ROUND(((vs.on_time_count::numeric / vs.total_predictions) * 100)::numeric, 1) as on_time_pct,
+                ROUND(vs.avg_delay::numeric) as avg_delay,
+                vs.routes_served
+            FROM vehicle_stats vs
+            ORDER BY on_time_pct %s
+            LIMIT :limit
+        ', $order);
+
+        $rows = $conn->executeQuery($sql, [
+            'start' => $start->format('Y-m-d H:i:s'),
+            'end'   => $end->format('Y-m-d H:i:s'),
+            'limit' => $limit,
+        ])->fetchAllAssociative();
+
+        $results = [];
+        foreach ($rows as $row) {
+            $results[] = new \App\Dto\Analytics\VehiclePerformanceDto(
+                vehicleId: (string) $row['vehicle_id'],
+                totalPredictions: (int) $row['total_predictions'],
+                onTimePercentage: (float) $row['on_time_pct'],
+                avgDelaySec: (int) $row['avg_delay'],
+                routesServed: (int) $row['routes_served'],
+            );
+        }
+
+        return $results;
+    }
+
+    /**
+     * Find hourly performance trends across all routes.
+     *
+     * @return list<\App\Dto\Analytics\HourlyTrendDto>
+     */
+    public function findHourlyTrends(
+        \DateTimeInterface $start,
+        \DateTimeInterface $end,
+    ): array {
+        $conn = $this->getEntityManager()->getConnection();
+
+        $sql = '
+            SELECT
+                EXTRACT(HOUR FROM a.predicted_at) as hour,
+                COUNT(*) as total,
+                SUM(CASE WHEN a.delay_sec BETWEEN -180 AND 180 THEN 1 ELSE 0 END) as on_time_count,
+                AVG(a.delay_sec) as avg_delay
+            FROM arrival_log a
+            WHERE a.predicted_at >= :start
+                AND a.predicted_at < :end
+                AND a.delay_sec IS NOT NULL
+            GROUP BY hour
+            ORDER BY hour
+        ';
+
+        $rows = $conn->executeQuery($sql, [
+            'start' => $start->format('Y-m-d H:i:s'),
+            'end'   => $end->format('Y-m-d H:i:s'),
+        ])->fetchAllAssociative();
+
+        $results = [];
+        foreach ($rows as $row) {
+            $total       = (int) $row['total'];
+            $onTimeCount = (int) $row['on_time_count'];
+            $onTimePct   = $total > 0 ? round(($onTimeCount / $total) * 100, 1) : 0.0;
+
+            $results[] = new \App\Dto\Analytics\HourlyTrendDto(
+                hour: (int) $row['hour'],
+                avgOnTimePercentage: $onTimePct,
+                avgDelaySec: (int) round((float) ($row['avg_delay'] ?? 0)),
+                sampleCount: $total,
+            );
+        }
+
+        return $results;
+    }
+
+    /**
+     * Count distinct vehicles in a date range.
+     */
+    public function countDistinctVehicles(
+        \DateTimeInterface $start,
+        \DateTimeInterface $end,
+    ): int {
+        $conn = $this->getEntityManager()->getConnection();
+
+        $sql = '
+            SELECT COUNT(DISTINCT vehicle_id) as count
+            FROM arrival_log
+            WHERE predicted_at >= :start
+                AND predicted_at < :end
+        ';
+
+        $result = $conn->executeQuery($sql, [
+            'start' => $start->format('Y-m-d H:i:s'),
+            'end'   => $end->format('Y-m-d H:i:s'),
+        ])->fetchAssociative();
+
+        return (int) ($result['count'] ?? 0);
+    }
 }

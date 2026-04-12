@@ -1,0 +1,32 @@
+# Traefik reverse-proxy overlay.
+# Auto-loaded by the Makefile when the zu-proxy Docker network exists.
+# Requires: https://github.com/ZuCommunications/zu-local-proxy
+
+services:
+  php:
+    environment:
+      TRUSTED_PROXIES: "REMOTE_ADDR"
+
+  nginx:
+    ports: !override []
+    volumes:
+      - ../:/var/www/app:ro
+      - ./dev/nginx.proxy.conf:/etc/nginx/conf.d/default.conf:ro
+    labels:
+      - "traefik.enable=true"
+      # HTTP
+      - "traefik.http.routers.mind-the-wait.rule=Host(`mind-the-wait.local`)"
+      - "traefik.http.routers.mind-the-wait.entrypoints=web"
+      # HTTPS
+      - "traefik.http.routers.mind-the-wait-secure.rule=Host(`mind-the-wait.local`)"
+      - "traefik.http.routers.mind-the-wait-secure.entrypoints=websecure"
+      - "traefik.http.routers.mind-the-wait-secure.tls=true"
+      # Backend port (Traefik forwards plain HTTP to nginx on port 80)
+      - "traefik.http.services.mind-the-wait.loadbalancer.server.port=80"
+    networks:
+      default:
+      zu-proxy:
+
+networks:
+  zu-proxy:
+    external: true

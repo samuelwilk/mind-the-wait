@@ -4,8 +4,6 @@ namespace App\Command;
 
 use App\Config\GtfsConfig;
 use App\Entity\City;
-use App\Entity\Route;
-use App\Entity\Stop;
 use App\Entity\StopTime;
 use App\Entity\Trip;
 use App\Enum\DirectionEnum;
@@ -428,15 +426,16 @@ final class GtfsLoadCommand extends Command
 
         $tStopTime = $em->getClassMetadata(StopTime::class)->getTableName();
         $tTrip     = $em->getClassMetadata(Trip::class)->getTableName();
-        $tStop     = $em->getClassMetadata(Stop::class)->getTableName();
-        $tRoute    = $em->getClassMetadata(Route::class)->getTableName();
 
-        // Truncate in FK-safe order (children first) WITHOUT CASCADE
-        // so that analytics tables (route_performance_daily, arrival_log,
-        // bunching_incident) that reference route are preserved.
-        foreach ([$tStopTime, $tTrip, $tStop, $tRoute] as $t) {
-            $conn->executeStatement(sprintf('TRUNCATE ONLY %s RESTART IDENTITY', $t));
-        }
+        // Truncate stop_time and trip together in one statement — PG requires
+        // referencing tables to appear in the same TRUNCATE command.
+        // Route and stop are NOT truncated because route_performance_daily,
+        // arrival_log, and bunching_incident hold FK references to their IDs.
+        // Routes and stops are upserted instead (find-or-create by gtfs_id),
+        // which preserves their primary keys and keeps analytics FKs valid.
+        $conn->executeStatement(
+            sprintf('TRUNCATE ONLY %s, %s RESTART IDENTITY', $tStopTime, $tTrip)
+        );
     }
 
     // ---------------- CSV (ZIP) LOADERS (unchanged) ----------------

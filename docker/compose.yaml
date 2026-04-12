@@ -99,7 +99,7 @@ services:
       - ../:/var/www/app:cached
     environment:
       MERCURE_URL: http://mercure/.well-known/mercure
-      MERCURE_PUBLIC_URL: http://localhost:3000/.well-known/mercure
+      MERCURE_PUBLIC_URL: http://localhost:3001/.well-known/mercure
       MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET}
 
   # Low-frequency scheduler: handles weather (hourly), aggregation (daily), insights (daily), bunching (daily)
@@ -131,7 +131,7 @@ services:
         anonymous
         cors_origins https://mind-the-wait.local http://localhost:8080 https://localhost
     ports:
-      - "3000:80"
+      - "3001:80"
     # Uncomment for production (requires proper domain + TLS setup)
     # command: /usr/bin/caddy run --config /etc/caddy/Caddyfile.dev
   ###< symfony/mercure-bundle ###

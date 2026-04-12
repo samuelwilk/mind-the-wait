@@ -643,4 +643,241 @@ final class RoutePerformanceDailyRepository extends BaseRepository
             default                 => 'F',
         };
     }
+
+    // ================== Analytics Methods ==================
+
+    /**
+     * Find route comparison data for selected routes within a date range.
+     *
+     * @param list<int>          $routeIds Route entity IDs to compare
+     * @param \DateTimeImmutable $start    Start date
+     * @param \DateTimeImmutable $end      End date
+     *
+     * @return list<\App\Dto\Analytics\RouteComparisonDto>
+     */
+    public function findRouteComparisonData(
+        array $routeIds,
+        \DateTimeImmutable $start,
+        \DateTimeImmutable $end,
+    ): array {
+        if (count($routeIds) === 0) {
+            return [];
+        }
+
+        $conn = $this->getEntityManager()->getConnection();
+
+        $sql = '
+            SELECT
+                r.id as route_id,
+                r.short_name,
+                r.long_name,
+                r.colour,
+                AVG(p.on_time_percentage) as avg_on_time,
+                AVG(p.avg_delay_sec) as avg_delay,
+                SUM(p.total_predictions) as total_predictions,
+                COUNT(p.id) as days_with_data,
+                MIN(CASE WHEN p.on_time_percentage IS NOT NULL THEN p.date END) as first_date,
+                MAX(CASE WHEN p.on_time_percentage = (
+                    SELECT MAX(p2.on_time_percentage)
+                    FROM route_performance_daily p2
+                    WHERE p2.route_id = r.id AND p2.date >= :start AND p2.date < :end
+                ) THEN p.date END) as best_day,
+                MAX(p.on_time_percentage) as best_day_pct,
+                MIN(CASE WHEN p.on_time_percentage = (
+                    SELECT MIN(p3.on_time_percentage)
+                    FROM route_performance_daily p3
+                    WHERE p3.route_id = r.id AND p3.date >= :start AND p3.date < :end AND p3.on_time_percentage IS NOT NULL
+                ) THEN p.date END) as worst_day,
+                MIN(NULLIF(p.on_time_percentage, NULL)) as worst_day_pct
+            FROM route r
+            INNER JOIN route_performance_daily p ON p.route_id = r.id
+            WHERE r.id IN (:route_ids)
+                AND p.date >= :start
+                AND p.date < :end
+                AND p.on_time_percentage IS NOT NULL
+            GROUP BY r.id, r.short_name, r.long_name, r.colour
+            ORDER BY avg_on_time DESC
+        ';
+
+        // Handle IN clause manually for DBAL
+        $placeholders = [];
+        $params       = ['start' => $start->format('Y-m-d'), 'end' => $end->format('Y-m-d')];
+        foreach ($routeIds as $i => $id) {
+            $placeholders[]          = ":route_id_{$i}";
+            $params["route_id_{$i}"] = $id;
+        }
+        $sql = str_replace(':route_ids', implode(',', $placeholders), $sql);
+
+        $rows = $conn->executeQuery($sql, $params)->fetchAllAssociative();
+
+        $results = [];
+        foreach ($rows as $row) {
+            $results[] = new \App\Dto\Analytics\RouteComparisonDto(
+                routeId: (int) $row['route_id'],
+                shortName: $row['short_name'],
+                longName: $row['long_name'],
+                colour: $row['colour'],
+                avgOnTimePercentage: round((float) $row['avg_on_time'], 1),
+                avgDelaySec: (int) round((float) ($row['avg_delay'] ?? 0)),
+                totalPredictions: (int) $row['total_predictions'],
+                daysWithData: (int) $row['days_with_data'],
+                bestDay: $row['best_day']                 !== null ? new \DateTimeImmutable($row['best_day']) : null,
+                bestDayPercentage: $row['best_day_pct']   !== null ? round((float) $row['best_day_pct'], 1) : null,
+                worstDay: $row['worst_day']               !== null ? new \DateTimeImmutable($row['worst_day']) : null,
+                worstDayPercentage: $row['worst_day_pct'] !== null ? round((float) $row['worst_day_pct'], 1) : null,
+            );
+        }
+
+        return $results;
+    }
+
+    /**
+     * Find all routes with performance data in the date range.
+     *
+     * @return list<array{id: int, short_name: string, long_name: string}>
+     */
+    public function findRoutesWithData(
+        \DateTimeImmutable $start,
+        \DateTimeImmutable $end,
+    ): array {
+        $qb = $this->createQueryBuilder('p');
+        $qb->select('DISTINCT r.id, r.shortName as short_name, r.longName as long_name')
+            ->join('p.route', 'r')
+            ->where('p.date >= :start')
+            ->andWhere('p.date < :end')
+            ->andWhere('p.onTimePercentage IS NOT NULL')
+            ->setParameter('start', $start)
+            ->setParameter('end', $end)
+            ->orderBy('r.shortName', 'ASC');
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * Find day-of-week performance trends.
+     *
+     * @return list<\App\Dto\Analytics\DayOfWeekTrendDto>
+     */
+    public function findDayOfWeekTrends(
+        \DateTimeImmutable $start,
+        \DateTimeImmutable $end,
+    ): array {
+        $conn = $this->getEntityManager()->getConnection();
+
+        $sql = '
+            SELECT
+                EXTRACT(DOW FROM p.date) as day_of_week,
+                AVG(p.on_time_percentage) as avg_on_time,
+                AVG(p.avg_delay_sec) as avg_delay,
+                COUNT(*) as sample_count
+            FROM route_performance_daily p
+            WHERE p.date >= :start
+                AND p.date < :end
+                AND p.on_time_percentage IS NOT NULL
+            GROUP BY day_of_week
+            ORDER BY day_of_week
+        ';
+
+        $rows = $conn->executeQuery($sql, [
+            'start' => $start->format('Y-m-d'),
+            'end'   => $end->format('Y-m-d'),
+        ])->fetchAllAssociative();
+
+        $results = [];
+        foreach ($rows as $row) {
+            $results[] = new \App\Dto\Analytics\DayOfWeekTrendDto(
+                dayOfWeek: (int) $row['day_of_week'],
+                avgOnTimePercentage: round((float) $row['avg_on_time'], 1),
+                avgDelaySec: (int) round((float) ($row['avg_delay'] ?? 0)),
+                sampleCount: (int) $row['sample_count'],
+            );
+        }
+
+        return $results;
+    }
+
+    /**
+     * Find monthly performance trends.
+     *
+     * @return list<\App\Dto\Analytics\MonthlyTrendDto>
+     */
+    public function findMonthlyTrends(
+        \DateTimeImmutable $start,
+        \DateTimeImmutable $end,
+    ): array {
+        $conn = $this->getEntityManager()->getConnection();
+
+        $sql = '
+            SELECT
+                EXTRACT(YEAR FROM p.date) as year,
+                EXTRACT(MONTH FROM p.date) as month,
+                AVG(p.on_time_percentage) as avg_on_time,
+                AVG(p.avg_delay_sec) as avg_delay,
+                COUNT(DISTINCT p.date) as days_with_data,
+                SUM(p.total_predictions) as total_predictions
+            FROM route_performance_daily p
+            WHERE p.date >= :start
+                AND p.date < :end
+                AND p.on_time_percentage IS NOT NULL
+            GROUP BY year, month
+            ORDER BY year, month
+        ';
+
+        $rows = $conn->executeQuery($sql, [
+            'start' => $start->format('Y-m-d'),
+            'end'   => $end->format('Y-m-d'),
+        ])->fetchAllAssociative();
+
+        $results = [];
+        foreach ($rows as $row) {
+            $results[] = new \App\Dto\Analytics\MonthlyTrendDto(
+                year: (int) $row['year'],
+                month: (int) $row['month'],
+                avgOnTimePercentage: round((float) $row['avg_on_time'], 1),
+                avgDelaySec: (int) round((float) ($row['avg_delay'] ?? 0)),
+                daysWithData: (int) $row['days_with_data'],
+                totalPredictions: (int) $row['total_predictions'],
+            );
+        }
+
+        return $results;
+    }
+
+    /**
+     * Get analytics summary for a date range.
+     *
+     * @return array{total_predictions: int, avg_on_time: float, avg_delay: int, days_with_data: int, routes_tracked: int}
+     */
+    public function getAnalyticsSummary(
+        \DateTimeImmutable $start,
+        \DateTimeImmutable $end,
+    ): array {
+        $conn = $this->getEntityManager()->getConnection();
+
+        $sql = '
+            SELECT
+                COALESCE(SUM(p.total_predictions), 0) as total_predictions,
+                COALESCE(AVG(p.on_time_percentage), 0) as avg_on_time,
+                COALESCE(AVG(p.avg_delay_sec), 0) as avg_delay,
+                COUNT(DISTINCT p.date) as days_with_data,
+                COUNT(DISTINCT p.route_id) as routes_tracked
+            FROM route_performance_daily p
+            WHERE p.date >= :start
+                AND p.date < :end
+                AND p.on_time_percentage IS NOT NULL
+        ';
+
+        $row = $conn->executeQuery($sql, [
+            'start' => $start->format('Y-m-d'),
+            'end'   => $end->format('Y-m-d'),
+        ])->fetchAssociative();
+
+        return [
+            'total_predictions' => (int) ($row['total_predictions'] ?? 0),
+            'avg_on_time'       => round((float) ($row['avg_on_time'] ?? 0), 1),
+            'avg_delay'         => (int) round((float) ($row['avg_delay'] ?? 0)),
+            'days_with_data'    => (int) ($row['days_with_data'] ?? 0),
+            'routes_tracked'    => (int) ($row['routes_tracked'] ?? 0),
+        ];
+    }
 }
