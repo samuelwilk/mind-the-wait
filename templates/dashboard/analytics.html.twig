@@ -440,6 +440,23 @@
                         </div>
                     </div>
                 </div>
+
+                {# Accuracy by distance (only shows when actual_arrival_at data exists) #}
+                {% if pageData.accuracyByDistanceChart %}
+                    <div class="mt-6 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                        <div class="px-5 py-3 border-b border-gray-100 bg-gray-50/60">
+                            <h3 class="text-sm font-semibold text-gray-700">Prediction Accuracy by Distance</h3>
+                            <p class="text-xs text-gray-400 mt-0.5">How prediction error decreases as the vehicle gets closer to the stop</p>
+                        </div>
+                        <div class="p-5">
+                            <div
+                                data-controller="chart"
+                                data-chart-options-value="{{ pageData.accuracyByDistanceChart|json_encode|e('html_attr') }}"
+                                style="width: 100%; min-height: 300px;">
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
             </section>
         {% endif %}
 

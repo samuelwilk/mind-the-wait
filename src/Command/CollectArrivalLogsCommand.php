@@ -6,6 +6,7 @@ namespace App\Command;
 
 use App\Repository\RealtimeRepository;
 use App\Repository\StopTimeRepository;
+use App\Service\History\ArrivalDetector;
 use App\Service\Prediction\ArrivalPredictorInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -34,6 +35,7 @@ final class CollectArrivalLogsCommand extends Command
         private readonly RealtimeRepository $realtimeRepo,
         private readonly StopTimeRepository $stopTimeRepo,
         private readonly ArrivalPredictorInterface $arrivalPredictor,
+        private readonly ArrivalDetector $arrivalDetector,
         private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
@@ -121,6 +123,19 @@ final class CollectArrivalLogsCommand extends Command
                     ]);
                 }
             }
+        }
+
+        // Detect actual arrivals via GPS route snapping
+        try {
+            $detections = $this->arrivalDetector->detectArrivals();
+            $io->info(sprintf(
+                'Arrival detection: %d arrivals from %d vehicles',
+                $detections['arrivals'],
+                $detections['vehicles'],
+            ));
+        } catch (\Exception $e) {
+            $this->logger->error('Arrival detection failed', ['error' => $e->getMessage()]);
+            $io->warning('Arrival detection failed: '.$e->getMessage());
         }
 
         // Output summary

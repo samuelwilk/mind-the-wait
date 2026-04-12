@@ -11,8 +11,9 @@ use function sprintf;
 final readonly class PredictionAccuracyDto
 {
     /**
-     * @param list<ConfidenceAccuracyDto> $byConfidence
-     * @param list<HourlyAccuracyDto>     $byHour
+     * @param list<ConfidenceAccuracyDto>                                                     $byConfidence
+     * @param list<HourlyAccuracyDto>                                                         $byHour
+     * @param list<array{stops_away: int, mae: float, within_3_min: float, sample_size: int}> $byStopsAway
      */
     public function __construct(
         public float $maeSeconds,
@@ -24,6 +25,7 @@ final readonly class PredictionAccuracyDto
         public float $within5Min,
         public array $byConfidence,
         public array $byHour,
+        public array $byStopsAway = [],
     ) {
     }
 

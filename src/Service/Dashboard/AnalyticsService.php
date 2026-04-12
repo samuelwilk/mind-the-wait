@@ -106,8 +106,9 @@ final readonly class AnalyticsService
             : null;
 
         // Prediction accuracy
-        $predictionAccuracy  = $this->buildPredictionAccuracy($dateRange);
-        $accuracyByHourChart = $this->buildAccuracyByHourChart($predictionAccuracy?->byHour ?? []);
+        $predictionAccuracy      = $this->buildPredictionAccuracy($dateRange);
+        $accuracyByHourChart     = $this->buildAccuracyByHourChart($predictionAccuracy?->byHour ?? []);
+        $accuracyByDistanceChart = $this->buildAccuracyByDistanceChart($predictionAccuracy?->byStopsAway ?? []);
 
         // Data gap note — show when range overlaps the collection interruption
         $gapStart    = new \DateTimeImmutable('2026-01-05');
@@ -133,6 +134,7 @@ final readonly class AnalyticsService
             dataGapNote: $dataGapNote,
             predictionAccuracy: $predictionAccuracy,
             accuracyByHourChart: $accuracyByHourChart,
+            accuracyByDistanceChart: $accuracyByDistanceChart,
         );
 
         $item->set($result);
@@ -307,6 +309,11 @@ final readonly class AnalyticsService
             $dateRange->endDate,
         );
 
+        $byStopsAway = $this->arrivalRepo->findAccuracyByStopsAway(
+            $dateRange->startDate,
+            $dateRange->endDate,
+        );
+
         return new PredictionAccuracyDto(
             maeSeconds: $summary['mae'],
             biasSeconds: $summary['bias'],
@@ -317,6 +324,7 @@ final readonly class AnalyticsService
             within5Min: $summary['within_5_min'],
             byConfidence: $byConfidence,
             byHour: $byHour,
+            byStopsAway: $byStopsAway,
         );
     }
 
@@ -336,6 +344,25 @@ final readonly class AnalyticsService
             ->categoryXAxis($hours)
             ->valueYAxis('MAE (minutes)', min: 0)
             ->addSeries('Avg Error', $maeData, ['itemStyle' => ['color' => '#F59E0B']])
+            ->build();
+    }
+
+    /**
+     * @param list<array{stops_away: int, mae: float, within_3_min: float, sample_size: int}> $byStopsAway
+     */
+    private function buildAccuracyByDistanceChart(array $byStopsAway): ?Chart
+    {
+        if (count($byStopsAway) === 0) {
+            return null;
+        }
+
+        $labels  = array_map(fn ($s) => $s['stops_away'].' stop'.($s['stops_away'] !== 1 ? 's' : ''), $byStopsAway);
+        $maeData = array_map(fn ($s) => round($s['mae'] / 60, 1), $byStopsAway);
+
+        return ChartBuilder::line()
+            ->categoryXAxis($labels)
+            ->valueYAxis('MAE (minutes)', min: 0)
+            ->addSeries('Prediction Error', $maeData, ['itemStyle' => ['color' => '#EC4899'], 'smooth' => true, 'areaStyle' => []])
             ->build();
     }
 }
