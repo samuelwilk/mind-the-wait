@@ -38,14 +38,14 @@ final class DashboardController extends AbstractController
         $startDate = $request->query->getString('start');
         $endDate   = $request->query->getString('end');
 
-        if ($startDate !== '' && $endDate !== '') {
+        if ($preset === DateRangeDto::PRESET_CUSTOM && $startDate !== '' && $endDate !== '') {
             try {
                 $dateRange = DateRangeDto::custom(
                     new \DateTimeImmutable($startDate),
-                    new \DateTimeImmutable($endDate),
+                    new \DateTimeImmutable($endDate.' +1 day'),
                 );
             } catch (\Exception) {
-                $dateRange = DateRangeDto::fromPreset($preset);
+                $dateRange = DateRangeDto::fromPreset(DateRangeDto::PRESET_ALL_TIME);
             }
         } else {
             $dateRange = DateRangeDto::fromPreset($preset);
