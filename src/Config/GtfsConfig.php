@@ -14,6 +14,7 @@ final readonly class GtfsConfig
         public ?string $stopsUrl,
         public ?string $tripsUrl,
         public ?string $stopTimesUrl,
+        public ?string $shapesUrl = null,
     ) {
     }
 }

@@ -113,14 +113,16 @@ class StopTimeRepository extends BaseRepository
         $colSeq  = $plat->quoteIdentifier('stop_sequence');
         $colArr  = $plat->quoteIdentifier('arrival_time');
         $colDep  = $plat->quoteIdentifier('departure_time');
+        $colDist = $plat->quoteIdentifier('shape_dist_traveled');
 
         $sql = <<<SQL
-            INSERT INTO {$table} ({$colTrip}, {$colStop}, {$colSeq}, {$colArr}, {$colDep})
-            VALUES (:trip, :stop, :seq, :arr, :dep)
+            INSERT INTO {$table} ({$colTrip}, {$colStop}, {$colSeq}, {$colArr}, {$colDep}, {$colDist})
+            VALUES (:trip, :stop, :seq, :arr, :dep, :dist)
             ON CONFLICT ({$colTrip}, {$colSeq}) DO UPDATE
             SET {$colStop} = EXCLUDED.{$colStop},
                 {$colArr}  = EXCLUDED.{$colArr},
-                {$colDep}  = EXCLUDED.{$colDep}
+                {$colDep}  = EXCLUDED.{$colDep},
+                {$colDist} = EXCLUDED.{$colDist}
         SQL;
 
         $stmt = $conn->prepare($sql);
@@ -133,6 +135,7 @@ class StopTimeRepository extends BaseRepository
                 'seq'  => (int) $r['seq'],
                 'arr'  => isset($r['arr']) ? (int) $r['arr'] : null,
                 'dep'  => isset($r['dep']) ? (int) $r['dep'] : null,
+                'dist' => isset($r['dist']) ? (float) $r['dist'] : null,
             ];
             $stmt->executeStatement($params);
         }

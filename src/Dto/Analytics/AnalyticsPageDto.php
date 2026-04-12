@@ -14,20 +14,23 @@ use App\ValueObject\Chart\Chart;
 final readonly class AnalyticsPageDto
 {
     /**
-     * @param DateRangeDto                $dateRange            Selected date range
-     * @param AnalyticsSummaryDto         $summary              Summary metrics for cards
-     * @param list<RouteComparisonDto>    $routeComparisons     Route comparison data
-     * @param list<VehiclePerformanceDto> $topVehicles          Top performing vehicles
-     * @param list<VehiclePerformanceDto> $worstVehicles        Worst performing vehicles
-     * @param list<DayOfWeekTrendDto>     $dayOfWeekTrends      Day-of-week performance
-     * @param list<HourlyTrendDto>        $hourlyTrends         Hourly performance trends
-     * @param list<MonthlyTrendDto>       $monthlyTrends        Monthly performance trends
-     * @param Chart|null                  $dayOfWeekChart       Day-of-week bar chart
-     * @param Chart|null                  $hourlyChart          Hourly line chart
-     * @param Chart|null                  $monthlyChart         Monthly trend chart
-     * @param Chart|null                  $routeComparisonChart Route comparison bar chart
-     * @param bool                        $hasHistoricalData    Whether historical data exists
-     * @param string|null                 $dataGapNote          Note about data gaps if any
+     * @param DateRangeDto                $dateRange               Selected date range
+     * @param AnalyticsSummaryDto         $summary                 Summary metrics for cards
+     * @param list<RouteComparisonDto>    $routeComparisons        Route comparison data
+     * @param list<VehiclePerformanceDto> $topVehicles             Top performing vehicles
+     * @param list<VehiclePerformanceDto> $worstVehicles           Worst performing vehicles
+     * @param list<DayOfWeekTrendDto>     $dayOfWeekTrends         Day-of-week performance
+     * @param list<HourlyTrendDto>        $hourlyTrends            Hourly performance trends
+     * @param list<MonthlyTrendDto>       $monthlyTrends           Monthly performance trends
+     * @param Chart|null                  $dayOfWeekChart          Day-of-week bar chart
+     * @param Chart|null                  $hourlyChart             Hourly line chart
+     * @param Chart|null                  $monthlyChart            Monthly trend chart
+     * @param Chart|null                  $routeComparisonChart    Route comparison bar chart
+     * @param bool                        $hasHistoricalData       Whether historical data exists
+     * @param string|null                 $dataGapNote             Note about data gaps if any
+     * @param PredictionAccuracyDto|null  $predictionAccuracy      Prediction accuracy metrics
+     * @param Chart|null                  $accuracyByHourChart     Accuracy by hour bar chart
+     * @param Chart|null                  $accuracyByDistanceChart Accuracy by stops_away chart
      */
     public function __construct(
         public DateRangeDto $dateRange,
@@ -44,6 +47,9 @@ final readonly class AnalyticsPageDto
         public ?Chart $routeComparisonChart = null,
         public bool $hasHistoricalData = false,
         public ?string $dataGapNote = null,
+        public ?PredictionAccuracyDto $predictionAccuracy = null,
+        public ?Chart $accuracyByHourChart = null,
+        public ?Chart $accuracyByDistanceChart = null,
     ) {
     }
 }

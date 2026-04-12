@@ -101,6 +101,39 @@ final class GtfsFeatureAdapter
         return $this->firstNonEmpty(['route_id', 'routeid']);
     }
 
+    public function tripShapeId(): ?string
+    {
+        $val = $this->firstAvailable(['shape_id', 'shapeid']);
+
+        return $val !== null ? (string) $val : null;
+    }
+
+    // --- SHAPE ---
+    public function shapeId(): string
+    {
+        return $this->firstNonEmpty(['shape_id', 'shapeid']);
+    }
+
+    public function shapePtLat(): float
+    {
+        return (float) $this->firstAvailable(['shape_pt_lat'], 0.0);
+    }
+
+    public function shapePtLon(): float
+    {
+        return (float) $this->firstAvailable(['shape_pt_lon'], 0.0);
+    }
+
+    public function shapePtSequence(): int
+    {
+        return $this->intOrZero($this->firstAvailable(['shape_pt_sequence']));
+    }
+
+    public function shapeDistTraveled(): float
+    {
+        return (float) ($this->firstAvailable(['shape_dist_traveled']) ?? 0.0);
+    }
+
     // --- STOP TIME ---
     public function stopSequence(): int
     {

@@ -688,4 +688,242 @@ final class ArrivalLogRepository extends BaseRepository
 
         return (int) ($result['count'] ?? 0);
     }
+
+    /**
+     * Calculate overall prediction accuracy summary.
+     *
+     * @return array{mae: float, bias: float, sample_size: int, within_1_min: float, within_2_min: float, within_3_min: float, within_5_min: float}|null
+     */
+    public function findPredictionAccuracySummary(
+        \DateTimeInterface $start,
+        \DateTimeInterface $end,
+    ): ?array {
+        $conn = $this->getEntityManager()->getConnection();
+
+        // Use actual_arrival_at (true accuracy) when available, fall back to delay_sec (schedule adherence)
+        $sql = '
+            SELECT
+                AVG(ABS(error_sec))::numeric AS mae,
+                AVG(error_sec)::numeric AS bias,
+                COUNT(*) AS sample_size,
+                ROUND(SUM(CASE WHEN ABS(error_sec) <= 60  THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(*), 0) * 100, 1) AS within_1_min,
+                ROUND(SUM(CASE WHEN ABS(error_sec) <= 120 THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(*), 0) * 100, 1) AS within_2_min,
+                ROUND(SUM(CASE WHEN ABS(error_sec) <= 180 THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(*), 0) * 100, 1) AS within_3_min,
+                ROUND(SUM(CASE WHEN ABS(error_sec) <= 300 THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(*), 0) * 100, 1) AS within_5_min
+            FROM (
+                SELECT
+                    CASE
+                        WHEN actual_arrival_at IS NOT NULL
+                        THEN EXTRACT(EPOCH FROM (predicted_arrival_at - actual_arrival_at))
+                        ELSE delay_sec
+                    END AS error_sec
+                FROM arrival_log
+                WHERE predicted_at >= :start
+                  AND predicted_at < :end
+                  AND (actual_arrival_at IS NOT NULL OR delay_sec IS NOT NULL)
+            ) sub
+        ';
+
+        $params = [
+            'start' => $start->format('Y-m-d H:i:s'),
+            'end'   => $end->format('Y-m-d H:i:s'),
+        ];
+
+        $row = $conn->executeQuery(
+            $sql,
+            $params,
+            [],
+            new QueryCacheProfile(self::ANALYTICS_CACHE_TTL, 'pred_accuracy_summary_'.md5(serialize($params)), $this->resultCache),
+        )->fetchAssociative();
+
+        if ($row === false || (int) $row['sample_size'] === 0) {
+            return null;
+        }
+
+        return [
+            'mae'          => round((float) $row['mae'], 1),
+            'bias'         => round((float) $row['bias'], 1),
+            'sample_size'  => (int) $row['sample_size'],
+            'within_1_min' => (float) $row['within_1_min'],
+            'within_2_min' => (float) $row['within_2_min'],
+            'within_3_min' => (float) $row['within_3_min'],
+            'within_5_min' => (float) $row['within_5_min'],
+        ];
+    }
+
+    /**
+     * Calculate prediction accuracy broken down by confidence level.
+     *
+     * @return list<\App\Dto\Analytics\ConfidenceAccuracyDto>
+     */
+    public function findPredictionAccuracyByConfidence(
+        \DateTimeInterface $start,
+        \DateTimeInterface $end,
+    ): array {
+        $conn = $this->getEntityManager()->getConnection();
+
+        $sql = "
+            SELECT
+                confidence,
+                AVG(ABS(error_sec))::numeric AS mae,
+                AVG(error_sec)::numeric AS bias,
+                COUNT(*) AS sample_size,
+                ROUND(SUM(CASE WHEN ABS(error_sec) <= 180 THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(*), 0) * 100, 1) AS within_3_min
+            FROM (
+                SELECT
+                    confidence,
+                    CASE
+                        WHEN actual_arrival_at IS NOT NULL
+                        THEN EXTRACT(EPOCH FROM (predicted_arrival_at - actual_arrival_at))
+                        ELSE delay_sec
+                    END AS error_sec
+                FROM arrival_log
+                WHERE predicted_at >= :start
+                  AND predicted_at < :end
+                  AND (actual_arrival_at IS NOT NULL OR delay_sec IS NOT NULL)
+            ) sub
+            GROUP BY confidence
+            ORDER BY CASE confidence WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END
+        ";
+
+        $params = [
+            'start' => $start->format('Y-m-d H:i:s'),
+            'end'   => $end->format('Y-m-d H:i:s'),
+        ];
+
+        $rows = $conn->executeQuery(
+            $sql,
+            $params,
+            [],
+            new QueryCacheProfile(self::ANALYTICS_CACHE_TTL, 'pred_accuracy_confidence_'.md5(serialize($params)), $this->resultCache),
+        )->fetchAllAssociative();
+
+        $results = [];
+        foreach ($rows as $row) {
+            $results[] = new \App\Dto\Analytics\ConfidenceAccuracyDto(
+                confidence: (string) $row['confidence'],
+                maeSeconds: round((float) $row['mae'], 1),
+                biasSeconds: round((float) $row['bias'], 1),
+                within3Min: (float) $row['within_3_min'],
+                sampleSize: (int) $row['sample_size'],
+            );
+        }
+
+        return $results;
+    }
+
+    /**
+     * Calculate prediction accuracy broken down by hour of day.
+     *
+     * @return list<\App\Dto\Analytics\HourlyAccuracyDto>
+     */
+    public function findPredictionAccuracyByHour(
+        \DateTimeInterface $start,
+        \DateTimeInterface $end,
+    ): array {
+        $conn = $this->getEntityManager()->getConnection();
+
+        $sql = '
+            SELECT
+                hour,
+                AVG(ABS(error_sec))::numeric AS mae,
+                ROUND(SUM(CASE WHEN ABS(error_sec) <= 180 THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(*), 0) * 100, 1) AS within_3_min,
+                COUNT(*) AS sample_size
+            FROM (
+                SELECT
+                    EXTRACT(HOUR FROM predicted_at) AS hour,
+                    CASE
+                        WHEN actual_arrival_at IS NOT NULL
+                        THEN EXTRACT(EPOCH FROM (predicted_arrival_at - actual_arrival_at))
+                        ELSE delay_sec
+                    END AS error_sec
+                FROM arrival_log
+                WHERE predicted_at >= :start
+                  AND predicted_at < :end
+                  AND (actual_arrival_at IS NOT NULL OR delay_sec IS NOT NULL)
+            ) sub
+            GROUP BY hour
+            ORDER BY hour
+        ';
+
+        $params = [
+            'start' => $start->format('Y-m-d H:i:s'),
+            'end'   => $end->format('Y-m-d H:i:s'),
+        ];
+
+        $rows = $conn->executeQuery(
+            $sql,
+            $params,
+            [],
+            new QueryCacheProfile(self::ANALYTICS_CACHE_TTL, 'pred_accuracy_hourly_'.md5(serialize($params)), $this->resultCache),
+        )->fetchAllAssociative();
+
+        $results = [];
+        foreach ($rows as $row) {
+            $results[] = new \App\Dto\Analytics\HourlyAccuracyDto(
+                hour: (int) $row['hour'],
+                maeSeconds: round((float) $row['mae'], 1),
+                within3Min: (float) $row['within_3_min'],
+                sampleSize: (int) $row['sample_size'],
+            );
+        }
+
+        return $results;
+    }
+
+    /**
+     * Calculate prediction accuracy grouped by stops_away.
+     * Only meaningful when actual_arrival_at is populated.
+     *
+     * @return list<array{stops_away: int, mae: float, within_3_min: float, sample_size: int}>
+     */
+    public function findAccuracyByStopsAway(
+        \DateTimeInterface $start,
+        \DateTimeInterface $end,
+    ): array {
+        $conn = $this->getEntityManager()->getConnection();
+
+        $sql = '
+            SELECT
+                stops_away,
+                AVG(ABS(EXTRACT(EPOCH FROM (predicted_arrival_at - actual_arrival_at))))::numeric AS mae,
+                ROUND(
+                    SUM(CASE WHEN ABS(EXTRACT(EPOCH FROM (predicted_arrival_at - actual_arrival_at))) <= 180 THEN 1 ELSE 0 END)::numeric
+                    / NULLIF(COUNT(*), 0) * 100, 1
+                ) AS within_3_min,
+                COUNT(*) AS sample_size
+            FROM arrival_log
+            WHERE predicted_at >= :start
+              AND predicted_at < :end
+              AND actual_arrival_at IS NOT NULL
+              AND stops_away IS NOT NULL
+              AND stops_away BETWEEN 1 AND 15
+            GROUP BY stops_away
+            ORDER BY stops_away
+        ';
+
+        $params = [
+            'start' => $start->format('Y-m-d H:i:s'),
+            'end'   => $end->format('Y-m-d H:i:s'),
+        ];
+
+        $rows = $conn->executeQuery(
+            $sql,
+            $params,
+            [],
+            new QueryCacheProfile(self::ANALYTICS_CACHE_TTL, 'pred_accuracy_stops_away_'.md5(serialize($params)), $this->resultCache),
+        )->fetchAllAssociative();
+
+        $results = [];
+        foreach ($rows as $row) {
+            $results[] = [
+                'stops_away'   => (int) $row['stops_away'],
+                'mae'          => round((float) $row['mae'], 1),
+                'within_3_min' => (float) $row['within_3_min'],
+                'sample_size'  => (int) $row['sample_size'],
+            ];
+        }
+
+        return $results;
+    }
 }

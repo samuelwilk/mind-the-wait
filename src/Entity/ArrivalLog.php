@@ -58,6 +58,10 @@ class ArrivalLog
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $predictedAt;
 
+    /** Observed actual arrival time (set by ArrivalDetector when vehicle reaches stop). */
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $actualArrivalAt = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
@@ -187,6 +191,18 @@ class ArrivalLog
     public function setPredictedAt(\DateTimeImmutable $predictedAt): self
     {
         $this->predictedAt = $predictedAt;
+
+        return $this;
+    }
+
+    public function getActualArrivalAt(): ?\DateTimeImmutable
+    {
+        return $this->actualArrivalAt;
+    }
+
+    public function setActualArrivalAt(?\DateTimeImmutable $actualArrivalAt): self
+    {
+        $this->actualArrivalAt = $actualArrivalAt;
 
         return $this;
     }

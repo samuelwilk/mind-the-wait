@@ -32,6 +32,9 @@ class Trip
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $headsign = null;
 
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $shapeId = null;
+
     #[ORM\ManyToOne(targetEntity: City::class)]
     #[ORM\JoinColumn(nullable: false)]
     private City $city;
@@ -108,6 +111,18 @@ class Trip
     public function setHeadsign(?string $headsign): static
     {
         $this->headsign = $headsign;
+
+        return $this;
+    }
+
+    public function getShapeId(): ?string
+    {
+        return $this->shapeId;
+    }
+
+    public function setShapeId(?string $shapeId): static
+    {
+        $this->shapeId = $shapeId;
 
         return $this;
     }
