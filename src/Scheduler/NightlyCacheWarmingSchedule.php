@@ -10,12 +10,12 @@ use Symfony\Component\Scheduler\Schedule;
 use Symfony\Component\Scheduler\ScheduleProviderInterface;
 
 /**
- * Schedules nightly cache warming for AI-generated insights.
+ * Schedules nightly cache warming for insights and analytics.
  *
- * Runs at 2:00 AM daily to ensure fresh insights are ready for morning peak usage.
+ * Runs at 2:00 AM daily to ensure all caches are warm for morning peak usage.
  */
-#[AsSchedule('insight_cache_warming')]
-final readonly class InsightCacheWarmingSchedule implements ScheduleProviderInterface
+#[AsSchedule('nightly_cache_warming')]
+final readonly class NightlyCacheWarmingSchedule implements ScheduleProviderInterface
 {
     public function getSchedule(): Schedule
     {
@@ -23,15 +23,15 @@ final readonly class InsightCacheWarmingSchedule implements ScheduleProviderInte
             ->add(
                 RecurringMessage::cron(
                     '0 2 * * *', // 2:00 AM daily
-                    new InsightCacheWarmingMessage()
+                    new NightlyCacheWarmingMessage()
                 )
             );
     }
 }
 
 /**
- * Message for nightly insight cache warming.
+ * Message for nightly cache warming (insights + analytics).
  */
-final readonly class InsightCacheWarmingMessage
+final readonly class NightlyCacheWarmingMessage
 {
 }
