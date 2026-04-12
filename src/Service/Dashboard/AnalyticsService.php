@@ -7,6 +7,7 @@ namespace App\Service\Dashboard;
 use App\Dto\Analytics\AnalyticsPageDto;
 use App\Dto\Analytics\AnalyticsSummaryDto;
 use App\Dto\Analytics\DateRangeDto;
+use App\Dto\Analytics\PredictionAccuracyDto;
 use App\Repository\ArrivalLogRepository;
 use App\Repository\BunchingIncidentRepository;
 use App\Repository\RoutePerformanceDailyRepository;
@@ -104,6 +105,10 @@ final readonly class AnalyticsService
             ? $this->buildRouteComparisonChart($routeComparisons)
             : null;
 
+        // Prediction accuracy
+        $predictionAccuracy  = $this->buildPredictionAccuracy($dateRange);
+        $accuracyByHourChart = $this->buildAccuracyByHourChart($predictionAccuracy?->byHour ?? []);
+
         // Data gap note — show when range overlaps the collection interruption
         $gapStart    = new \DateTimeImmutable('2026-01-05');
         $gapEnd      = new \DateTimeImmutable('2026-02-07');
@@ -126,6 +131,8 @@ final readonly class AnalyticsService
             routeComparisonChart: $routeComparisonChart,
             hasHistoricalData: false,
             dataGapNote: $dataGapNote,
+            predictionAccuracy: $predictionAccuracy,
+            accuracyByHourChart: $accuracyByHourChart,
         );
 
         $item->set($result);
@@ -276,6 +283,59 @@ final readonly class AnalyticsService
             ->categoryXAxis($routes)
             ->valueYAxis('On-Time %', min: 0, max: 100)
             ->addSeries('On-Time %', $data, ['itemStyle' => ['color' => '#3B82F6']])
+            ->build();
+    }
+
+    private function buildPredictionAccuracy(DateRangeDto $dateRange): ?PredictionAccuracyDto
+    {
+        $summary = $this->arrivalRepo->findPredictionAccuracySummary(
+            $dateRange->startDate,
+            $dateRange->endDate,
+        );
+
+        if ($summary === null) {
+            return null;
+        }
+
+        $byConfidence = $this->arrivalRepo->findPredictionAccuracyByConfidence(
+            $dateRange->startDate,
+            $dateRange->endDate,
+        );
+
+        $byHour = $this->arrivalRepo->findPredictionAccuracyByHour(
+            $dateRange->startDate,
+            $dateRange->endDate,
+        );
+
+        return new PredictionAccuracyDto(
+            maeSeconds: $summary['mae'],
+            biasSeconds: $summary['bias'],
+            sampleSize: $summary['sample_size'],
+            within1Min: $summary['within_1_min'],
+            within2Min: $summary['within_2_min'],
+            within3Min: $summary['within_3_min'],
+            within5Min: $summary['within_5_min'],
+            byConfidence: $byConfidence,
+            byHour: $byHour,
+        );
+    }
+
+    /**
+     * @param list<\App\Dto\Analytics\HourlyAccuracyDto> $hourlyAccuracy
+     */
+    private function buildAccuracyByHourChart(array $hourlyAccuracy): ?Chart
+    {
+        if (count($hourlyAccuracy) === 0) {
+            return null;
+        }
+
+        $hours   = array_map(fn ($h) => $h->getHourLabel(), $hourlyAccuracy);
+        $maeData = array_map(fn ($h) => $h->getMaeMinutes(), $hourlyAccuracy);
+
+        return ChartBuilder::bar()
+            ->categoryXAxis($hours)
+            ->valueYAxis('MAE (minutes)', min: 0)
+            ->addSeries('Avg Error', $maeData, ['itemStyle' => ['color' => '#F59E0B']])
             ->build();
     }
 }

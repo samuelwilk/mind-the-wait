@@ -28,6 +28,8 @@ final readonly class AnalyticsPageDto
      * @param Chart|null                  $routeComparisonChart Route comparison bar chart
      * @param bool                        $hasHistoricalData    Whether historical data exists
      * @param string|null                 $dataGapNote          Note about data gaps if any
+     * @param PredictionAccuracyDto|null  $predictionAccuracy   Prediction accuracy metrics
+     * @param Chart|null                  $accuracyByHourChart  Accuracy by hour bar chart
      */
     public function __construct(
         public DateRangeDto $dateRange,
@@ -44,6 +46,8 @@ final readonly class AnalyticsPageDto
         public ?Chart $routeComparisonChart = null,
         public bool $hasHistoricalData = false,
         public ?string $dataGapNote = null,
+        public ?PredictionAccuracyDto $predictionAccuracy = null,
+        public ?Chart $accuracyByHourChart = null,
     ) {
     }
 }
