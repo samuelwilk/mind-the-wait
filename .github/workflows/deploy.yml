@@ -127,8 +127,10 @@ jobs:
             # Run migrations
             docker compose -f docker/compose.prod.yaml exec -T php bin/console doctrine:migrations:migrate --no-interaction || true
 
-            # Warm cache
+            # Warm caches
             docker compose -f docker/compose.prod.yaml exec -T php bin/console cache:warmup
+            docker compose -f docker/compose.prod.yaml exec -T php bin/console app:warm-analytics-cache || true
+            docker compose -f docker/compose.prod.yaml exec -T php bin/console app:warm-insight-cache || true
 
             # Health check
             curl -sf http://localhost/api/healthz || echo "Health check failed but deployment complete"
