@@ -34,7 +34,7 @@ final class DashboardController extends AbstractController
     public function analysis(Request $request): Response
     {
         // Get date range from query params or session
-        $preset    = $request->query->getString('preset', DateRangeDto::PRESET_ALL_TIME);
+        $preset    = $request->query->getString('preset', DateRangeDto::PRESET_LAST_30_DAYS);
         $startDate = $request->query->getString('start');
         $endDate   = $request->query->getString('end');
 
