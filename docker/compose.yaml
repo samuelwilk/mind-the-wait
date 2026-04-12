@@ -112,7 +112,7 @@ services:
       - redis
       - database
     working_dir: /var/www/app
-    command: php bin/console messenger:consume scheduler_weather_collection scheduler_performance_aggregation scheduler_insight_cache_warming scheduler_bunching_detection -vv
+    command: php bin/console messenger:consume scheduler_weather_collection scheduler_performance_aggregation scheduler_nightly_cache_warming scheduler_bunching_detection -vv
     volumes:
       - ../:/var/www/app:cached
     # No explicit environment vars - Symfony will load from .env files in mounted volume

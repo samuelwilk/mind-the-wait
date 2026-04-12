@@ -28,7 +28,7 @@ use function count;
  */
 final readonly class AnalyticsService
 {
-    private const CACHE_TTL = 3600; // 1 hour
+    private const CACHE_TTL = 86400; // 24 hours — data aggregated daily, warmed nightly at 2 AM
 
     public function __construct(
         private RoutePerformanceDailyRepository $performanceRepo,

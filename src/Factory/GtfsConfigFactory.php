@@ -15,7 +15,7 @@ final readonly class GtfsConfigFactory
         private string $arcgisStopsUrl,
         private string $arcgisTripsUrl,
         private string $arcgisStopTimesUrl,
-        private string $arcgisShapesUrl = '',
+        private ?string $arcgisShapesUrl = null,
     ) {
     }
 
