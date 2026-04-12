@@ -18,7 +18,6 @@ use App\Service\History\ArrivalLogger;
 use App\Service\Realtime\VehicleStatusService;
 
 use function array_slice;
-use function count;
 use function time;
 use function usort;
 
@@ -214,6 +213,10 @@ final readonly class ArrivalPredictor implements ArrivalPredictorInterface
 
     /**
      * Tier 2: Use GPS position + schedule to interpolate arrival time (medium confidence).
+     *
+     * Finds the nearest stop to the vehicle, calculates how far behind/ahead
+     * of schedule the vehicle is, then applies that delay to the target stop's
+     * scheduled arrival time.
      */
     private function fromGpsInterpolation(string $stopId, VehicleDto $vehicle): ?ArrivalPredictionDto
     {
@@ -221,47 +224,60 @@ final readonly class ArrivalPredictor implements ArrivalPredictorInterface
             return null;
         }
 
-        // Use position interpolator to estimate arrival time
-        $stop = $this->stopRepo->findOneByGtfsId($stopId);
-        if ($stop === null) {
-            return null;
-        }
-
-        // Find the stop in the trip's sequence
+        // Find the trip's stop times with scheduled arrival seconds-since-midnight
         $stopTimes = $this->staticStopTimeRepo->getStopTimesForTrip($vehicle->tripId);
         if ($stopTimes === null) {
             return null;
         }
 
-        $targetStop = null;
+        // Find the target stop and its scheduled arrival
+        $targetStopArr = null;
         foreach ($stopTimes as $st) {
             if ($st['stop_id'] === $stopId) {
-                $targetStop = $st;
+                $targetStopArr = $st['arr'] ?? $st['dep'] ?? null;
                 break;
             }
         }
-
-        if ($targetStop === null) {
+        if ($targetStopArr === null) {
             return null;
         }
 
-        // Calculate progress through route
-        $tripProgress = $this->positionInterpolator->estimateProgress($vehicle, $stopTimes);
-        if ($tripProgress === null) {
+        // Find the nearest stop to the vehicle's GPS position
+        $nearestStop = $this->positionInterpolator->findNearestStop($vehicle);
+        if ($nearestStop === null) {
             return null;
         }
 
-        // Estimate time to target stop
-        $targetProgress = $targetStop['seq'] / count($stopTimes);
-        $tripDuration   = $this->realtimeStopTimeProvider->getTripDuration($vehicle->tripId);
-        if ($tripDuration === null) {
+        // Get the scheduled time for the nearest stop
+        $nearestStopArr = null;
+        foreach ($stopTimes as $st) {
+            if ($st['stop_id'] === $nearestStop->getGtfsId()) {
+                $nearestStopArr = $st['arr'] ?? $st['dep'] ?? null;
+                break;
+            }
+        }
+        if ($nearestStopArr === null) {
             return null;
         }
 
-        $totalTripSec     = $tripDuration['end'] - $tripDuration['start'];
-        $remainingRatio   = $targetProgress      - $tripProgress;
-        $estimatedDelay   = $remainingRatio * $totalTripSec;
-        $estimatedArrival = time() + (int) $estimatedDelay;
+        // Don't predict for stops the vehicle has already passed
+        if ($targetStopArr < $nearestStopArr) {
+            return null;
+        }
+
+        // Calculate current delay: how far behind/ahead of schedule the vehicle is
+        // Vehicle should be at nearestStop at (midnight + nearestStopArr)
+        $todayMidnight = strtotime('today');
+        $scheduledNow  = $todayMidnight + $nearestStopArr;
+        $currentDelay  = time() - $scheduledNow;
+
+        // Estimated arrival = scheduled arrival at target + current delay
+        $estimatedArrival = $todayMidnight + $targetStopArr + $currentDelay;
+
+        // Handle after-midnight trips (GTFS times > 86400)
+        if ($estimatedArrival < time() - 43200) {
+            $estimatedArrival += 86400;
+        }
 
         return $this->buildPrediction(
             vehicle: $vehicle,
