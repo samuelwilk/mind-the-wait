@@ -12,6 +12,7 @@ use App\Repository\BunchingIncidentRepository;
 use App\Repository\RoutePerformanceDailyRepository;
 use App\ValueObject\Chart\Chart;
 use App\ValueObject\Chart\ChartBuilder;
+use Psr\Cache\CacheItemPoolInterface;
 
 use function count;
 
@@ -26,10 +27,13 @@ use function count;
  */
 final readonly class AnalyticsService
 {
+    private const CACHE_TTL = 3600; // 1 hour
+
     public function __construct(
         private RoutePerformanceDailyRepository $performanceRepo,
         private ArrivalLogRepository $arrivalRepo,
         private BunchingIncidentRepository $bunchingRepo,
+        private CacheItemPoolInterface $cache,
     ) {
     }
 
@@ -43,6 +47,13 @@ final readonly class AnalyticsService
         DateRangeDto $dateRange,
         ?array $routeIds = null,
     ): AnalyticsPageDto {
+        $cacheKey = 'analytics_page_'.md5($dateRange->startDate->format('Y-m-d').'_'.$dateRange->endDate->format('Y-m-d').'_'.json_encode($routeIds));
+        $item     = $this->cache->getItem($cacheKey);
+
+        if ($item->isHit()) {
+            return $item->get();
+        }
+
         // Build summary
         $summary = $this->buildSummary($dateRange);
 
@@ -104,7 +115,7 @@ final readonly class AnalyticsService
             $dataGapNote = 'Note: Data collection was interrupted from Jan 5 - Feb 7, 2026.';
         }
 
-        return new AnalyticsPageDto(
+        $result = new AnalyticsPageDto(
             dateRange: $dateRange,
             summary: $summary,
             routeComparisons: $routeComparisons,
@@ -120,6 +131,12 @@ final readonly class AnalyticsService
             hasHistoricalData: $hasHistoricalData,
             dataGapNote: $dataGapNote,
         );
+
+        $item->set($result);
+        $item->expiresAfter(self::CACHE_TTL);
+        $this->cache->save($item);
+
+        return $result;
     }
 
     /**
@@ -129,10 +146,23 @@ final readonly class AnalyticsService
      */
     public function getAvailableRoutes(DateRangeDto $dateRange): array
     {
-        return $this->performanceRepo->findRoutesWithData(
+        $cacheKey = 'analytics_routes_'.md5($dateRange->startDate->format('Y-m-d').'_'.$dateRange->endDate->format('Y-m-d'));
+        $item     = $this->cache->getItem($cacheKey);
+
+        if ($item->isHit()) {
+            return $item->get();
+        }
+
+        $routes = $this->performanceRepo->findRoutesWithData(
             $dateRange->startDate,
             $dateRange->endDate,
         );
+
+        $item->set($routes);
+        $item->expiresAfter(self::CACHE_TTL);
+        $this->cache->save($item);
+
+        return $routes;
     }
 
     /**
