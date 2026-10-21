@@ -19,6 +19,8 @@ jobs:
         with:
           php-version: '8.3'
           extensions: zip, xml, pdo, pdo_pgsql, redis, intl, opcache
+          # jsDelivr can be slow serving large +esm bundles during importmap:install
+          ini-values: default_socket_timeout=300
 
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress
@@ -63,6 +65,8 @@ jobs:
         with:
           php-version: '8.3'
           extensions: zip, xml, pdo, pdo_pgsql, redis, intl, opcache
+          # jsDelivr can be slow serving large +esm bundles during importmap:install
+          ini-values: default_socket_timeout=300
           coverage: pcov
 
       - name: Install dependencies
