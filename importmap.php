@@ -28,7 +28,7 @@ return [
     '@symfony/ux-live-component' => [
         'path' => './vendor/symfony/ux-live-component/assets/dist/live_controller.js',
     ],
-    'echarts/dist/echarts.js' => [
+    'echarts/dist/echarts.esm.min.js' => [
         'version' => '6.0.0',
     ],
     'flowbite' => [

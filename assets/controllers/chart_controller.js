@@ -1,5 +1,5 @@
 import { Controller } from '@hotwired/stimulus';
-import * as echarts from 'echarts/dist/echarts.js';
+import * as echarts from 'echarts/dist/echarts.esm.min.js';
 import { mindTheWaitTheme } from '../themes/echarts-theme.js';
 
 /**
